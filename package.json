@@ -1,0 +1,53 @@
+{
+  "name": "draft-lab",
+  "version": "2.6.0",
+  "description": "Analyseur de draft League of Legends : winrate en direct, pentagone des compos, synergies, mode soloQ / pro, suggestions alternatives. Données du patch actuel (Data Dragon, lolalytics, gol.gg).",
+  "main": "boot.js",
+  "author": "Draft Lab",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --publish never",
+    "dist:mac": "electron-builder --mac --publish never",
+    "dist:win": "electron-builder --win --publish never",
+    "update-bundle": "node tools/build-update.mjs"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "gg.draftlab.app",
+    "productName": "Draft Lab",
+    "files": [
+      "boot.js",
+      "main.js",
+      "preload.js",
+      "providers/**",
+      "seed/**",
+      "src/**"
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "category": "public.app-category.games"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "updateRepo": "theofauviaux-stack/draft-lab"
+}

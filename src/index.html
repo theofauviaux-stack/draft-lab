@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self'; img-src 'self' https://ddragon.leagueoflegends.com data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src https://ddragon.leagueoflegends.com" />
+  <title>Draft Lab</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="logo">◆</span> Draft Lab</div>
+    <div class="pill" id="patchPill">Patch …</div>
+    <button class="verpill" id="verPill" title="Version de l’application — cliquer pour chercher une mise à jour">v…</button>
+    <div class="sources" id="sources"></div>
+    <div class="spacer"></div>
+    <label class="ctl">Mode
+      <select id="mode">
+        <option value="soloq">Solo queue (lolalytics)</option>
+        <option value="pro">Compétition pro (gol.gg)</option>
+      </select>
+    </label>
+    <label class="ctl">Rang
+      <select id="tier">
+        <option value="emerald_plus">Émeraude+</option>
+        <option value="diamond_plus">Diamant+</option>
+        <option value="master_plus">Master+</option>
+        <option value="platinum_plus">Platine+</option>
+        <option value="all">Tous</option>
+      </select>
+    </label>
+    <label class="ctl">Je suis
+      <select id="mySide">
+        <option value="blue">Côté bleu</option>
+        <option value="red">Côté rouge</option>
+      </select>
+    </label>
+    <button id="menuBtn" title="Menu de départ">☰ Menu</button>
+    <button id="undo" title="Annuler le dernier choix (Ctrl/Cmd+Z)">↶ Annuler</button>
+    <button id="reset">Nouvelle draft</button>
+    <button id="refresh" title="Forcer la mise à jour des données">⟳ Données</button>
+  </header>
+
+  <section class="tools">
+    <details class="box" id="playersBox">
+      <summary>Joueurs (multi op.gg)</summary>
+      <div class="teams-in">
+        <div class="tin blue">
+          <label>Équipe 1 — côté bleu</label>
+          <div class="row"><input id="opggBlue" placeholder="Lien multi op.gg, ou Nom#TAG, Nom#TAG…" /><button class="loadTeam" data-side="blue">Charger</button></div>
+          <div id="playersBlue" class="plist"></div>
+        </div>
+        <div class="tin red">
+          <label>Équipe 2 — côté rouge</label>
+          <div class="row"><input id="opggRed" placeholder="Lien multi op.gg, ou Nom#TAG, Nom#TAG…" /><button class="loadTeam" data-side="red">Charger</button></div>
+          <div id="playersRed" class="plist"></div>
+        </div>
+      </div>
+      <div class="muted small-note">Les joueurs sont placés dans l’ordre Top, Jungle, Mid, ADC, Support : change le rôle si besoin.
+        Tu peux aussi remplir ou corriger chaque pool à la main (+ champion, clic sur un portrait pour le retirer), même sans op.gg.
+        Région (si tu colles des noms) :
+        <select id="region"><option value="euw">EUW</option><option value="eune">EUNE</option><option value="na">NA</option><option value="kr">KR</option><option value="br">BR</option><option value="tr">TR</option><option value="lan">LAN</option><option value="las">LAS</option><option value="oce">OCE</option><option value="jp">JP</option><option value="me">ME</option></select>
+      </div>
+    </details>
+    <details class="box" id="savesBox">
+      <summary>Mes drafts <span id="savesCount"></span></summary>
+      <div class="row"><input id="saveName" placeholder="Nom de la draft (ex : Scrim vs KC, game 2)" /><button id="saveBtn">Sauvegarder la draft actuelle</button></div>
+      <div id="savesList"></div>
+    </details>
+  </section>
+
+  <section class="bans">
+    <div class="banrow blue" id="blueBans"></div>
+    <div class="step" id="stepInfo"></div>
+    <div class="banrow red" id="redBans"></div>
+  </section>
+
+  <section class="scoreboard" id="scoreboard">
+    <div class="sb-team blue" id="sbBlue"></div>
+    <div class="sb-center">
+      <svg id="gauge" viewBox="0 0 320 185"></svg>
+      <div class="sb-bars" id="sbBars"></div>
+    </div>
+    <div class="sb-team red" id="sbRed"></div>
+  </section>
+
+  <main class="board">
+    <aside class="team blue" id="blueTeam"></aside>
+
+    <section class="center">
+      <div class="filters">
+        <input id="search" type="search" placeholder="Rechercher un champion…" autocomplete="off" />
+        <div class="chips" id="roleFilter"></div>
+        <div class="chips" id="archFilter"></div>
+        <label class="ctl small"><input type="checkbox" id="onlyRole" checked /> Rôle du slot</label>
+      </div>
+      <div class="grid" id="grid"></div>
+    </section>
+
+    <aside class="team red" id="redTeam"></aside>
+  </main>
+
+  <section class="analysis">
+    <div class="card recos-card props-card">
+      <div class="card-h"><h3>Drafts proposées</h3><span class="muted" id="propFor"></span></div>
+      <div id="proposals" class="proposals"></div>
+    </div>
+    <div class="card plan-card">
+      <div class="card-h"><h3>Plan de jeu</h3><span class="muted">pour ton côté (choix « Je suis » en haut)</span></div>
+      <div id="advice" class="advice"></div>
+    </div>
+    <div class="card plan-card" id="forecastCard" hidden>
+      <div class="card-h"><h3>Pronostic hors draft</h3><span class="muted">rang réel op.gg (LP), winrate de la saison, forme du moment, profondeur de pool à leur rôle</span></div>
+      <div id="forecast" class="forecast"></div>
+    </div>
+    <div class="card recos-card">
+      <div class="card-h"><h3>Suggestions pour ce pick</h3><span class="muted" id="recoFor"></span></div>
+      <div id="recos" class="recos"></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>Évolution du winrate</h3><span class="muted">côté bleu, à chaque étape</span></div>
+      <svg id="timeline" viewBox="0 0 420 170" preserveAspectRatio="none"></svg>
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>Pentagone des compos</h3><span class="muted">trait plein = gros avantage, pointillé = léger</span></div>
+      <svg id="pentagon" viewBox="0 0 360 300"></svg>
+      <div id="identity" class="identity"></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>Scaling</h3><span class="muted">puissance de chaque compo selon la minute</span></div>
+      <svg id="scaling" viewBox="0 0 420 190"></svg>
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>Pourquoi ce pourcentage</h3></div>
+      <div id="factors"></div>
+    </div>
+  </section>
+
+  <footer>
+    Données : Riot Data Dragon (patch & champions), lolalytics (soloQ), gol.gg (compétition), op.gg (pools des joueurs), ta feuille de compos (synergies)
+    et <span class="credit">guide support season 16 de coach k</span> (duos bot / jungle, counters et fiches support).
+    Le pourcentage est une estimation de modèle, pas une certitude. Draft Lab n’est pas affilié à Riot Games.
+  </footer>
+
+  <div id="startMenu" class="overlay" hidden>
+    <div class="menu">
+      <button id="menuClose" class="menu-x" title="Fermer (Échap)">×</button>
+      <h1><span class="logo">◆</span> Draft Lab</h1>
+      <p class="muted">Comment veux-tu préparer ta draft ?</p>
+      <div id="startChoices" class="choices">
+        <button id="startZero" class="choice">
+          <b>Draft de zéro</b>
+          <span>Draft vierge : suggestions selon la méta du patch, le pentagone des compos et les synergies.</span>
+        </button>
+        <button id="startPlayers" class="choice">
+          <b>Draft depuis des joueurs</b>
+          <span>Colle les liens multi op.gg des deux équipes : pools des joueurs, picks adverses probables, bans ciblés et drafts sur mesure.</span>
+        </button>
+      </div>
+      <div id="startForm" class="start-form" hidden>
+        <label class="blue">Équipe 1 — côté bleu<input id="menuBlue" placeholder="Lien multi op.gg ou Nom#TAG, Nom#TAG…" /></label>
+        <label class="red">Équipe 2 — côté rouge<input id="menuRed" placeholder="Lien multi op.gg ou Nom#TAG, Nom#TAG…" /></label>
+        <div class="form-row">
+          <label>Je suis <select id="menuSide"><option value="blue">Équipe 1 (bleu)</option><option value="red">Équipe 2 (rouge)</option></select></label>
+          <label>Mode <select id="menuMode"><option value="soloq">Solo queue</option><option value="pro">Compétition pro</option></select></label>
+          <label>Région <select id="menuRegion"><option value="euw">EUW</option><option value="eune">EUNE</option><option value="na">NA</option><option value="kr">KR</option><option value="br">BR</option><option value="tr">TR</option><option value="lan">LAN</option><option value="las">LAS</option><option value="oce">OCE</option><option value="jp">JP</option><option value="me">ME</option></select></label>
+        </div>
+        <p class="muted">Ordre des joueurs : Top, Jungle, Mid, ADC, Support (modifiable ensuite). La région est lue dans le lien op.gg ; le menu ne sert que si tu colles des noms.</p>
+        <div class="form-row"><button id="menuBack">Retour</button><button id="menuGo" class="primary">Lancer la draft</button></div>
+      </div>
+      <div id="menuSaves" class="menu-saves"></div>
+    </div>
+  </div>
+
+  <div id="updBar" class="updbar" hidden><span id="updText"></span><button id="updRestart" class="primary">Redémarrer maintenant</button><button id="updLater">Plus tard</button></div>
+  <datalist id="champList"></datalist>
+  <div id="toast" class="toast"></div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

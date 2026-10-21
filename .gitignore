@@ -1,0 +1,4 @@
+node_modules/
+dist/
+preview-cache/
+.DS_Store
