@@ -16,21 +16,6 @@
     <button class="primary updbtn" id="updRestart" hidden title="Une nouvelle version est installée">⟳ Redémarrer maintenant</button>
     <div class="sources" id="sources"></div>
     <div class="spacer"></div>
-    <label class="ctl">Mode
-      <select id="mode">
-        <option value="soloq">Solo queue (lolalytics)</option>
-        <option value="pro">Compétition pro (gol.gg)</option>
-      </select>
-    </label>
-    <label class="ctl">Rang
-      <select id="tier">
-        <option value="emerald_plus">Émeraude+</option>
-        <option value="diamond_plus">Diamant+</option>
-        <option value="master_plus">Master+</option>
-        <option value="platinum_plus">Platine+</option>
-        <option value="all">Tous</option>
-      </select>
-    </label>
     <label class="ctl">Je suis
       <select id="mySide">
         <option value="blue">Côté bleu</option>
@@ -40,7 +25,7 @@
     <button id="menuBtn" title="Menu de départ">☰ Menu</button>
     <button id="undo" title="Annuler le dernier choix (Ctrl/Cmd+Z)">↶ Annuler</button>
     <button id="reset">Nouvelle draft</button>
-    <button id="refresh" title="Forcer la mise à jour des données">⟳ Données</button>
+    <button id="refresh" title="Recharge tout de suite les données du patch (champions Riot, winrates lolalytics, stats gol.gg). Elles se mettent déjà à jour seules toutes les 2 h.">⟳ Données</button>
   </header>
 
   <section class="tools">
@@ -103,43 +88,31 @@
   </main>
 
   <section class="analysis">
-    <div class="card recos-card props-card">
-      <div class="card-h"><h3>Drafts proposées</h3><span class="muted" id="propFor"></span></div>
-      <div id="proposals" class="proposals"></div>
+    <div class="card plan-card bans-card">
+      <div class="card-h"><h3>Bans conseillés</h3><span class="muted" id="banFor"></span></div>
+      <div class="want" id="wantArch"></div>
+      <div id="banPlan" class="banplan"></div>
     </div>
     <div class="card plan-card">
       <div class="card-h"><h3>Plan de jeu</h3><span class="muted">pour ton côté (choix « Je suis » en haut)</span></div>
       <div id="advice" class="advice"></div>
     </div>
-    <div class="card plan-card" id="forecastCard" hidden>
-      <div class="card-h"><h3>Pronostic hors draft</h3><span class="muted">rang réel op.gg (LP), winrate de la saison, forme du moment, profondeur de pool à leur rôle</span></div>
-      <div id="forecast" class="forecast"></div>
-    </div>
-    <div class="card recos-card">
-      <div class="card-h"><h3>Suggestions pour ce pick</h3><span class="muted" id="recoFor"></span></div>
-      <div id="recos" class="recos"></div>
-    </div>
-    <div class="card">
-      <div class="card-h"><h3>Évolution du winrate</h3><span class="muted">côté bleu, à chaque étape</span></div>
-      <svg id="timeline" viewBox="0 0 420 170" preserveAspectRatio="none"></svg>
-    </div>
-    <div class="card">
+    <div class="card half">
       <div class="card-h"><h3>Pentagone des compos</h3><span class="muted">trait plein = gros avantage, pointillé = léger</span></div>
       <svg id="pentagon" viewBox="0 0 360 300"></svg>
       <div id="identity" class="identity"></div>
     </div>
-    <div class="card">
-      <div class="card-h"><h3>Scaling</h3><span class="muted">puissance de chaque compo selon la minute</span></div>
-      <svg id="scaling" viewBox="0 0 420 190"></svg>
-    </div>
-    <div class="card">
-      <div class="card-h"><h3>Pourquoi ce pourcentage</h3></div>
-      <div id="factors"></div>
+    <div class="card half">
+      <details id="scalingBox" class="scal">
+        <summary><h3>Courbe de scaling</h3><span class="muted">clique pour l’afficher</span></summary>
+        <div class="chips" id="scalPick"></div>
+        <svg id="scaling" viewBox="0 0 420 190"></svg>
+      </details>
     </div>
   </section>
 
   <footer>
-    Données : Riot Data Dragon (patch & champions), lolalytics (soloQ), gol.gg (compétition), op.gg (pools des joueurs), ta feuille de compos (synergies)
+    Données : Riot Data Dragon (patch & champions), lolalytics (soloQ Émeraude+), gol.gg (compétition, pour écarter les picks hors rôle), op.gg (pools des joueurs), ta feuille de compos (synergies)
     et <span class="credit">guide support season 16 de coach k</span> (duos bot / jungle, counters et fiches support).
     Le pourcentage est une estimation de modèle, pas une certitude. Draft Lab n’est pas affilié à Riot Games.
   </footer>
@@ -152,11 +125,11 @@
       <div id="startChoices" class="choices">
         <button id="startZero" class="choice">
           <b>Draft de zéro</b>
-          <span>Draft vierge : suggestions selon la méta du patch, le pentagone des compos et les synergies.</span>
+          <span>Draft vierge : plan de jeu, pentagone des compos et bans selon la méta du patch.</span>
         </button>
         <button id="startPlayers" class="choice">
           <b>Draft depuis des joueurs</b>
-          <span>Colle les liens multi op.gg des deux équipes : pools des joueurs, picks adverses probables, bans ciblés et drafts sur mesure.</span>
+          <span>Colle les liens multi op.gg des deux équipes : pools des joueurs, picks adverses probables et bans ciblés sur leurs champions.</span>
         </button>
       </div>
       <div id="startForm" class="start-form" hidden>
@@ -164,7 +137,6 @@
         <label class="red">Équipe 2 — côté rouge<input id="menuRed" placeholder="Lien multi op.gg ou Nom#TAG, Nom#TAG…" /></label>
         <div class="form-row">
           <label>Je suis <select id="menuSide"><option value="blue">Équipe 1 (bleu)</option><option value="red">Équipe 2 (rouge)</option></select></label>
-          <label>Mode <select id="menuMode"><option value="soloq">Solo queue</option><option value="pro">Compétition pro</option></select></label>
           <label>Région <select id="menuRegion"><option value="euw">EUW</option><option value="eune">EUNE</option><option value="na">NA</option><option value="kr">KR</option><option value="br">BR</option><option value="tr">TR</option><option value="lan">LAN</option><option value="las">LAS</option><option value="oce">OCE</option><option value="jp">JP</option><option value="me">ME</option></select></label>
         </div>
         <p class="muted">Ordre des joueurs : Top, Jungle, Mid, ADC, Support (modifiable ensuite). La région est lue dans le lien op.gg ; le menu ne sert que si tu colles des noms.</p>

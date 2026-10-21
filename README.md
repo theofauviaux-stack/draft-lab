@@ -236,3 +236,13 @@ Publier une mise à jour :
 3. commit + push sur `main` : les applis installées la récupèrent dans les 6 h (ou au prochain démarrage).
 
 Seul un changement de version d'Electron demande de retélécharger l'application complète.
+
+## Version 2.7 — retour à l’essentiel
+
+- Une seule base de stats : soloQ Émeraude+ (lolalytics), complétée par gol.gg pour écarter les picks hors rôle. Plus de choix Pro / SoloQ ni de rang.
+- La draft commence directement par les picks. Les bans sont conseillés à côté, par phase :
+  phase 1 (avant les picks, 3 bans) et phase 2 (après les 3 premiers picks de chaque équipe, 2 bans),
+  ciblés sur les champions que jouent leurs joueurs (op.gg) et sur ce qui bat la compo que tu veux jouer (pentagone). Un clic = ban.
+- Analyse limitée au plan de jeu : lanes, jungle, phases, objectifs simplifiés (à prioriser / si gratuit / à laisser), pentagone, synergies.
+- Pentagone : Protect devient Peeling. Courbe de scaling repliée, à ouvrir au clic (les deux compos, la tienne ou la leur).
+- Retirés : drafts proposées, suggestions par pick, matchup bot par niveau, évolution du winrate, détail du pourcentage, pronostic hors draft détaillé.

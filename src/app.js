@@ -1,5 +1,4 @@
 import { teamSynergy, KINDS } from './synergy.js';
-import { botMatchup } from './botlevels.js';
 import {
   ROLES, ROLE_LABEL, ARCH, ORDER, rel,
   buildProfiles, evaluate, recommend, recommendBans, projectPicks, gamePlan, powerCurve,
@@ -26,18 +25,8 @@ const api = window.draftlab ?? {
 };
 
 // ---------- Ordres de draft ----------
-const SEQ = {
-  soloq: [
-    ...[0, 1, 2, 3, 4].flatMap((i) => [['blueBans', i], ['redBans', i]]),
-    ['blue', 0], ['red', 0], ['red', 1], ['blue', 1], ['blue', 2], ['red', 2], ['red', 3], ['blue', 3], ['blue', 4], ['red', 4]
-  ],
-  pro: [
-    ['blueBans', 0], ['redBans', 0], ['blueBans', 1], ['redBans', 1], ['blueBans', 2], ['redBans', 2],
-    ['blue', 0], ['red', 0], ['red', 1], ['blue', 1], ['blue', 2], ['red', 2],
-    ['redBans', 3], ['blueBans', 3], ['redBans', 4], ['blueBans', 4],
-    ['red', 3], ['blue', 3], ['blue', 4], ['red', 4]
-  ]
-};
+// La draft commence directement par les picks (ordre officiel) ; les bans se remplissent à côté, avec les conseils.
+const PICKS = [['blue', 0], ['red', 0], ['red', 1], ['blue', 1], ['blue', 2], ['red', 2], ['red', 3], ['blue', 3], ['blue', 4], ['red', 4]];
 const stepLabel = ([t, i]) => (t.endsWith('Bans') ? `Ban ${t.startsWith('blue') ? 'bleu' : 'rouge'} ${i + 1}` : `Pick ${t === 'blue' ? 'bleu' : 'rouge'} ${i + 1}`);
 const shortLabel = ([t, i]) => (t.endsWith('Bans') ? null : `${t === 'blue' ? 'B' : 'R'}${i + 1}`);
 
@@ -49,20 +38,22 @@ const state = {
   roles: { blue: [...ROLES], red: [...ROLES] },
   selected: null, history: [],
   search: '', roleFilter: null, archFilter: null, onlyRole: true,
-  players: { blue: [], red: [] }, teamInput: { blue: '', red: '' }, region: 'euw'
+  players: { blue: [], red: [] }, teamInput: { blue: '', red: '' }, region: 'euw',
+  wantArch: null, scalShow: 'both'
 };
 function emptySlots() {
   return { blueBans: Array(5).fill(null), redBans: Array(5).fill(null), blue: Array(5).fill(null), red: Array(5).fill(null) };
 }
 try {
   const saved = JSON.parse(localStorage.getItem('draftlab-prefs') ?? '{}');
-  Object.assign(state, { mode: saved.mode ?? state.mode, tier: saved.tier ?? state.tier, mySide: saved.mySide ?? state.mySide });
+  Object.assign(state, { mySide: saved.mySide ?? state.mySide, wantArch: saved.wantArch ?? null });
 } catch {}
-const savePrefs = () => { try { localStorage.setItem('draftlab-prefs', JSON.stringify({ mode: state.mode, tier: state.tier, mySide: state.mySide })); } catch {} };
+// Une seule base de données : soloQ Émeraude+ (lolalytics), complétée par la compétition (gol.gg) pour écarter les picks hors rôle.
+const savePrefs = () => { try { localStorage.setItem('draftlab-prefs', JSON.stringify({ mySide: state.mySide, wantArch: state.wantArch })); } catch {} };
 
 const $ = (id) => document.getElementById(id);
 const img = (id) => (state.data ? `https://ddragon.leagueoflegends.com/cdn/${state.data.version}/img/champion/${id}.png` : '');
-const seq = () => SEQ[state.mode];
+const seq = () => PICKS;
 const used = () => new Set(Object.values(state.slots).flat().filter(Boolean));
 // ---------- Joueurs (multi op.gg) ----------
 // Un champion du pool ne compte que s'il est joué à la lane du joueur
@@ -131,10 +122,9 @@ function render() {
   renderBans(); renderTeams(); renderStep();
   const ev = evaluate(team('blue'), team('red'));
   renderWr(ev);
-  const proj = renderRecos();
-  renderGrid(proj);
-  renderPlayers(); renderProposals(); renderSaves();
-  renderTimeline(); renderPentagon(ev); renderScaling(); renderFactors(ev); renderAdvice();
+  renderGrid(gridInfo());
+  renderPlayers(); renderSaves(); renderBanPlan();
+  renderPentagon(ev); renderScaling(); renderAdvice();
 }
 
 function renderBans() {
@@ -172,7 +162,7 @@ function renderTeams() {
         <div class="portrait">${c ? `<img src="${img(id)}" alt="">` : (side === 'blue' ? 'B' : 'R') + (i + 1)}</div>
         <div>
           <div class="name">${c ? c.name : '<span class="muted">À choisir</span>'}</div>
-          <div class="meta">${roleSel}${c?.wr != null ? `<span class="wrtag">${c.wr.toFixed(1)} % ${state.mode === 'pro' ? 'pro' : 'soloQ'}</span>` : ''}</div>
+          <div class="meta">${roleSel}${c?.wr != null ? `<span class="wrtag" title="Winrate du patch, soloQ Émeraude+">${c.wr.toFixed(1)} % WR</span>` : ''}</div>
           ${c ? archBar(c) : ''}
           ${c ? sPairs.filter((x) => x.a.id === id || x.b.id === id).slice(0, 2).map((x) => { const o = x.a.id === id ? x.b : x.a; return `<span class="slink" style="--k:${KINDS[x.kind]?.color ?? '#8a93a8'}" title="${x.title} : ${x.why.replace(/"/g, '&quot;')}">🔗 ${o.name} · ${KINDS[x.kind]?.label ?? ''}</span>`; }).join('') : ''}
         </div>
@@ -230,7 +220,6 @@ function renderWr(ev) {
         return `<div class="sb-p" title="${p ? playerLabel(p) + (pts != null ? ' — ' + pointsLabel(pts) : '') : ROLE_LABEL[r]}"><i style="background:${tierColor(pts)}"></i><span>${ROLE_LABEL[r]}</span><b>${p && p.riotId ? playerLabel(p) : '—'}</b></div>`;
       }).join('')}</div>`;
   }
-  renderForecast(fc);
 }
 
 function renderGauge(v, label) {
@@ -254,37 +243,6 @@ function renderGauge(v, label) {
   $('gauge').innerHTML = s;
 }
 
-function renderForecast(fc) {
-  const card = $('forecastCard');
-  if (!fc.blue && !fc.red) { card.hidden = true; return; }
-  card.hidden = false;
-  const B = fc.blue, R = fc.red;
-  // la barre penche selon l'écart entre les équipes (scale = écart qui donne 100 % d'un côté)
-  const tug = (label, bv, rv, fmt, bTxt, rTxt, scale) => {
-    const has = bv != null && rv != null;
-    const bp = !has ? 50 : scale ? 50 + Math.max(-48, Math.min(48, ((bv - rv) / scale) * 50)) : bv;
-    return `<div class="tug"><b class="b">${bTxt ?? (bv != null ? fmt(bv) : '—')}</b>
-      <div class="tug-mid"><span>${label}</span><div class="tug-track"><div class="tb" style="width:${bp}%"></div><div class="tr" style="width:${100 - bp}%"></div></div></div>
-      <b class="r">${rTxt ?? (rv != null ? fmt(rv) : '—')}</b></div>`;
-  };
-  const rows = [
-    tug('Rang moyen', B?.rank, R?.rank, () => '', B ? pointsLabel(B.rank) : '—', R ? pointsLabel(R.rank) : '—', 800),
-    tug('Winrate de la saison', B?.wr, R?.wr, (v) => v + ' %', null, null, 10),
-    tug('Joueurs en forme', B ? B.hot / B.n : null, R ? R.hot / R.n : null, () => '', B ? `${B.hot}/${B.n}` : '—', R ? `${R.hot}/${R.n}` : '—', 1),
-    tug('Profondeur de pool', B?.pool, R?.pool, () => '', B ? `${(B.pool / 5).toFixed(1)} champ.` : '—', R ? `${(R.pool / 5).toFixed(1)} champ.` : '—', 25),
-    fc.wr != null ? tug('Chance de victoire (hors draft)', fc.wr, 100 - fc.wr, (v) => v.toFixed(1) + ' %') : ''
-  ].join('');
-  const plist = (t, side) => !t ? `<p class="muted">Aucun rang connu.</p>` : t.players.map(({ p, r }) => {
-    const pts = r.parts.rank;
-    return `<div class="fc-p"><span class="tier" style="--c:${tierColor(pts)}">${pointsLabel(pts)}</span>
-      <span class="fc-role">${ROLE_LABEL[p.role]}</span><b>${playerLabel(p)}</b>
-      <span class="muted">${r.games ? `${r.wr} % · ${r.games} g` : ''}${p.rank?.hot ? ' · 🔥' : ''}</span></div>`;
-  }).join('');
-  $('forecast').innerHTML = `<div class="tugs">${rows}</div>
-    <div class="fc-teams"><div class="fc-team blue">${plist(B, 'blue')}</div><div class="fc-team red">${plist(R, 'red')}</div></div>
-    <p class="muted fc-note">Note de chaque joueur : rang + LP, winrate de la saison (lissé), forme (série, vétéran, inactif) et nombre de champions maîtrisés à son rôle. Le pronostic global combine ce chiffre avec la draft.</p>`;
-}
-
 function currentContext() {
   const tg = target();
   if (!tg) return null;
@@ -294,48 +252,16 @@ function currentContext() {
   return { tg, isPick, side, role };
 }
 
-function renderRecos() {
-  const ctx = currentContext(), el = $('recos');
-  el.innerHTML = '';
-  if (!ctx) { $('recoFor').textContent = ''; el.innerHTML = '<p class="muted">Draft complète. Regarde le plan de jeu et les facteurs ci-dessous.</p>'; return null; }
-  const blue = team('blue'), red = team('red');
-  const p = ctx.isPick ? pool().map((c) => withComfort(c, ctx.side, ctx.role)) : pool();
-  // si on remplace un slot déjà pris, on l'enlève de l'équipe pour la projection
-  const strip = (arr, side) => (ctx.isPick && ctx.side === side && state.slots[side][ctx.tg[1]] ? arr.filter((c) => c.id !== state.slots[side][ctx.tg[1]]) : arr);
-  const b = strip(blue, 'blue'), r = strip(red, 'red');
-  let res, proj;
-  if (ctx.isPick) {
-    const enemySide = ctx.side === 'blue' ? 'red' : 'blue';
-    const supIdx = state.roles[enemySide].indexOf('S');
-    const enemySup = supIdx >= 0 ? state.slots[enemySide][supIdx] : null;
-    const pl = playerFor(ctx.side, ctx.role);
-    res = recommend(b, r, ctx.side, ctx.role, p, {
-      ...(enemySup ? { enemySupport: enemySup, enemySupportName: state.P[enemySup].name } : {}),
-      ...(pl ? { playerName: playerLabel(pl) } : {})
-    });
-    const knownPlayer = playerFor(ctx.side, ctx.role);
-    proj = new Map(projectPicks(b, r, ctx.side, null, p).map((x) => [x.c.id, {
-      ...x, prio: x.wr + (knownPlayer ? (x.c.comfort > 0 ? 1.5 * x.c.comfort : -5) : 0), inPool: x.c.comfort > 0
-    }]));
-    $('recoFor').textContent = `pour ${stepLabel(ctx.tg)} · ${ROLE_LABEL[ctx.role]} — % = winrate projeté de ce côté`;
-  } else {
-    res = recommendBans(b, r, ctx.side, p, rolePlayers(ctx.side === 'blue' ? 'red' : 'blue'));
-    $('recoFor').textContent = `pour ${stepLabel(ctx.tg)} — % = winrate qu’obtiendrait l’adversaire`;
+// Grille : les champions du joueur à ce rôle passent en premier (★), sans projection de pick.
+function gridInfo() {
+  const ctx = currentContext();
+  if (!ctx) return null;
+  const proj = new Map();
+  for (const c of state.list) {
+    const cc = withComfort(c, ctx.side, ctx.role);
+    proj.set(c.id, { prio: (cc.comfort > 0 ? 100 + cc.comfort * 10 : 0) + (c.wr ?? 50) / 10, inPool: cc.comfort > 0 });
   }
-  for (const g of res.groups) {
-    const d = document.createElement('div');
-    d.className = 'group';
-    if (g.arch) d.style.borderTopColor = ARCH[g.arch].color;
-    d.innerHTML = `<h4>${g.title}</h4><div class="hint">${g.hint}</div>` + g.list.map((x) => `
-      <div class="reco" data-id="${x.c.id}" title="Cliquer pour choisir">
-        <img src="${img(x.c.id)}" alt="">
-        <div><div>${x.c.name}</div>${x.why ? `<div class="r-why">${x.why}</div>` : ''}${archBar(x.c)}</div>
-        <div><div class="r-wr">${x.wr.toFixed(1)}%</div>${x.delta ? `<div class="r-d ${x.delta > 0 ? 'up' : 'down'}">${x.delta > 0 ? '+' : ''}${x.delta}</div>` : ''}</div>
-      </div>`).join('');
-    d.querySelectorAll('.reco').forEach((n) => (n.onclick = () => place(n.dataset.id)));
-    el.appendChild(d);
-  }
-  return { ctx, proj, best: res.groups[0]?.list.map((x) => x.c.id) ?? [] };
+  return { ctx, proj };
 }
 
 function renderGrid(info) {
@@ -354,11 +280,8 @@ function renderGrid(info) {
     const t = document.createElement('div');
     t.className = 'tile' + (u.has(c.id) ? ' used' : '') + (c.offmeta ? ' offmeta' : '');
     const pj = info?.proj?.get(c.id);
-    const rank = info?.best.indexOf(c.id);
     t.innerHTML = `<img loading="lazy" src="${img(c.id)}" alt="">
-      ${pj ? `<span class="proj ${pj.delta >= 0 ? 'up' : 'down'}">${pj.wr.toFixed(1)}</span>` : ''}
       ${pj?.inPool ? '<span class="star" title="Dans le pool du joueur">★</span>' : ''}
-      ${rank >= 0 && rank < 3 ? `<span class="rank">#${rank + 1}</span>` : ''}
       <div class="dots">${ORDER.filter((k) => c[k] >= 2).map((k) => `<i style="background:${ARCH[k].color}"></i>`).join('')}</div>
       <div class="nm">${c.name}</div>`;
     t.title = `${c.name} — ${(c.roles.length ? c.roles : c.soloRoles).map((r) => ROLE_LABEL[r]).join('/')}` +
@@ -371,40 +294,6 @@ function renderGrid(info) {
     frag.appendChild(t);
   }
   el.appendChild(frag);
-}
-
-function renderTimeline() {
-  const svg = $('timeline');
-  const acc = emptySlots();
-  const pts = [{ label: 'Début', wr: 50 }];
-  for (const st of seq()) {
-    const [t, i] = st;
-    if (!state.slots[t][i]) continue;
-    acc[t][i] = state.slots[t][i];
-    const lab = shortLabel(st);
-    if (!lab) continue;
-    const ev = evaluate(acc.blue.filter(Boolean).map((id) => state.P[id]), acc.red.filter(Boolean).map((id) => state.P[id]));
-    pts.push({ label: lab, wr: ev.wr });
-  }
-  const W = 420, H = 170, L = 30, R = 10, T = 12, B = 22;
-  const lo = Math.min(40, ...pts.map((p) => p.wr - 2)), hi = Math.max(60, ...pts.map((p) => p.wr + 2));
-  const x = (i) => L + (i * (W - L - R)) / 10;
-  const y = (v) => T + ((hi - v) * (H - T - B)) / (hi - lo);
-  let s = `<line x1="${L}" x2="${W - R}" y1="${y(50)}" y2="${y(50)}" stroke="#8a93a8" stroke-dasharray="4 4" stroke-width="1"/>`;
-  for (const v of [lo, 50, hi]) s += `<text x="${L - 4}" y="${y(v) + 4}" fill="#8a93a8" font-size="10" text-anchor="end">${Math.round(v)}</text>`;
-  s += `<rect x="${L}" y="${T}" width="${W - L - R}" height="${y(50) - T}" fill="rgba(59,140,255,.06)"/>`;
-  s += `<rect x="${L}" y="${y(50)}" width="${W - L - R}" height="${H - B - y(50)}" fill="rgba(255,77,94,.06)"/>`;
-  if (pts.length > 1) {
-    s += `<polyline fill="none" stroke="#c8aa6e" stroke-width="2.5" stroke-linejoin="round" points="${pts.map((p, i) => `${x(i)},${y(p.wr)}`).join(' ')}"/>`;
-  }
-  pts.forEach((p, i) => {
-    const col = p.wr >= 50 ? '#3b8cff' : '#ff4d5e';
-    s += `<circle cx="${x(i)}" cy="${y(p.wr)}" r="4" fill="${col}" stroke="#0b0f17" stroke-width="1.5"><title>${p.label} : ${p.wr} % bleu</title></circle>`;
-    s += `<text x="${x(i)}" y="${H - 6}" fill="#8a93a8" font-size="9.5" text-anchor="middle">${p.label}</text>`;
-  });
-  const last = pts[pts.length - 1];
-  s += `<text x="${x(pts.length - 1) + 6}" y="${y(last.wr) - 6}" fill="#e6e9f2" font-size="11" font-weight="700">${last.wr}%</text>`;
-  svg.innerHTML = s;
 }
 
 function renderPentagon(ev) {
@@ -452,7 +341,9 @@ function renderScaling() {
   const svg = $('scaling');
   const W = 420, H = 190, L = 34, Rr = 10, T = 14, B = 24;
   const x = (m) => L + ((m - 3) * (W - L - Rr)) / 37;
-  const curves = ['red', 'blue'].map((sd) => team(sd)).filter((t) => t.length).map(powerCurve);
+  const me = state.mySide, them = me === 'blue' ? 'red' : 'blue';
+  const sides = state.scalShow === 'mine' ? [me] : state.scalShow === 'theirs' ? [them] : ['red', 'blue'];
+  const curves = sides.map((sd) => team(sd)).filter((t) => t.length).map(powerCurve);
   const vals = curves.flat().map(([, v]) => v);
   const lo = Math.min(0.9, ...vals) - 0.04, hi = Math.max(1.1, ...vals) + 0.04;
   const y = (v) => T + ((hi - v) * (H - T - B)) / (hi - lo);
@@ -467,28 +358,20 @@ function renderScaling() {
   s += `<text x="${L - 6}" y="${H - B}" fill="#8a93a8" font-size="9.5" text-anchor="end">faible</text>`;
   let any = false;
   for (const [side, col] of [['red', '#ff4d5e'], ['blue', '#3b8cff']]) {
+    if (!sides.includes(side)) continue;
     const tm = team(side);
     if (!tm.length) continue;
     any = true;
     const pts = powerCurve(tm);
     s += `<polyline fill="none" stroke="${col}" stroke-width="2.6" stroke-linejoin="round" points="${pts.map(([m, v]) => `${x(m)},${y(v)}`).join(' ')}"/>`;
   }
-  if (any) s += `<circle cx="${W - 92}" cy="${T + 6}" r="4" fill="#3b8cff"/><text x="${W - 84}" y="${T + 10}" fill="#e6e9f2" font-size="10">Bleu</text><circle cx="${W - 46}" cy="${T + 6}" r="4" fill="#ff4d5e"/><text x="${W - 38}" y="${T + 10}" fill="#e6e9f2" font-size="10">Rouge</text>`;
+  if (any && sides.includes('blue')) s += `<circle cx="${W - 92}" cy="${T + 6}" r="4" fill="#3b8cff"/><text x="${W - 84}" y="${T + 10}" fill="#e6e9f2" font-size="10">Bleu</text>`;
+  if (any && sides.includes('red')) s += `<circle cx="${W - 46}" cy="${T + 6}" r="4" fill="#ff4d5e"/><text x="${W - 38}" y="${T + 10}" fill="#e6e9f2" font-size="10">Rouge</text>`;
+  $('scalPick').innerHTML = [['both', 'Les deux'], ['mine', 'Ta compo'], ['theirs', 'Leur compo']]
+    .map(([k, l]) => `<button class="chip ${state.scalShow === k ? 'on' : ''}" data-k="${k}">${l}</button>`).join('');
+  $('scalPick').querySelectorAll('.chip').forEach((b) => (b.onclick = () => { state.scalShow = b.dataset.k; renderScaling(); }));
   if (!any) s += `<text x="${W / 2}" y="${H / 2}" fill="#8a93a8" font-size="12" text-anchor="middle">Les courbes apparaissent avec les picks</text>`;
   svg.innerHTML = s;
-}
-
-function renderFactors(ev) {
-  const el = $('factors');
-  if (!ev.factors.length) { el.innerHTML = '<p class="muted">50/50 tant qu’il n’y a pas de picks. Chaque choix fera bouger la balance.</p>'; return; }
-  const max = Math.max(4, ...ev.factors.map((f) => Math.abs(f.value)));
-  el.innerHTML = ev.factors.map((f) => {
-    const w = (Math.abs(f.value) / max) * 50;
-    const pos = f.value >= 0;
-    return `<div class="factor"><div class="row"><span>${f.label}</span><b class="${pos ? 'up' : 'down'}">${pos ? '+' : ''}${f.value.toFixed(1)} bleu</b></div>
-      <div class="bar"><span style="${pos ? `left:50%` : `left:${50 - w}%`};width:${w}%;background:${pos ? 'var(--blue)' : 'var(--red)'}"></span></div>
-      <div class="det">${f.detail}</div></div>`;
-  }).join('');
 }
 
 const roster = (side) => state.slots[side].map((id, i) => (id ? { c: state.P[id], role: state.roles[side][i] } : null)).filter(Boolean);
@@ -582,131 +465,68 @@ function renderPlayers() {
 }
 
 // ---------- Drafts proposées ----------
-function eligible(c, role) {
-  if (state.mode === 'pro') return c.roles.includes(role);
-  return c.roles.includes(role) && !c.offmeta;
+// ---------- Bans conseillés, par phase ----------
+// Phase 1 : avant les picks (3 bans). Phase 2 : après les 3 premiers picks de chaque équipe (2 bans).
+// On bannit ce que LEURS joueurs ont le plus de chances de prendre (pools op.gg, sinon méta du rôle),
+// pondéré par le danger pour la compo que tu veux jouer (styles qui la battent dans le pentagone).
+const champArch = (c) => ORDER.reduce((a, k) => (c[k] > c[a] ? k : a), ORDER[0]);
+function wantedArch() {
+  if (state.wantArch) return { k: state.wantArch, auto: false };
+  const t = team(state.mySide);
+  if (t.length) return { k: dominant(teamShares(t)), auto: true, from: 'tes picks' };
+  const sum = Object.fromEntries(ORDER.map((k) => [k, 0]));
+  for (const p of rolePlayers(state.mySide)) for (const e of p.pool) { const c = state.P[e.id]; if (c) for (const k of ORDER) sum[k] += c[k] * e.games; }
+  if (ORDER.some((k) => sum[k] > 0)) return { k: ORDER.reduce((a, k) => (sum[k] > sum[a] ? k : a)), auto: true, from: 'les champions de tes joueurs' };
+  return { k: null, auto: true };
 }
-// Drafts proposées pour les DEUX équipes, uniquement avec les champions joués par les joueurs.
-// Un rôle sans pool connu prend le pick méta le plus probable (signalé « méta »).
-function sideDraft(side) {
-  const other = side === 'blue' ? 'red' : 'blue';
-  const fixed = team(side), theirs = team(other);
-  const fixedRoster = state.slots[side].map((id, i) => (id ? { c: fixed.find((x) => x.id === id), role: state.roles[side][i] } : null)).filter(Boolean);
-  const open = state.roles[side].filter((r, i) => !state.slots[side][i]);
-  const avail = pool();
-  // Picks adverses probables (pour calculer le winrate attendu)
-  const enemyOpen = state.roles[other].filter((r, i) => !state.slots[other][i]);
-  const enemyCand = {};
-  for (const r of enemyOpen) enemyCand[r] = avail.map((c) => withComfort(c, other, r)).filter((c) => c.roles.includes(r) && !c.offmeta);
-  const pred = predictPicks(enemyOpen, enemyCand, rolePlayers(other));
-  const scen = enemyOpen.length ? enemyScenarios(theirs, pred) : null;
-  // Candidats : UNIQUEMENT les champions joués par le joueur à ce rôle (op.gg / ajout manuel). Aucun pick inventé.
-  const cand = {}, noPool = [], poolRoles = [];
-  for (const r of open) {
-    const mine = avail.map((c) => withComfort(c, side, r)).filter((c) => c.comfort > 0);
-    if (mine.length) { cand[r] = mine; poolRoles.push(r); } else noPool.push(r);
-  }
-  const res = poolRoles.length ? proposeDrafts(fixed, theirs, side, poolRoles, cand, 30, scen).slice(0, 2) : [];
-  // Compo adverse la plus probable, avec rôles, pour l'analyse
-  const likely = [...state.slots[other].map((id, i) => (id ? { c: theirs.find((x) => x.id === id), role: state.roles[other][i] } : null)).filter(Boolean),
-    ...enemyOpen.map((r) => (pred[r]?.[0] ? { c: pred[r][0].c, role: r } : null)).filter(Boolean)];
-  // Suggestions hors pool : on garde la draft, on indique seulement un pick meilleur s'il existe
-  const likelyTeam = likely.map((x) => x.c);
-  const vsWr = (teamArr) => {
-    const ev = side === 'blue' ? evaluate(teamArr, likelyTeam) : evaluate(likelyTeam, teamArr);
-    return side === 'blue' ? ev.wr : 100 - ev.wr;
-  };
-  const metaFor = (r, taken) => avail.filter((c) => !taken.has(c.id) && c.roles.includes(r) && !c.offmeta && !(cand[r] ?? []).some((x) => x.id === c.id));
-  for (const d of res) {
-    const base = [...fixed, ...d.picks.map((p) => p.c)];
-    const baseWr = vsWr(base);
-    const taken = new Set([...base, ...likelyTeam].map((c) => c.id));
-    d.suggest = [];
-    for (const p of d.picks) {
-      let best = null;
-      for (const c of metaFor(p.role, taken)) {
-        const wr = vsWr(base.map((x) => (x.id === p.c.id ? c : x)));
-        if (!best || wr > best.wr) best = { c, wr };
-      }
-      if (best && best.wr - baseWr >= 1) d.suggest.push({ role: p.role, c: best.c, replaces: p.c, gain: +(best.wr - baseWr).toFixed(1), player: playerFor(side, p.role) });
-    }
-    for (const r of noPool) {
-      let best = null;
-      for (const c of metaFor(r, taken)) {
-        const wr = vsWr([...base, c]);
-        if (!best || wr > best.wr) best = { c, wr };
-      }
-      if (best) d.suggest.push({ role: r, c: best.c, replaces: null, gain: +(best.wr - baseWr).toFixed(1), player: state.players[side].find((x) => x.role === r) });
-    }
-    d.suggest.sort((a, b) => b.gain - a.gain);
-  }
-  return { side, other, fixed, fixedRoster, open, res, noPool, pred, enemyOpen, likely, hasPools: rolePlayers(side).length > 0 };
-}
-
-function draftBlock(d, k, info, contested = new Set()) {
-  const roster = [...info.fixedRoster, ...d.picks];
-  const an = analyzeDraft(roster, info.likely);
-  const sideName = info.side === 'blue' ? 'Équipe 1' : 'Équipe 2';
-  return `
-    <div class="prop big" style="border-top-color:${ARCH[d.arch]?.color ?? 'var(--gold)'}">
-      <div class="prop-h"><b>${k === 0 ? 'Meilleure draft' : `Alternative ${ARCH[d.arch]?.label ?? ''}`}</b><span class="prop-wr" title="Winrate attendu de ${sideName}, moyenné sur les compos adverses probables">${d.wr.toFixed(1)} %</span></div>
-      ${d.vsLikely != null ? `<div class="muted">vs leur compo la plus probable : ${d.vsLikely.toFixed(1)} %</div>` : ''}
-      <div class="prop-champs">${ROLES.map((r) => {
-        const fixedPick = info.fixedRoster.find((x) => x.role === r);
-        const p = fixedPick ? { c: fixedPick.c, role: r, fixed: true } : d.picks.find((x) => x.role === r);
-        if (!p) return info.noPool.includes(r) ? `<span class="pc nopool" title="Aucun champion connu à ce rôle dans le pool du joueur"><span class="pc-empty">?</span><em>Aucun pool</em><small>${ROLE_LABEL[r]}</small><small class="tag">ajoute ses champions</small></span>` : '';
-        const tag = p.fixed ? 'déjà pick' : p.c.comfortTxt?.split(' : ')[1] ?? '';
-        const cont = !p.fixed && contested.has(p.c.id);
-        return `<span class="pc ${p.fixed ? 'locked' : p.c.metaPick ? 'meta' : 'comfy'}" title="${p.c.name} — ${tag}${cont ? ' — l’autre équipe le veut aussi : à prendre en premier pick ou à bannir' : ''}"><img src="${img(p.c.id)}" alt="">${cont ? '<b class="contest">contesté</b>' : ''}<em>${p.c.name}</em><small>${ROLE_LABEL[r]}</small><small class="tag">${tag}</small></span>`;
-      }).join('')}</div>
-      ${d.suggest?.length ? `<div class="sugg"><div class="sugg-h">Suggestions hors pool <span>(la draft reste basée sur leurs champions)</span></div>${d.suggest.slice(0, 3).map((x) => `
-        <div class="sugg-r"><img src="${img(x.c.id)}" alt=""><div><b>${ROLE_LABEL[x.role]} : ${x.c.name}</b>${x.replaces ? ` au lieu de ${x.replaces.name}` : ''}
-        <span>${x.gain > 0 ? `+${x.gain} % de winrate attendu` : 'meilleur choix pour ce rôle'} · pas dans le pool${x.player?.riotId ? ` de ${playerLabel(x.player)}` : ''}</span></div></div>`).join('')}</div>` : ''}
-      <div class="an-points">${an.points.map((x) => `<div class="an-p"><span>${x.k}</span><b class="${x.tone ?? ''}">${x.v}</b></div>`).join('')}</div>
-      <details class="an-more"><summary>Analyse complète et plan de jeu</summary>
-        ${an.plan.map((sec) => `<div class="an-sec"><h5>${sec.title}</h5>${sec.items.map((t) => `<p>${t}</p>`).join('')}</div>`).join('')}
-      </details>
-      <button class="apply" data-side="${info.side}" data-k="${k}">Appliquer à ${info.side === state.mySide ? 'ma draft' : 'leur draft'}</button>
-    </div>`;
-}
-
-function renderProposals() {
-  const el = $('proposals');
+function banList(want) {
   const me = state.mySide, other = me === 'blue' ? 'red' : 'blue';
-  const infos = { [me]: sideDraft(me), [other]: sideDraft(other) };
-  // Champions voulus par les deux équipes (dans leurs meilleures drafts)
-  const ids = (info) => new Set(info.res.flatMap((d) => d.picks.map((p) => p.c.id)));
-  const a = ids(infos[me]), b = ids(infos[other]);
-  const contested = new Set([...a].filter((x) => b.has(x)));
-  $('propFor').textContent = 'uniquement avec les champions joués par chaque joueur à son rôle (op.gg / ajout manuel), face aux picks adverses les plus probables ; les meilleurs picks hors pool sont proposés à part';
-  const col = (info) => {
-    const mine = info.side === me;
-    const head = `<div class="pcol-h ${info.side}"><b>${mine ? 'Ton équipe' : 'Équipe adverse'}</b><span>${info.side === 'blue' ? 'Équipe 1 · bleu' : 'Équipe 2 · rouge'}</span></div>`;
-    if (!info.open.length) return `<div class="pcol">${head}<p class="muted">Équipe complète.</p></div>`;
-    const warn = !info.hasPools ? `<div class="pwarn">Aucun pool de joueur connu : charge le multi op.gg de cette équipe (ou ajoute des champions à la main). Les drafts proposées n’utilisent que les champions réellement joués.</div>`
-      : info.noPool.length ? `<div class="pwarn">Aucun champion connu au rôle ${info.noPool.map((r) => ROLE_LABEL[r]).join(', ')} : le slot reste vide, une suggestion est donnée à part.</div>` : '';
-    // Bans conseillés contre l'adversaire (dans la colonne de mon équipe) / picks probables (dans la colonne adverse)
-    let extra = '';
-    if (mine && !state.slots[`${me}Bans`].every(Boolean)) {
-      const bl = predictedBans(info.fixed, team(other), me, infos[me].pred).slice(0, 5);
-      if (bl.length) extra = `<div class="prop bans-prop"><div class="prop-h"><b>Bans conseillés</b><span class="muted">probabilité de pick × danger</span></div>
-        <div class="prop-champs">${bl.map((x) => `<span class="pc" title="${x.why}"><img src="${img(x.c.id)}" alt=""><em>${x.c.name}</em><small>${x.why.match(/(\d+ %)/)?.[1] ?? ''}</small></span>`).join('')}</div></div>`;
-    }
-    if (!mine && info.enemyOpen) {
-      const myInfo = infos[me];
-      if (myInfo.enemyOpen.length) extra = `<div class="prop pred-prop"><div class="prop-h"><b>Leurs picks les plus probables</b><span class="muted">${info.hasPools ? 'pools de leurs joueurs + méta' : 'méta du rôle'}</span></div>
-        ${myInfo.enemyOpen.map((r) => `<div class="pred-row"><span class="pred-role">${ROLE_LABEL[r]}</span>${(myInfo.pred[r] ?? []).slice(0, 3).map((x) => `<span class="pred-c" title="${x.c.name} : ${x.why}"><img src="${img(x.c.id)}" alt=""><b>${Math.round(x.p * 100)} %</b></span>`).join('')}</div>`).join('')}</div>`;
-    }
-    return `<div class="pcol">${head}${warn}${extra}${info.res.map((d, k) => draftBlock(d, k, info, contested)).join('')}</div>`;
-  };
-  el.innerHTML = col(infos[me]) + col(infos[other]);
-  el.querySelectorAll('.apply').forEach((b) => (b.onclick = () => {
-    const side = b.dataset.side, d = infos[side].res[+b.dataset.k];
-    for (const p of d.picks) {
-      const j = state.roles[side].findIndex((r, i) => r === p.role && !state.slots[side][i]);
-      if (j >= 0 && !used().has(p.c.id)) { state.slots[side][j] = p.c.id; state.history.push([side, j]); }
-    }
-    render(); toast(side === state.mySide ? 'Draft appliquée à ton équipe' : 'Draft adverse simulée');
+  const avail = pool();
+  const open = state.roles[other].filter((r, i) => !state.slots[other][i]);
+  if (!open.length) return [];
+  const cand = {};
+  for (const r of open) cand[r] = avail.map((c) => withComfort(c, other, r)).filter((c) => c.roles.includes(r) && !c.offmeta);
+  const pred = predictPicks(open, cand, rolePlayers(other));
+  return predictedBans(team(me), team(other), me, pred).map((x) => {
+    const a = champArch(x.c), r = want ? rel(a, want) : 0;
+    return { ...x, arch: a, counter: r > 0 ? r : 0, score: x.score * (1 + 0.8 * Math.max(0, r)) };
+  }).sort((a, b) => b.score - a.score);
+}
+function banRow(x, want) {
+  const why = x.why.replace(/ \(méta\)$/, ' (méta du rôle)');
+  const ctr = x.counter ? `<span class="bp-ctr" style="--a:${ARCH[x.arch].color}">${ARCH[x.arch].label} : ${x.counter === 1 ? 'gros' : 'léger'} avantage sur ta compo ${ARCH[want].label}</span>` : '';
+  return `<button class="bp-r" data-id="${x.c.id}" title="Cliquer pour le bannir"><img src="${img(x.c.id)}" alt=""><div><b>${x.c.name}</b><span>${why}</span>${ctr}</div><em>Bannir</em></button>`;
+}
+function renderBanPlan() {
+  const me = state.mySide, other = me === 'blue' ? 'red' : 'blue';
+  const w = wantedArch();
+  $('wantArch').innerHTML = `<span class="want-l">Compo que tu veux jouer :</span>` +
+    [null, ...ORDER].map((k) => `<button class="chip ${state.wantArch === k ? 'on' : ''}" data-k="${k ?? ''}" ${k ? `style="border-color:${ARCH[k].color}"` : ''}>${k ? ARCH[k].label : `Auto${w.auto && w.k ? ` (${ARCH[w.k].label})` : ''}`}</button>`).join('') +
+    (w.auto && w.k ? `<span class="muted">détectée d’après ${w.from}</span>` : '');
+  $('wantArch').querySelectorAll('.chip').forEach((b) => (b.onclick = () => { state.wantArch = b.dataset.k || null; savePrefs(); render(); }));
+  const hasPools = rolePlayers(other).length > 0;
+  $('banFor').textContent = hasPools ? 'ciblés sur les champions joués par leurs joueurs (op.gg), selon la compo que tu veux jouer'
+    : 'selon la méta du rôle — charge leur multi op.gg pour cibler leurs joueurs';
+  const picks = state.slots.blue.filter(Boolean).length + state.slots.red.filter(Boolean).length;
+  const list = banList(w.k);
+  const myBans = state.slots[`${me}Bans`];
+  const done = (from, to) => myBans.slice(from, to).filter(Boolean);
+  const slots = (from, to) => `<div class="bp-slots">${myBans.slice(from, to).map((id) => (id ? `<img src="${img(id)}" title="${state.P[id].name}">` : '<span></span>')).join('')}</div>`;
+  const col = (title, sub, state_, body, from, to) => `<div class="bp-col ${state_}"><div class="bp-h"><b>${title}</b><em>${sub}</em>${slots(from, to)}</div>${body}</div>`;
+  const rows = (n) => (list.length ? list.slice(0, n).map((x) => banRow(x, w.k)).join('') : '<p class="muted">Plus rien à bannir : leur équipe est complète.</p>');
+  const p1 = picks === 0
+    ? col('Phase 1', 'maintenant · 3 bans', 'now', rows(3 - done(0, 3).length + 2), 0, 3)
+    : col('Phase 1', 'terminée', 'past', `<p class="muted">${done(0, 3).length ? 'Tes bans de phase 1 sont enregistrés.' : 'Les picks ont commencé.'}</p>`, 0, 3);
+  const p2state = picks >= 6 && picks < 10 ? 'now' : picks >= 10 ? 'past' : 'next';
+  const p2 = col('Phase 2', p2state === 'now' ? 'maintenant · 2 bans' : p2state === 'past' ? 'terminée' : 'aperçu : se précise après les 3 premiers picks de chaque équipe', p2state,
+    p2state === 'past' ? '<p class="muted">Draft terminée.</p>' : rows(2 - done(3, 5).length + 1), 3, 5);
+  $('banPlan').innerHTML = p1 + p2;
+  $('banPlan').querySelectorAll('.bp-r').forEach((b) => (b.onclick = () => {
+    const ph2 = picks > 0;
+    let j = myBans.findIndex((id, i) => !id && (ph2 ? i >= 3 : i < 3));
+    if (j < 0) j = myBans.findIndex((id) => !id);
+    if (j < 0) { toast('Tes 5 bans sont déjà remplis (clic droit sur un ban pour le retirer)'); return; }
+    myBans[j] = b.dataset.id; render(); toast(`${state.P[b.dataset.id].name} banni`);
   }));
 }
 
@@ -715,7 +535,7 @@ function openMenu() {
   $('startMenu').hidden = false;
   $('startForm').hidden = true; $('startChoices').hidden = false;
   $('menuBlue').value = state.teamInput.blue ?? ''; $('menuRed').value = state.teamInput.red ?? '';
-  $('menuSide').value = state.mySide; $('menuRegion').value = state.region; $('menuMode').value = state.mode;
+  $('menuSide').value = state.mySide; $('menuRegion').value = state.region;
   const saves = readSaves().slice(0, 4);
   $('menuSaves').innerHTML = saves.length ? `<div class="muted">Reprendre une draft sauvegardée :</div>` +
     saves.map((d) => `<button class="msave" data-id="${d.id}">${d.name.replace(/</g, '&lt;')}</button>`).join('') : '';
@@ -726,14 +546,13 @@ function startFromZero() {
   state.players = { blue: [], red: [] }; state.teamInput = { blue: '', red: '' };
   $('opggBlue').value = ''; $('opggRed').value = '';
   reset(); closeMenu();
-  toast('Draft de zéro : suggestions basées sur la méta, le pentagone et les synergies');
+  toast('Draft de zéro : bans et plan de jeu selon la méta du patch');
 }
 async function startFromPlayers() {
   const blue = $('menuBlue').value.trim(), red = $('menuRed').value.trim();
   if (!blue && !red) { toast('Colle au moins un lien multi op.gg'); return; }
   state.region = $('menuRegion').value; $('region').value = state.region;
   state.mySide = $('menuSide').value; $('mySide').value = state.mySide;
-  if ($('menuMode').value !== state.mode) { state.mode = $('menuMode').value; $('mode').value = state.mode; $('tier').disabled = state.mode === 'pro'; ingest(state.data); }
   savePrefs();
   $('opggBlue').value = blue; $('opggRed').value = red;
   reset();
@@ -764,10 +583,10 @@ function loadDraft(id) {
   const d = readSaves().find((x) => x.id === id);
   if (!d) return;
   Object.assign(state, {
-    mode: d.mode, mySide: d.mySide, slots: d.slots, roles: d.roles, history: d.history ?? [],
+    mySide: d.mySide, slots: d.slots, roles: d.roles, history: d.history ?? [],
     players: d.players ?? { blue: [], red: [] }, teamInput: d.teamInput ?? { blue: '', red: '' }, selected: null
   });
-  $('mode').value = state.mode; $('mySide').value = state.mySide; $('tier').disabled = state.mode === 'pro';
+  $('mySide').value = state.mySide;
   $('opggBlue').value = state.teamInput.blue ?? ''; $('opggRed').value = state.teamInput.red ?? '';
   savePrefs();
   ingest(state.data);
@@ -780,7 +599,7 @@ function renderSaves() {
   el.innerHTML = list.map((d) => {
     const ids = [...(d.slots.blue ?? []), ...(d.slots.red ?? [])];
     return `<div class="srow">
-      <div class="sname"><b>${d.name.replace(/</g, '&lt;')}</b><span class="muted">${new Date(d.date).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })} · ${d.mode === 'pro' ? 'pro' : 'soloQ'}</span></div>
+      <div class="sname"><b>${d.name.replace(/</g, '&lt;')}</b><span class="muted">${new Date(d.date).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}</span></div>
       <div class="smini">${d.slots.blue.map((id) => (id ? `<img src="${img(id)}" class="b">` : '<span class="e b"></span>')).join('')}<span class="vs">vs</span>${d.slots.red.map((id) => (id ? `<img src="${img(id)}" class="r">` : '<span class="e r"></span>')).join('')}</div>
       <button class="sload" data-id="${d.id}">Ouvrir</button><button class="sdel" data-id="${d.id}">Supprimer</button>
     </div>`;
@@ -817,28 +636,6 @@ function miniMap(mp, myJ) {
   return `<svg viewBox="0 0 220 220" class="minimap"><defs><marker id="jarr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0L10,5L0,10z" fill="#e6e9f2"/></marker></defs>${s}</svg>`;
 }
 
-function botBlock(mine, theirs) {
-  const bm = botMatchup(mine, theirs);
-  if (!bm) return '<div class="bm empty"><h4 class="pl-sub">Matchup bot par niveau</h4><p class="muted">Choisis au moins un ADC ou un support de chaque côté.</p></div>';
-  const duo = (a, s) => [a, s].map((c) => (c ? `<img src="${img(c.id)}" title="${c.name}">` : '<span class="bm-empty"></span>')).join('');
-  const W = { mine: ['Avantage toi', 'up'], theirs: ['Avantage eux', 'down'], even: ['Équilibré', ''] };
-  return `<div class="bm">
-    <div class="bm-head"><h4 class="pl-sub">Matchup bot par niveau</h4>
-      <div class="bm-duos"><span class="bm-duo b">${duo(bm.mA, bm.mS)}</span><b>vs</b><span class="bm-duo r">${duo(bm.tA, bm.tS)}</span></div>
-      <div class="bm-sum"><b class="up">${bm.summary}</b>${bm.danger ? ` <b class="down">${bm.danger}</b>` : ''}</div></div>
-    <div class="bm-rows">${bm.rows.map((r) => {
-      const tot = r.mine + r.theirs || 1, bp = (r.mine / tot) * 100;
-      return `<div class="bm-row ${W[r.who][1]}">
-        <div class="bm-lv"><b>${r.name}</b><span>${r.when}</span></div>
-        <div class="bm-bar"><div class="b" style="width:${bp}%"></div><div class="r" style="width:${100 - bp}%"></div></div>
-        <em class="${W[r.who][1]}">${W[r.who][0]}</em>
-        <p>${r.tip}</p></div>`;
-    }).join('')}</div>
-    <ul class="bm-notes">${bm.notes.map((n) => `<li>${n}</li>`).join('')}</ul>
-    <p class="muted bm-src">Puissance par niveau estimée à partir des kits des champions et des fiches support ; à ajuster selon le niveau des joueurs.</p>
-  </div>`;
-}
-
 function renderAdvice() {
   const me = state.mySide, them = me === 'blue' ? 'red' : 'blue';
   const mine = roster(me), theirs = roster(them);
@@ -862,9 +659,9 @@ function renderAdvice() {
       ${p.alts.length ? `<div class="ph-alt"><span>Alternatives</span><ul>${p.alts.map((t) => `<li>${t}</li>`).join('')}</ul></div>` : ''}
     </div>`;
   };
-  const objCard = (icon, o, prio) => `<div class="ob">
-      <div class="ob-h"><span class="ob-i">${icon}</span><b>${o.title}</b>${prio ? `<em class="${WHO[prio]?.[1] ?? ''}">prio ${WHO[prio]?.[0] ?? prio}</em>` : ''}</div>
-      ${o.items.map((t) => `<p>${t}</p>`).join('')}</div>`;
+  const objCard = (icon, name, when, o) => `<div class="ob ${o.simple[0]}">
+      <div class="ob-h"><span class="ob-i">${icon}</span><b>${name}</b><small>${when}</small><em>${o.simple[1]}</em></div>
+      <p>${o.simple[2]}</p>${o.fake ? `<p class="ob-x">${o.fake}</p>` : ''}</div>`;
   const synM = teamSynergy(mine.map((x) => x.c)).pairs.slice(0, 4), synT = teamSynergy(theirs.map((x) => x.c)).pairs.slice(0, 2);
   const synCard = (x, enemy) => `<div class="sy ${enemy ? 'enemy' : ''}">
       <div class="sy-pics"><img src="${img(x.a.id)}"><span>+</span><img src="${img(x.b.id)}"></div>
@@ -895,12 +692,11 @@ function renderAdvice() {
       </div>
     </div>
     <div class="pl-phases">${mp.phases.map(phaseCard).join('')}</div>
-    <div class="pl-objs">${objCard('🐉', mp.drake, mp.drake.prio)}${objCard('🪲', mp.grubs, mp.grubs.value >= 0.55 ? mp.grubs.prio : 'skip')}${objCard('👁', mp.herald, mp.herald.prio)}${objCard('🟣', mp.baron, null)}</div>
+    <h4 class="pl-sub">Objectifs : quoi prioriser</h4>
+    <div class="pl-objs">${objCard('🐉', 'Drakes', '5:00', mp.drake)}${objCard('🪲', 'Larves', '8:00', mp.grubs)}${objCard('👁', 'Héraut', '15:00', mp.herald)}${objCard('🟣', 'Baron', '20:00', mp.baron)}</div>
     ${pentaBlock}
     ${synM.length || synT.length ? `<h4 class="pl-sub">Synergies</h4><div class="pl-syn">${synM.map((x) => synCard(x, false)).join('')}${synT.map((x) => synCard(x, true)).join('')}</div>` : ''}
-    <div class="pl-text">${textSecs.map((sec) => `<div class="plan-sec"><h4>${sec.title}</h4>${sec.items.map((t) => `<p>${t}</p>`).join('')}</div>`).join('')}</div>
-    <h4 class="pl-sub">Gestion de la lane bot</h4>
-    ${botBlock(mine, theirs)}`;
+    <div class="pl-text">${textSecs.map((sec) => `<div class="plan-sec"><h4>${sec.title}</h4>${sec.items.map((t) => `<p>${t}</p>`).join('')}</div>`).join('')}</div>`;
 }
 
 function renderSources() {
@@ -947,15 +743,6 @@ async function load(force = false) {
 }
 
 function initControls() {
-  $('mode').value = state.mode; $('tier').value = state.tier; $('mySide').value = state.mySide;
-  $('mode').onchange = (e) => {
-    state.mode = e.target.value; savePrefs(); state.selected = null;
-    $('tier').disabled = state.mode === 'pro';
-    if (state.data) ingest(state.data); else render();
-    toast(state.mode === 'pro' ? 'Mode pro : rôles, winrates et méta tirés de la compétition (gol.gg)' : 'Mode soloQ : winrates et rôles lolalytics');
-  };
-  $('tier').disabled = state.mode === 'pro';
-  $('tier').onchange = (e) => { state.tier = e.target.value; savePrefs(); load(); };
   $('mySide').onchange = (e) => { state.mySide = e.target.value; savePrefs(); render(); };
   $('undo').onclick = undo; $('reset').onclick = openMenu; $('menuBtn').onclick = openMenu;
   $('startZero').onclick = startFromZero;

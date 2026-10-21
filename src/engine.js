@@ -15,13 +15,13 @@ export const ROLES = ['T', 'J', 'M', 'A', 'S'];
 export const ROLE_LABEL = { T: 'Top', J: 'Jungle', M: 'Mid', A: 'ADC', S: 'Support' };
 
 // Ordre du pentagone : chaque style bat le suivant (gros avantage) et celui d'après (léger avantage).
-// Engage › Split › Poke › Protect › Catch › Engage
+// Engage › Split › Poke › Peeling › Catch › Engage
 export const ORDER = ['e', 's', 'p', 'd', 'c'];
 export const ARCH = {
   e: { label: 'Engage', color: '#ff5a3c', short: 'ENG', desc: 'forcer les teamfights' },
   s: { label: 'Split', color: '#b65cff', short: 'SPL', desc: 'pression en side lane' },
   p: { label: 'Poke', color: '#ffad3b', short: 'POK', desc: 'user avant le fight' },
-  d: { label: 'Protect', color: '#5fe39a', short: 'PRO', desc: 'protéger le carry / réception' },
+  d: { label: 'Peeling', color: '#5fe39a', short: 'PEE', desc: 'protéger le carry (peel)' },
   c: { label: 'Catch', color: '#5b8cff', short: 'CAT', desc: 'attraper un joueur isolé' }
 };
 
@@ -543,7 +543,7 @@ const VS = {
   s: 'face à une compo Split : un champion qui tient le splitpusher en 1v1, et forcer les objectifs à 5 quand il est loin.',
   c: 'face à une compo Catch : bouger en groupe, warder ensemble, ne pas sortir seul en side lane sans vision.',
   p: 'face à une compo Poke : ne pas rester sous le siège, chercher l’engage rapide ou aller prendre l’objectif opposé.',
-  d: 'face à une compo Protect : ne pas foncer dans la frontline, chercher les picks ou la pression en side lane.'
+  d: 'face à une compo Peeling : ne pas foncer dans la frontline, chercher les picks ou la pression en side lane.'
 };
 // Carry = le dealer qui scale le mieux (on écarte les tanks), ADC > Mid > Top à scaling égal.
 const ROLE_PRIO = { A: 3, M: 2, T: 1, J: 0.5, S: 0 };
@@ -882,6 +882,12 @@ export function matchPlan(mine, theirs) {
     drake.items.push('Lanes équilibrées : le premier côté qui gagne sa lane prend le drake. Joue autour de la vague canon de 4:30 et de la prio mid.');
   }
   drake.title = drakeTitle;
+  drake.simple = theyOutscale && o.bot.who !== 'theirs' ? ['high', 'À prioriser', 'Ils sont plus forts en fin de partie : enchaîne les drakes pour prendre l’âme avant leur pic.']
+    : theyOutscale ? ['mid', 'À contester', 'Conteste quand la vague bot est poussée. Ne leur laisse jamais l’âme.']
+    : iOutscale ? ['mid', 'Si gratuit', 'Tu es plus fort en fin de partie : ne force pas, empêche seulement l’âme.']
+    : o.bot.who === 'mine' ? ['high', 'À prioriser', 'Ta bot lane et ton jungler ont la prio : stacke vers l’âme.']
+    : o.bot.who === 'theirs' ? ['low', 'À laisser (le 1er)', 'Ils ont la prio bot : prends plaques ou Larves en échange, conteste les suivants.']
+    : ['mid', 'Disputé', 'Le premier qui gagne sa lane bot le prend.'];
 
   // 5) Larves (méta actuelle : split moins rentable, moins d'or depuis 26.1)
   let grubValue = 0.45 + (splitter ? 0.25 : 0) + (o.top.who === 'mine' ? 0.25 : o.top.who === 'theirs' ? -0.15 : 0);
@@ -897,6 +903,9 @@ export function matchPlan(mine, theirs) {
     grubs.items.push(`Peu de valeur pour ta compo${splitter ? '' : ' (aucun splitpusher pour exploiter Hunger of the Void)'}${o.top.who === 'theirs' ? ' et ils ont la prio top' : ''} : laisse-les et prends le 2e drake ou des camps en échange.`);
   }
   grubs.items.push('Elles disparaissent à 14:45 si personne ne les prend.');
+  grubs.simple = grubValue >= 0.85 ? ['high', 'À prioriser', `Top et jungle ont la prio${splitter ? ` et ${splitter.name} transforme les Larves en tours` : ''}.`]
+    : grubValue >= 0.55 ? ['mid', 'Si gratuites', 'Peu d’or dans la méta actuelle : seulement si elles ne coûtent rien.']
+    : ['low', 'À laisser', 'Peu de valeur pour ta compo : échange-les contre un drake ou des camps.'];
 
   // 6) Héraut / Baron / Elder
   const herald = { prio: tag(mid), items: [] };
@@ -905,6 +914,9 @@ export function matchPlan(mine, theirs) {
     ? 'Tu es plus fort en mid game : prends le Héraut à 15:00 et lâche-le en mid (ou sur la lane la plus avancée) pour ouvrir la carte et la rotation vers le drake suivant.'
     : tag(mid) === 'theirs' ? 'Ils sont plus forts en mid game : ne te bats pas pour le Héraut, prends le drake ou des tours ailleurs pendant qu’ils le font.'
       : 'À jouer selon la vague mid : le Héraut sert surtout à faire tomber une tour et ses plaques (depuis 2026 les plaques T1 restent toute la partie et les T2/T3 en ont 3 chacune).');
+  herald.simple = tag(mid) === 'mine' ? ['high', 'À prioriser', 'Tu es plus fort en mid game : utilise-le pour une tour et ses plaques.']
+    : tag(mid) === 'theirs' ? ['low', 'À laisser', 'Ils sont plus forts en mid game : prends un drake ou des tours ailleurs.']
+    : ['mid', 'Si la vague mid est poussée', 'À prendre seulement avec la prio mid.'];
   const baron = { items: [] };
   baron.title = iOutscale ? 'Baron en late' : theyOutscale ? 'Baron dès 20:00' : 'Baron sur ouverture';
   baron.items.push(iOutscale ? 'Le temps joue pour toi : lance le Baron uniquement avec la vision installée et après un pick ou un fight gagné.'
@@ -932,6 +944,10 @@ export function matchPlan(mine, theirs) {
   }
   if (thSus >= 2) fake.items.push(`Eux peuvent faire le faux Nashor (${them.filter((c) => LIFESTEAL.has(c.id) || HEALERS.has(c.id)).map((c) => c.name).join(', ')}) : quand ils lancent le Baron, ne face-check pas en file indienne. Arrive groupé ou prends un objectif ailleurs.`);
   baron.items.push(`<b>${fake.title}</b> : ${fake.items.join(' ')}`);
+  baron.simple = theyOutscale ? ['high', 'Dès 20:00', 'Après chaque fight gagné : finis avant leur pic.']
+    : iOutscale ? ['mid', 'Sans risque', 'Le temps joue pour toi : seulement avec la vision et après un pick.']
+    : ['mid', 'Sur ouverture', 'Après un pick, un fight gagné ou leur jungler mort.'];
+  baron.fake = fake.on ? 'Faux Nashor possible (vol de vie / soins) : lance-le pour les attirer et retourne-toi sur eux.' : null;
 
   // 7) Timeline des objectifs
   const timeline = [

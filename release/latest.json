@@ -1,7 +1,7 @@
 {
-  "version": "2.6.1",
-  "sha256": "252115017554038fabae03b1dd36d79abd08b8f0d6edc8b0081fdfcdec8ce108",
-  "file": "draftlab-2.6.1.json.gz",
-  "notes": "Bouton Redémarrer dans la barre du haut",
-  "date": "2026-10-21T14:14:18.502Z"
+  "version": "2.7.0",
+  "sha256": "f3c785e4ffc62c3b4d1e80e29e118563969a65c8c8bbe70fd1f983d81cf0ff63",
+  "file": "draftlab-2.7.0.json.gz",
+  "notes": "Version épurée : bans par phase, plan de jeu simplifié, Peeling",
+  "date": "2026-10-21T18:12:17.345Z"
 }
