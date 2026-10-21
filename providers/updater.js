@@ -1,6 +1,5 @@
-// Mises à jour automatiques de l'application (code + interface) depuis les releases GitHub.
-// Chaque release contient un fichier "draftlab-update.json.gz" : tous les fichiers de l'app,
-// et dans la description de la release la ligne  sha256: <empreinte>  pour vérifier le téléchargement.
+// Mises à jour automatiques de l'application (code + interface) depuis le dépôt GitHub (dossier release/).
+// release/latest.json donne la version, l'empreinte sha256 et le nom du paquet (tous les fichiers de l'app).
 // Le nouveau code est installé dans le dossier utilisateur et lancé au prochain démarrage (voir boot.js).
 const { app } = require('electron');
 const path = require('path');
@@ -26,18 +25,18 @@ function repo() {
   } catch { return null; }
 }
 
+// Le dépôt contient release/latest.json  { version, sha256, notes, file }  et le paquet release/<file>.
+const RAW = (r, f) => `https://raw.githubusercontent.com/${r}/main/release/${f}?t=${Date.now()}`;
 async function checkForUpdate(current) {
   const r = repo();
   if (!r) return { status: 'off', message: 'Mises à jour automatiques pas encore configurées (dépôt GitHub manquant).' };
-  const res = await doFetch(`https://api.github.com/repos/${r}/releases/latest`, { headers: { 'User-Agent': UA, Accept: 'application/vnd.github+json' } });
+  const res = await doFetch(RAW(r, 'latest.json'), { headers: { 'User-Agent': UA }, cache: 'no-store' });
   if (!res.ok) return { status: 'error', message: `GitHub : ${res.status}` };
   const rel = await res.json();
-  const version = String(rel.tag_name || '').replace(/^v/, '');
+  const version = String(rel.version || '').replace(/^v/, '');
   if (!version || !newer(version, current)) return { status: 'uptodate', version: current };
-  const asset = (rel.assets || []).find((a) => a.name === 'draftlab-update.json.gz');
-  const sha = (String(rel.body || '').match(/sha256:\s*([a-f0-9]{64})/i) || [])[1];
-  if (!asset || !sha) return { status: 'error', message: 'release incomplète (fichier ou empreinte manquant)' };
-  return { status: 'available', version, url: asset.browser_download_url, sha, notes: String(rel.body || '').replace(/sha256:.*$/im, '').trim() };
+  if (!rel.sha256 || !rel.file) return { status: 'error', message: 'mise à jour incomplète (fichier ou empreinte manquant)' };
+  return { status: 'available', version, url: RAW(r, rel.file), sha: rel.sha256, notes: String(rel.notes || '') };
 }
 
 async function install(info) {

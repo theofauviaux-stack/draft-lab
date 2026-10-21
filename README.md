@@ -232,8 +232,7 @@ Si une version téléchargée ne démarre pas, l'application revient automatique
 
 Publier une mise à jour :
 1. augmenter `version` dans `package.json` ;
-2. `npm run update-bundle` → crée `dist/draftlab-update.json.gz` et affiche `sha256: …` ;
-3. créer une release GitHub `v<version>` avec ce fichier en pièce jointe et la ligne `sha256: …` dans la description
-   (`gh release create v2.6.1 dist/draftlab-update.json.gz --notes "Nouveautés…  sha256: …"`).
+2. `node tools/build-update.mjs "Notes de version"` → écrit `release/latest.json` et `release/draftlab-<version>.json.gz` ;
+3. commit + push sur `main` : les applis installées la récupèrent dans les 6 h (ou au prochain démarrage).
 
 Seul un changement de version d'Electron demande de retélécharger l'application complète.
