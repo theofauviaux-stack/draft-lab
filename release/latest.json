@@ -1,7 +1,7 @@
 {
-  "version": "2.7.0",
-  "sha256": "f3c785e4ffc62c3b4d1e80e29e118563969a65c8c8bbe70fd1f983d81cf0ff63",
-  "file": "draftlab-2.7.0.json.gz",
-  "notes": "Version épurée : bans par phase, plan de jeu simplifié, Peeling",
-  "date": "2026-10-21T18:12:17.345Z"
+  "version": "2.7.1",
+  "sha256": "502af1a676647ad1848ea880274ea6a0ee251c27e78bec6b1826bbe97c32e3a1",
+  "file": "draftlab-2.7.1.json.gz",
+  "notes": "Bans conseillés et op.gg uniquement en draft depuis des joueurs",
+  "date": "2026-10-21T18:16:53.702Z"
 }

@@ -39,7 +39,8 @@ const state = {
   selected: null, history: [],
   search: '', roleFilter: null, archFilter: null, onlyRole: true,
   players: { blue: [], red: [] }, teamInput: { blue: '', red: '' }, region: 'euw',
-  wantArch: null, scalShow: 'both'
+  wantArch: null, scalShow: 'both',
+  flow: 'zero' // 'zero' = draft de zéro (sans op.gg), 'players' = draft depuis des joueurs
 };
 function emptySlots() {
   return { blueBans: Array(5).fill(null), redBans: Array(5).fill(null), blue: Array(5).fill(null), red: Array(5).fill(null) };
@@ -123,6 +124,8 @@ function render() {
   const ev = evaluate(team('blue'), team('red'));
   renderWr(ev);
   renderGrid(gridInfo());
+  $('playersBox').hidden = state.flow !== 'players';
+  document.body.classList.toggle('flow-zero', state.flow !== 'players');
   renderPlayers(); renderSaves(); renderBanPlan();
   renderPentagon(ev); renderScaling(); renderAdvice();
 }
@@ -204,7 +207,7 @@ function renderWr(ev) {
     <div class="sb-bar ${l === 'Global' ? 'glob' : ''}">
       <div class="sb-bar-h"><b class="b">${v.toFixed(1)}%</b><span>${l}<small>${sub}</small></span><b class="r">${(100 - v).toFixed(1)}%</b></div>
       <div class="sb-track"><div style="width:${v}%"></div></div>
-    </div>`).join('') + (fc.wr == null ? '<div class="sb-hint">Charge les joueurs (multi op.gg) pour ajouter le pronostic joueurs.</div>' : '');
+    </div>`).join('') + (fc.wr == null && state.flow === 'players' ? '<div class="sb-hint">Charge les joueurs (multi op.gg) pour ajouter le pronostic joueurs.</div>' : '');
   for (const side of ['blue', 'red']) {
     const t = fc[side];
     const list = state.players[side] ?? [];
@@ -499,14 +502,16 @@ function banRow(x, want) {
 }
 function renderBanPlan() {
   const me = state.mySide, other = me === 'blue' ? 'red' : 'blue';
+  // Bans conseillés uniquement en « draft depuis des joueurs », quand on connaît les pools adverses.
+  const on = state.flow === 'players' && rolePlayers(other).length > 0;
+  $('bansCard').hidden = !on;
+  if (!on) return;
   const w = wantedArch();
   $('wantArch').innerHTML = `<span class="want-l">Compo que tu veux jouer :</span>` +
     [null, ...ORDER].map((k) => `<button class="chip ${state.wantArch === k ? 'on' : ''}" data-k="${k ?? ''}" ${k ? `style="border-color:${ARCH[k].color}"` : ''}>${k ? ARCH[k].label : `Auto${w.auto && w.k ? ` (${ARCH[w.k].label})` : ''}`}</button>`).join('') +
     (w.auto && w.k ? `<span class="muted">détectée d’après ${w.from}</span>` : '');
   $('wantArch').querySelectorAll('.chip').forEach((b) => (b.onclick = () => { state.wantArch = b.dataset.k || null; savePrefs(); render(); }));
-  const hasPools = rolePlayers(other).length > 0;
-  $('banFor').textContent = hasPools ? 'ciblés sur les champions joués par leurs joueurs (op.gg), selon la compo que tu veux jouer'
-    : 'selon la méta du rôle — charge leur multi op.gg pour cibler leurs joueurs';
+  $('banFor').textContent = 'ciblés sur les champions joués par leurs joueurs (op.gg), selon la compo que tu veux jouer';
   const picks = state.slots.blue.filter(Boolean).length + state.slots.red.filter(Boolean).length;
   const list = banList(w.k);
   const myBans = state.slots[`${me}Bans`];
@@ -543,7 +548,7 @@ function openMenu() {
 }
 const closeMenu = () => { $('startMenu').hidden = true; };
 function startFromZero() {
-  state.players = { blue: [], red: [] }; state.teamInput = { blue: '', red: '' };
+  state.players = { blue: [], red: [] }; state.teamInput = { blue: '', red: '' }; state.flow = 'zero';
   $('opggBlue').value = ''; $('opggRed').value = '';
   reset(); closeMenu();
   toast('Draft de zéro : bans et plan de jeu selon la méta du patch');
@@ -555,6 +560,7 @@ async function startFromPlayers() {
   state.mySide = $('menuSide').value; $('mySide').value = state.mySide;
   savePrefs();
   $('opggBlue').value = blue; $('opggRed').value = red;
+  state.flow = 'players';
   reset();
   const go = $('menuGo'); go.disabled = true; go.textContent = 'Chargement des joueurs…';
   await Promise.all([loadTeam('blue'), loadTeam('red')]);
@@ -571,7 +577,7 @@ function saveDraft() {
   const name = $('saveName').value.trim() || `Draft du ${new Date().toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}`;
   const list = readSaves();
   const entry = {
-    id: Date.now(), name, date: Date.now(), mode: state.mode, mySide: state.mySide,
+    id: Date.now(), name, date: Date.now(), flow: state.flow, mySide: state.mySide,
     slots: structuredClone(state.slots), roles: structuredClone(state.roles), history: structuredClone(state.history),
     players: structuredClone(state.players), teamInput: { ...state.teamInput }
   };
@@ -584,7 +590,8 @@ function loadDraft(id) {
   if (!d) return;
   Object.assign(state, {
     mySide: d.mySide, slots: d.slots, roles: d.roles, history: d.history ?? [],
-    players: d.players ?? { blue: [], red: [] }, teamInput: d.teamInput ?? { blue: '', red: '' }, selected: null
+    players: d.players ?? { blue: [], red: [] }, teamInput: d.teamInput ?? { blue: '', red: '' }, selected: null,
+    flow: d.flow ?? ([...(d.players?.blue ?? []), ...(d.players?.red ?? [])].some((p) => p.riotId || p.pool?.length) ? 'players' : 'zero')
   });
   $('mySide').value = state.mySide;
   $('opggBlue').value = state.teamInput.blue ?? ''; $('opggRed').value = state.teamInput.red ?? '';

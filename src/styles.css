@@ -554,3 +554,7 @@ footer .credit { display: inline; margin: 0; font-size: inherit; text-transform:
 .scal summary h3 { margin: 0; } .scal summary::before { content: '▸'; color: var(--gold); }
 .scal[open] summary::before { content: '▾'; }
 .scal .chips { margin: 10px 0 6px; }
+
+/* Draft de zéro : pas de joueurs ni d'op.gg */
+body.flow-zero .sb-players, body.flow-zero .sb-meta { display: none; }
+.box[hidden], .card[hidden] { display: none !important; }
