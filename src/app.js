@@ -1009,8 +1009,11 @@ function initUpdates() {
     pill.title = st.status === 'uptodate' ? `Version ${st.current} : à jour` : st.status === 'downloading' ? `Téléchargement de la version ${st.version}…`
       : st.status === 'ready' ? `Version ${st.version} installée : redémarre pour l’utiliser` : st.status === 'off' ? st.message : `Mise à jour : ${st.message ?? ''}`;
     if (st.status === 'ready') {
-      $('updText').textContent = `Nouvelle version ${st.version} installée${st.notes ? ' — ' + st.notes.split('\n')[0].slice(0, 120) : ''}.`;
-      $('updBar').hidden = false;
+      const b = $('updRestart');
+      b.textContent = `⟳ Redémarrer (v${st.version})`;
+      b.title = `Version ${st.version} installée${st.notes ? ' : ' + st.notes : ''}. Redémarre pour l’utiliser.`;
+      b.hidden = false;
+      toast(`Nouvelle version ${st.version} prête : clique sur « Redémarrer » en haut`);
     }
   };
   api.lastUpdate?.().then(show);
@@ -1021,7 +1024,6 @@ function initUpdates() {
     else if (st?.status === 'error') toast('Mise à jour impossible : ' + st.message);
   })); };
   $('updRestart').onclick = () => api.restart();
-  $('updLater').onclick = () => { $('updBar').hidden = true; };
 }
 
 initControls();
