@@ -152,7 +152,8 @@ function askLane(side, i, force) {
   const box = $('laneAsk');
   box.innerHTML = `<div class="la-card"><img src="${img(id)}" alt=""><div class="la-body">
       <b>Sur quelle lane joue ${c.name} ?</b><span class="muted">${side === 'blue' ? 'Équipe 1' : 'Équipe 2'} · ${force ? 'changer la lane' : 'champion joué sur plusieurs lanes'}</span>
-      <div class="la-opts">${[...opts].sort((a, b) => share(b) - share(a)).map((r) => `<button data-r="${r}">${ROLE_LABEL[r]}${share(r) ? `<small>${share(r)} % des games</small>` : ''}</button>`).join('')}</div></div></div>`;
+      <div class="la-opts">${(() => { const sorted = [...opts].sort((a, b) => share(b) - share(a)); const main = ROLES.reduce((a, r) => (share(r) > share(a) ? r : a), ROLES[0]);
+        return sorted.map((r) => `<button data-r="${r}" class="${r === main ? 'main' : ''}">${r === main ? '<em>Lane principale</em>' : ''}${ROLE_LABEL[r]}<small>${share(r)} % des games</small></button>`).join(''); })()}</div></div></div>`;
   box.hidden = false;
   box.querySelectorAll('button').forEach((b) => (b.onclick = () => {
     state.lock[side][i] = b.dataset.r; assignRoles(side); box.hidden = true; render();

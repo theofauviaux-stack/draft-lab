@@ -1,7 +1,7 @@
 {
-  "version": "2.16.1",
-  "sha256": "3aabb32a703cadc67c4c751417707af1371f403836b7f80ab4b6d398ad4a5da7",
-  "file": "draftlab-2.16.1.json.gz",
-  "notes": "Champion rajouté au pool : vraies stats du joueur, sinon juste le champion",
-  "date": "2026-10-22T17:36:59.540Z"
+  "version": "2.16.2",
+  "sha256": "b108e134f63b9b9dfaaaa640c92491bd4b04e0f2dbd1c5cbed4a2b1def331db2",
+  "file": "draftlab-2.16.2.json.gz",
+  "notes": "Choix de lane : 0 % affiché et lane principale en surbrillance",
+  "date": "2026-10-22T17:41:34.387Z"
 }
