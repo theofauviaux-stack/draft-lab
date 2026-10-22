@@ -1,7 +1,7 @@
 {
-  "version": "2.14.0",
-  "sha256": "523e5b6bf3595e478c09c973e576d472c883bfb13247b80b8f3ae3f59b88917c",
-  "file": "draftlab-2.14.0.json.gz",
-  "notes": "Games pro du patch (gol.gg) et réponses selon l'ordre de pick",
-  "date": "2026-10-22T17:06:42.286Z"
+  "version": "2.14.1",
+  "sha256": "fb271899a05bba5850921a28bf62bad082afbdf2db000adee8e06f07af4adf63",
+  "file": "draftlab-2.14.1.json.gz",
+  "notes": "Retrait du bouton Voir le calcul",
+  "date": "2026-10-22T17:15:10.677Z"
 }

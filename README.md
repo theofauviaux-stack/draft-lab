@@ -268,4 +268,4 @@ Seul un changement de version d'Electron demande de retélécharger l'applicatio
 - On garde le dernier patch joué en compétition (et le précédent tant qu'il y a moins de 150 games) : par exemple 16.20 + 16.18.
 - Winrate pro du patch par champion (lissé vers 50 % avec peu de games) : remplace en grande partie le winrate pro de la saison.
 - « Réponses en pro » : pour deux champions face à face en lane, on regarde d'abord les games où ils ont été pickés dans le même ordre que dans la draft (qui a répondu à qui), sinon toutes leurs games l'un contre l'autre.
-- Tout est détaillé dans « 🔍 Voir le calcul ».
+

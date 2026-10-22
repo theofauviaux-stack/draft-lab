@@ -238,7 +238,7 @@ function renderWr(ev) {
   const glob = combineWr(ev.wr, fc.wr);
   const main = fc.wr != null ? glob : ev.wr;
   renderGauge(main, fc.wr != null ? 'Pronostic global' : 'Winrate de la draft');
-  renderCalc(ev);
+
   const bars = [['Draft', ev.wr, 'composition, synergies, méta']];
   if (fc.wr != null) bars.push(['Joueurs', fc.wr, 'rang, forme, pools'], ['Global', glob, 'draft + joueurs']);
   $('sbBars').innerHTML = bars.map(([l, v, sub]) => `
