@@ -294,3 +294,4 @@ Seul un changement de version d'Electron demande de retélécharger l'applicatio
   - op.gg chargé pour chaque joueur dont le nom est visible ; les noms masqués (mode streamer, sélection anonyme) sont ignorés.
 - Menu en carré : 2 choix en haut, 2 en dessous.
 - Synergies d'interactions de kits : passif de Braum ou de Sejuani chargé par les attaques rapides d'un allié (Bel'Veth, Master Yi, Kog'Maw, Katarina R…), ralentissements (Ashe, Nasus, Lulu…) qui transforment le E de Séraphine en racine / étourdissement, Yuumi sur un hyper-attaquant, lien de Taric.
+- 2.19.1 : menu — la carte du fond se remplit de la couleur du choix survolé (bleu, or, rouge, vert).

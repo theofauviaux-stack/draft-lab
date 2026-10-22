@@ -909,3 +909,17 @@ html, body { overflow-x: hidden; }
 .livebar .muted { flex: 1; }
 .lv-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
 .livebar[data-phase="ChampSelect"] .lv-dot, .livebar[data-phase="InProgress"] .lv-dot { background: var(--red); animation: pulse 1.2s infinite; }
+
+/* Menu : la carte du fond prend la couleur du choix survolé */
+.start { --tint: transparent; }
+.start[data-hover="zero"] { --tint: #2f6fe0; }
+.start[data-hover="players"] { --tint: #b08a3e; }
+.start[data-hover="live"] { --tint: #d64552; }
+.start[data-hover="shot"] { --tint: #1f9d5b; }
+.st-tint { fill: var(--tint); opacity: 0; transition: opacity .45s ease, fill .45s ease; }
+.start[data-hover] .st-tint { opacity: .42; }
+.start[data-hover] .st-lanes path { stroke: color-mix(in srgb, var(--tint) 55%, var(--st-lane)); opacity: 1; transition: stroke .45s; }
+.start[data-hover] .st-jungle circle { fill: color-mix(in srgb, var(--tint) 30%, var(--st-jgl)); transition: fill .45s; }
+.st-card.zero:hover { border-color: #2f6fe0; } .st-card.players:hover { border-color: #b08a3e; }
+.st-card.live:hover { border-color: #d64552; } .st-card.shot:hover { border-color: #1f9d5b; }
+.st-card.zero .st-ic { color: #2f6fe0; } .st-card.players .st-ic { color: #b08a3e; }

@@ -1,7 +1,7 @@
 {
-  "version": "2.19.0",
-  "sha256": "53cc6b152723684170ed51897652905ed7136984f9bc8a5c33b6ee0d9231e414",
-  "file": "draftlab-2.19.0.json.gz",
-  "notes": "Partie en direct (soloQ) comme Porofessor · menu en carré · interactions de kits (Braum, Sejuani, Séraphine…)",
-  "date": "2026-10-22T22:10:14.971Z"
+  "version": "2.19.1",
+  "sha256": "ffcda32f55e9afabf9e849d5712073237d335b5fa266e69d1cc4118d754f2e98",
+  "file": "draftlab-2.19.1.json.gz",
+  "notes": "Menu : la carte du fond prend la couleur du choix survolé",
+  "date": "2026-10-22T22:22:53.278Z"
 }

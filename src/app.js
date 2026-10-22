@@ -806,9 +806,9 @@ function startBackground() {
   };
   tick();
   // survol d'une carte : la carte du fond s'éclaire du côté correspondant
-  $('startZero').onmouseenter = () => root.dataset.hover = 'zero';
-  $('startPlayers').onmouseenter = () => root.dataset.hover = 'players';
-  for (const id of ['startZero', 'startPlayers']) $(id).onmouseleave = () => delete root.dataset.hover;
+  // survol d'un choix : la carte du fond se remplit de la couleur de ce choix
+  const HOV = { startZero: 'zero', startPlayers: 'players', startLive: 'live', startShot: 'shot' };
+  for (const [id, k] of Object.entries(HOV)) { $(id).onmouseenter = () => { root.dataset.hover = k; }; $(id).onmouseleave = () => delete root.dataset.hover; }
 }
 function openMenu() {
   if (LIVE.on) stopLiveMode();
