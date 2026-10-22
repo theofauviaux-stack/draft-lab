@@ -43,7 +43,7 @@ const shortLabel = ([t, i]) => (t.endsWith('Bans') ? null : `${t === 'blue' ? 'B
 // ---------- État ----------
 const state = {
   data: null, P: {}, list: [],
-  mode: 'soloq', tier: 'emerald_plus', mySide: 'blue',
+  mode: 'soloq', tier: 'master_plus', mySide: 'blue',
   slots: emptySlots(),
   roles: { blue: [...ROLES], red: [...ROLES] },
   selected: null, history: [],
@@ -59,7 +59,7 @@ try {
   const saved = JSON.parse(localStorage.getItem('draftlab-prefs') ?? '{}');
   Object.assign(state, { mySide: saved.mySide ?? state.mySide, wantArch: saved.wantArch ?? null, theme: saved.theme ?? 'light' });
 } catch {}
-// Une seule base de données : soloQ Émeraude+ (lolalytics), complétée par la compétition (gol.gg) pour écarter les picks hors rôle.
+// Une seule base : soloQ Master+ (lolalytics, effet one-trick atténué) + compétition (gol.gg).
 const savePrefs = () => { try { localStorage.setItem('draftlab-prefs', JSON.stringify({ mySide: state.mySide, wantArch: state.wantArch, theme: state.theme })); } catch {} };
 
 const $ = (id) => document.getElementById(id);
@@ -93,7 +93,7 @@ function withComfort(c, side, role) {
   return { ...c, comfort: comfortPts(e), comfortTxt: `${playerLabel(pl)} : ${e.games} games${e.manual ? ' (ajouté)' : `, ${Math.round((e.wins / e.games) * 100)} %`}` };
 }
 const team = (side) => state.slots[side].map((id, i) => (id ? { ...withComfort(state.P[id], side, state.roles[side][i]), lane: state.roles[side][i] } : null)).filter(Boolean);
-// Matchups et duos GM+ : chargés à la demande pour chaque champion pické, à sa lane
+// Matchups et duos Master+ : chargés à la demande pour chaque champion pické, à sa lane
 const DET = new Map();
 setDetailSource((key, lane) => DET.get(`${key}|${lane}`)?.data ?? null);
 function ensureDetails() {
@@ -201,7 +201,7 @@ function renderTeams() {
         <div class="portrait">${c ? `<img src="${img(id)}" alt="">` : (side === 'blue' ? 'B' : 'R') + (i + 1)}</div>
         <div>
           <div class="name">${c ? c.name : '<span class="muted">À choisir</span>'}</div>
-          <div class="meta">${roleSel}${c?.wr != null ? `<span class="wrtag" title="Winrate du patch, soloQ Émeraude+">${c.wr.toFixed(1)} % WR</span>` : ''}</div>
+          <div class="meta">${roleSel}${c?.wr != null ? `<span class="wrtag" title="Winrate estimé : games pro + Master+ (one-tricks atténués)">${c.wr.toFixed(1)} % WR</span>` : ''}</div>
           ${c ? archBar(c) : ''}
           ${c ? sPairs.filter((x) => x.a.id === id || x.b.id === id).slice(0, 2).map((x) => { const o = x.a.id === id ? x.b : x.a; return `<span class="slink" style="--k:${KINDS[x.kind]?.color ?? '#6b7280'}" title="${x.title} : ${x.why.replace(/"/g, '&quot;')}">🔗 ${o.name} · ${KINDS[x.kind]?.label ?? ''}</span>`; }).join('') : ''}
         </div>
@@ -237,6 +237,7 @@ function renderWr(ev) {
   const glob = combineWr(ev.wr, fc.wr);
   const main = fc.wr != null ? glob : ev.wr;
   renderGauge(main, fc.wr != null ? 'Pronostic global' : 'Winrate de la draft');
+  renderCalc(ev);
   const bars = [['Draft', ev.wr, 'composition, synergies, méta']];
   if (fc.wr != null) bars.push(['Joueurs', fc.wr, 'rang, forme, pools'], ['Global', glob, 'draft + joueurs']);
   $('sbBars').innerHTML = bars.map(([l, v, sub]) => `
@@ -259,6 +260,34 @@ function renderWr(ev) {
         return `<div class="sb-p" title="${p ? playerLabel(p) + (pts != null ? ' — ' + pointsLabel(pts) : '') : ROLE_LABEL[r]}"><i style="background:${tierColor(pts)}"></i><span>${ROLE_LABEL[r]}</span><b>${p && p.riotId ? playerLabel(p) : '—'}</b></div>`;
       }).join('')}</div>`;
   }
+}
+
+// ---------- Comment le pourcentage est calculé ----------
+function renderCalc(ev) {
+  const el = $('calc'); if (!el) return;
+  const tB = team('blue'), tR = team('red');
+  if (!tB.length && !tR.length) { el.innerHTML = '<p class="muted">50 % tant qu’aucun champion n’est pické. Chaque pick ajoute ou retire des points selon les facteurs ci-dessous.</p>'; return; }
+  const sum = ev.factors.reduce((a, f) => a + f.value, 0);
+  const champ = (c) => `<div class="cc-r"><img src="${img(c.id)}"><b>${c.name}</b>
+    <span>${c.soloWr != null ? c.soloWr.toFixed(1) + ' %' : '—'}</span>
+    <span>${c.proWr != null ? `${c.proWr.toFixed(1)} % (${c.proPicks} g)` : '—'}</span>
+    <span class="cc-w">${Math.round((c.wPro ?? 0) * 100)} % pro</span>
+    <em>${c.wr != null ? c.wr.toFixed(1) + ' %' : '—'}</em></div>`;
+  el.innerHTML = `
+    <div class="calc-eq">50 % <span>de base</span> ${ev.factors.map((f) => `<b class="${f.value >= 0 ? 'up' : 'down'}">${f.value >= 0 ? '+' : '−'} ${Math.abs(f.value).toFixed(1)}</b>`).join(' ')} = <strong>${(50 + sum).toFixed(1)} %</strong> <span>pour l’équipe 1 (bleu)</span></div>
+    <div class="calc-f">${ev.factors.map((f) => `<div class="cf"><div class="cf-h"><span>${f.label}</span><b class="${f.value >= 0 ? 'up' : 'down'}">${f.value >= 0 ? '+' : ''}${f.value.toFixed(1)} bleu</b></div><p>${f.detail}</p></div>`).join('') || '<p class="muted">Aucun facteur notable.</p>'}</div>
+    <h5>Force de chaque champion</h5>
+    <div class="cc"><div class="cc-r cc-h"><span></span><b>Champion</b><span>Master+</span><span>Pro (saison)</span><span>Mélange</span><em>Retenu</em></div>
+      ${tB.map(champ).join('')}${tR.length ? '<div class="cc-sep">Équipe 2</div>' + tR.map(champ).join('') : ''}</div>
+    <h5>Comment je calcule</h5>
+    <ol class="calc-m">
+      <li><b>Force des champions.</b> Winrate Master+ (lolalytics) ramené à la moyenne de sa lane. Pour limiter l’effet des one-tricks (aucun site ne permet de les exclure), l’écart d’un champion peu joué est atténué : pickrate ÷ (pickrate + 1,2). Ce chiffre est mélangé au winrate pro de la saison (gol.gg, lissé vers 50 % quand il y a peu de games) avec un poids pro qui monte jusqu’à 50 % selon le nombre de games pro. Facteur = écart moyen entre les deux équipes × 0,6.</li>
+      <li><b>Face-à-face des lanes</b> (Master+, 30 derniers jours) : winrate du matchup − 50, pondéré par le nombre de games (n ÷ (n + 250)), × 0,55, plafonné à ±7. Au bot, ADC et support comptent contre l’ADC et le support adverses.</li>
+      <li><b>Duos mesurés</b> (Master+) : écart du duo à son winrate attendu, pondéré n ÷ (n + 300), × 0,5, plafonné à ±4. Quand un duo est mesuré, la table de synergies théoriques pèse moitié moins.</li>
+      <li><b>Pentagone des compos</b> (Engage › Split › Poke › Peeling › Catch) : avantage du style de chaque équipe sur l’autre, × 8, proportionnel au nombre de picks.</li>
+      <li><b>Le reste</b> : clarté du plan de jeu, synergies théoriques, maîtrise des joueurs (op.gg), mélange des dégâts, ligne de front, outils d’engage.</li>
+    </ol>
+    <p class="muted">Le total est borné entre 25 et 75 %. C’est une estimation, pas une certitude.</p>`;
 }
 
 function renderGauge(v, label) {

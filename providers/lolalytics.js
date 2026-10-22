@@ -70,22 +70,6 @@ async function fetchLane(patch, lane, tier, idx) {
   throw lastErr ?? new Error('aucune donnée');
 }
 
-async function fetchGmRel(patch, idx) {
-  const res = await Promise.allSettled(Object.keys(LANES).map((lane) => fetchLane(patch, lane, 'grandmaster_plus', idx)));
-  const acc = {};
-  for (const r of res) {
-    if (r.status !== 'fulfilled') continue;
-    const rows = Object.entries(r.value.data);
-    const tot = rows.reduce((a, [, x]) => a + (x.games || 1), 0) || 1;
-    const avg = rows.reduce((a, [, x]) => a + x.wr * (x.games || 1), 0) / tot;
-    for (const [id, x] of rows) {
-      const g = x.games || 0, a = (acc[id] ??= { s: 0, g: 0 });
-      a.s += (x.wr - avg) * g; a.g += g;
-    }
-  }
-  return Object.fromEntries(Object.entries(acc).filter(([, a]) => a.g > 0).map(([id, a]) => [id, +((a.s / a.g) * (a.g / (a.g + 300))).toFixed(2)]));
-}
-
 async function fetchLolalytics(patch, tier, champions) {
   const idx = championIndex(champions);
   const results = await Promise.allSettled(
@@ -94,20 +78,26 @@ async function fetchLolalytics(patch, tier, champions) {
   const stats = {};
   let okLanes = 0;
   let usedPatch = patch;
+  // Sans OTP : on ne dispose pas de filtre « one-trick » ; on ramène vers la moyenne de la lane
+  // les champions peu joués (là où les one-tricks font l'essentiel des games et gonflent le winrate).
+  const damp = (pr) => pr / (pr + 1.2);
   results.forEach((r, i) => {
     if (r.status !== 'fulfilled') return;
     okLanes++;
     const role = Object.values(LANES)[i];
     usedPatch = r.value.patch;
-    for (const [id, s] of Object.entries(r.value.data)) {
+    const rows = Object.entries(r.value.data);
+    const tot = rows.reduce((a, [, x]) => a + (x.games || x.pr || 1), 0) || 1;
+    const mean = rows.reduce((a, [, x]) => a + x.wr * (x.games || x.pr || 1), 0) / tot;
+    for (const [id, s] of rows) {
       const cur = (stats[id] ??= { wrSum: 0, w: 0, pr: 0, roles: {}, roleWr: {} });
       const weight = s.games || s.pr || 1;
-      cur.wrSum += s.wr * weight;
+      cur.wrSum += (50 + (s.wr - mean) * damp(s.pr || 0)) * weight;
       cur.w += weight;
       cur.pr += s.pr;
       // part des parties du champion jouées dans ce rôle (en %)
       cur.roles[role] = s.pctLane ?? s.pr;
-      cur.roleWr[role] = s.wr;
+      cur.roleWr[role] = +(50 + (s.wr - mean)).toFixed(2);
     }
   });
   if (!okLanes) {
@@ -118,21 +108,16 @@ async function fetchLolalytics(patch, tier, champions) {
   for (const [id, s] of Object.entries(stats)) {
     final[id] = { wr: +(s.wrSum / s.w).toFixed(2), pr: +s.pr.toFixed(2), roles: s.roles, roleWr: s.roleWr };
   }
-  // Grandmaster+ : écart de chaque champion au winrate moyen de sa lane, lissé selon le nombre de games
-  try {
-    const gm = await fetchGmRel(patch, idx);
-    for (const [id, rel] of Object.entries(gm)) if (final[id]) final[id].gmRel = rel;
-  } catch {}
   return { stats: final, lanes: okLanes, patch: usedPatch };
 }
 
-// Détail d'un champion à sa lane, en Grandmaster+ sur les 30 derniers jours :
+// Détail d'un champion à sa lane, en Master+ sur les 30 derniers jours :
 // face-à-face contre chaque lane adverse utile (counter) et duos avec ses alliés (build-team).
 const LANE_NAME = { T: 'top', J: 'jungle', M: 'middle', A: 'bottom', S: 'support' };
 const OPP = { T: ['T'], J: ['J'], M: ['M'], A: ['A', 'S'], S: ['S', 'A'] };
 const SLUG = { monkeyking: 'wukong' };
 const slug = (id) => { const s = String(id).toLowerCase().replace(/[^a-z0-9]/g, ''); return SLUG[s] ?? s; };
-async function fetchDetail(champId, lane, tier = 'grandmaster_plus') {
+async function fetchDetail(champId, lane, tier = 'master_plus') {
   const base = `https://a1.lolalytics.com/mega/?v=1&patch=30&c=${slug(champId)}&lane=${LANE_NAME[lane]}&tier=${tier}&queue=ranked&region=all`;
   const vs = {}, team = {};
   let gm = null;

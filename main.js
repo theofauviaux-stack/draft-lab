@@ -15,7 +15,7 @@ const CHECK_EVERY = 2 * HOUR; // vérification automatique d'un nouveau patch
 
 let win;
 let cache = {};
-let lastTier = 'emerald_plus';
+let lastTier = 'master_plus';
 let busy = null;
 
 const cacheFile = () => path.join(app.getPath('userData'), 'draftlab-cache.json');
@@ -174,7 +174,7 @@ app.whenReady().then(() => {
       return res;
     } catch (e) { return { error: e.message }; }
   });
-  // Matchups et duos GM+ d'un champion à sa lane (mis en cache 24 h)
+  // Matchups et duos Master+ d'un champion à sa lane (mis en cache 24 h)
   const details = new Map();
   ipcMain.handle('lola:detail', async (_e, { cid, lane }) => {
     const k = `${cid}|${lane}`, c = details.get(k);

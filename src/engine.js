@@ -75,11 +75,12 @@ export function buildProfiles(champions, stats = {}, pro = {}, mode = MODE) {
     prof.proRoles = proPct ? ROLES.filter((r) => (p.roles[r]?.picks ?? 0) >= Math.max(10, 0.1 * proPicks)) : [];
     // Winrate pro "lissé" : peu de games = on reste proche de 50 %
     const proWr = p?.wr != null && proPicks ? (p.wr * proPicks + 50 * 40) / (proPicks + 40) : null;
-    // soloQ : moitié Émeraude+, moitié Grandmaster+ (écart à la moyenne GM+) quand on l'a
-    const soloWr = s?.wr == null ? null : s.gmRel != null ? 0.5 * s.wr + 0.5 * (50 + s.gmRel) : s.wr;
+    // soloQ Master+ (ramené à la moyenne de la lane, champions peu joués atténués pour limiter l'effet one-trick)
+    const soloWr = s?.wr ?? null;
     let wr = null;
-    // Winrate pro : simple départage (il dépend surtout du niveau des équipes et mélange toute la saison)
-    if (soloWr != null && proWr != null) wr = mode === 'pro' ? 0.7 * proWr + 0.3 * soloWr : 0.9 * soloWr + 0.1 * proWr;
+    // Pro + Master+ : le pro (sans one-tricks) pèse jusqu'à 50 % selon son nombre de games
+    let wP = 0;
+    if (soloWr != null && proWr != null) { wP = 0.5 * proPicks / (proPicks + 200); wr = (1 - wP) * soloWr + wP * proWr; }
     else wr = soloWr ?? proWr;
     if (wr != null) wr = 50 + Math.max(-4, Math.min(4, wr - 50));
     // En mode pro : un champion quasiment jamais joué en compétition est signalé (et pas proposé)
@@ -87,7 +88,7 @@ export function buildProfiles(champions, stats = {}, pro = {}, mode = MODE) {
     NAMES[c.id] = c.name;
     map[c.id] = {
       ...prof, id: c.id, key: +c.key, name: c.name, offmeta,
-      wr, soloWr, proWr, pr: s?.pr ?? 0,
+      wr, soloWr, proWr, wPro: wP, pr: s?.pr ?? 0,
       presence: p?.presence ?? 0, proPicks, proRoleStats: p?.roles ?? null
     };
   }
@@ -121,7 +122,7 @@ function damagePenalty(s) {
 const frontPenalty = (s) => (s.n >= 4 && s.f < 3 ? -W.frontline : 0);
 const engagePenalty = (s) => (s.n >= 4 && s.e + s.c < 3 ? -W.engageTool : 0);
 
-// ---------- Données GM+ (lolalytics) : face-à-face par lane et duos ----------
+// ---------- Données Master+ (lolalytics) : face-à-face par lane et duos ----------
 // DETAIL(key, lane) renvoie { vs: { lane: { cid: [vsWr, n] } }, team: { lane: { cid: [wr, d2, n] } } } ou null.
 let DETAIL = () => null;
 export const setDetailSource = (fn) => { DETAIL = fn; };
@@ -190,15 +191,15 @@ export function evaluate(blue, red) {
   }
   add('clarity', 'Clarté du plan de jeu', (clarity(sb) * (B.n / 5) - clarity(sr) * (R.n / 5)) * W.clarity,
     'Une compo avec une identité nette joue mieux ses fights');
-  if (B.hasWr || R.hasWr) add('strength', MODE === 'pro' ? 'Force des champions (compétition)' : 'Force des champions (soloQ)', (B.wr - R.wr) * W.strength,
-    MODE === 'pro' ? 'Winrates pro gol.gg de la saison (lissés quand il y a peu de games)' : 'Winrates soloQ lolalytics du patch actuel');
+  if (B.hasWr || R.hasWr) add('strength', 'Force des champions (pro + Master+)', (B.wr - R.wr) * W.strength,
+    'Winrate Master+ (one-tricks atténués) mélangé au winrate pro de la saison : détail par champion ci-dessous');
   const synB = teamSynergy(blue), synR = teamSynergy(red);
   const gm = gmFactors(blue, red);
-  // quand les duos sont mesurés en GM+, la table de synergies théoriques pèse moins
+  // quand les duos sont mesurés en Master+, la table de synergies théoriques pèse moins
   const synW = gm.dt.length || Math.abs(gm.duo) > 0.2 ? W.synergy * 0.55 : W.synergy;
   const synV = Math.max(-6, Math.min(6, (synB.total - synR.total) * synW));
-  add('lanes', 'Face-à-face des lanes (GM+)', gm.lane, gm.lt.length ? gm.lt.slice(0, 4).join(' · ') : 'Winrates des matchups en Grandmaster+ (lolalytics), lissés selon le nombre de games');
-  add('duos', 'Duos mesurés (GM+)', gm.duo, gm.dt.length ? gm.dt.slice(0, 4).join(' · ') : 'Synergie réelle des duos en Grandmaster+');
+  add('lanes', 'Face-à-face des lanes (Master+)', gm.lane, gm.lt.length ? gm.lt.slice(0, 4).join(' · ') : 'Winrates des matchups en Master+ (lolalytics), lissés selon le nombre de games');
+  add('duos', 'Duos mesurés (Master+)', gm.duo, gm.dt.length ? gm.dt.slice(0, 4).join(' · ') : 'Synergie réelle des duos en Master+');
   const pairTxt = (pp) => pp.slice(0, 2).map((x) => `${x.a.name} + ${x.b.name} (${x.title})`).join(', ');
   add('synergy', 'Synergies entre champions', synV,
     [synB.pairs.length ? `Bleu : ${pairTxt(synB.pairs)}` : '', synR.pairs.length ? `Rouge : ${pairTxt(synR.pairs)}` : ''].filter(Boolean).join(' · ') || 'Aucune synergie notable');
@@ -870,7 +871,7 @@ export function matchPlan(mine, theirs) {
     return laneEarly(at(roster, lane), lane);
   };
   const lanes = {};
-  // Face-à-face mesurés en GM+ (lolalytics) : ils corrigent l'estimation théorique de la lane
+  // Face-à-face mesurés en Master+ (lolalytics) : ils corrigent l'estimation théorique de la lane
   const measured = (L) => {
     const roles = L === 'B' ? ['A', 'S'] : [L];
     let sum = 0, any = false, best = null;
@@ -892,7 +893,7 @@ export function matchPlan(mine, theirs) {
     lanes[L] = { edge, state: edge == null ? 'inconnu' : edge > 0.07 ? 'fort' : edge < -0.07 ? 'faible' : 'égal',
       mine: L === 'B' ? [at(mine, 'A'), at(mine, 'S')].filter(Boolean) : [at(mine, L)].filter(Boolean),
       theirs: L === 'B' ? [at(theirs, 'A'), at(theirs, 'S')].filter(Boolean) : [at(theirs, L)].filter(Boolean),
-      gm: m?.best ? `GM+ : ${m.best.a.name} ${(50 + m.best.raw).toFixed(0)} % contre ${m.best.b.name} (${m.best.n} games)` : null };
+      gm: m?.best ? `Master+ : ${m.best.a.name} ${(50 + m.best.raw).toFixed(0)} % contre ${m.best.b.name} (${m.best.n} games)` : null };
   }
   const known = Object.entries(lanes).filter(([, v]) => v.edge != null);
   const strong = known.length ? known.reduce((a, b) => (b[1].edge > a[1].edge ? b : a)) : null;

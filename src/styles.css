@@ -755,3 +755,26 @@ details.box > summary, .scal summary { cursor: pointer; }
 
 .tb-menu { border-radius: 10px; padding: 7px 14px; font-weight: 800; font-size: 13px; border: 1px solid var(--gold) !important; color: var(--gold); background: var(--panel); }
 .tb-menu:hover { background: var(--gold) !important; color: #fff; }
+
+/* ---- Voir le calcul ---- */
+.calc { width: 100%; margin-top: 4px; }
+.calc > summary { cursor: pointer; text-align: center; font-weight: 700; font-size: 12.5px; color: var(--gold); padding: 6px; border-radius: 8px; list-style: none; }
+.calc > summary::-webkit-details-marker { display: none; }
+.calc > summary:hover { background: var(--hover); }
+.calc[open] > summary { margin-bottom: 8px; }
+#calc { text-align: left; font-size: 12px; }
+.calc-eq { background: var(--panel-2); border-radius: 10px; padding: 10px; line-height: 1.9; font-size: 13px; }
+.calc-eq span { color: var(--muted); font-size: 11.5px; } .calc-eq b { margin: 0 2px; } .calc-eq strong { font-size: 15px; }
+.calc-eq .up, .cf .up { color: var(--blue); } .calc-eq .down, .cf .down { color: var(--red); }
+.calc-f { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
+.cf { border-left: 3px solid var(--line); padding: 2px 0 2px 8px; }
+.cf-h { display: flex; justify-content: space-between; font-weight: 700; }
+.cf p { margin: 2px 0 0; color: var(--muted); line-height: 1.4; }
+#calc h5 { margin: 12px 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--gold); }
+.cc { display: flex; flex-direction: column; gap: 3px; }
+.cc-r { display: grid; grid-template-columns: 22px 1.1fr 1fr 1.2fr .9fr .7fr; gap: 6px; align-items: center; font-size: 11.5px; }
+.cc-r img { width: 22px; height: 22px; border-radius: 5px; }
+.cc-r em { font-style: normal; font-weight: 800; text-align: right; }
+.cc-h { color: var(--muted); font-size: 10.5px; font-weight: 700; }
+.cc-w { color: var(--muted); } .cc-sep { font-size: 10.5px; color: var(--red); font-weight: 700; margin-top: 4px; }
+.calc-m { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; line-height: 1.45; color: var(--text); }

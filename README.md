@@ -254,3 +254,10 @@ Seul un changement de version d'Electron demande de retélécharger l'applicatio
 - Duos mesurés en GM+ (ex. Zeri + Yuumi, Ashe + Séraphine) : quand la donnée existe, la table de synergies théoriques pèse moins.
 - Les % de winrate projeté sont de retour sur les portraits de la grille.
 - Barre du haut réorganisée : identité (patch, version) · draft (type, côté, annuler, nouvelle draft) · outils (données, thème).
+
+## Version 2.13 — pro + Master+, sans one-tricks, calcul visible
+
+- Winrates soloQ en Master+ (au lieu d'Émeraude+ / GM+), ramenés à la moyenne de chaque lane. Aucun site ne permet d'exclure les one-tricks : l'écart d'un champion peu joué est atténué (pickrate ÷ (pickrate + 1,2)), car c'est là que les one-tricks gonflent le winrate.
+- Winrate pro (gol.gg, saison) mélangé jusqu'à 50 % selon le nombre de games pro.
+- Face-à-face des lanes et duos mesurés en Master+ (échantillons plus grands qu'en GM+).
+- « 🔍 Voir le calcul » sous la balance : l'équation complète, chaque facteur, la force de chaque champion (Master+, pro, poids pro, retenu) et la méthode.

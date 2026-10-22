@@ -1,7 +1,7 @@
 {
-  "version": "2.12.1",
-  "sha256": "d2a9310ad7dcd7bbd077ba33a0f5fb6f65689c37972b359920591ddd8344a373",
-  "file": "draftlab-2.12.1.json.gz",
-  "notes": "Bouton Menu de retour dans la barre du haut",
-  "date": "2026-10-22T16:45:00.782Z"
+  "version": "2.13.0",
+  "sha256": "4704ba11d95944369e128732eb4b32809fac2f3a608e56c2feea61eab104acef",
+  "file": "draftlab-2.13.0.json.gz",
+  "notes": "Pro + Master+ (one-tricks atténués) · bouton Voir le calcul",
+  "date": "2026-10-22T16:50:10.036Z"
 }
