@@ -167,7 +167,7 @@ function renderTeams() {
           <div class="name">${c ? c.name : '<span class="muted">À choisir</span>'}</div>
           <div class="meta">${roleSel}${c?.wr != null ? `<span class="wrtag" title="Winrate du patch, soloQ Émeraude+">${c.wr.toFixed(1)} % WR</span>` : ''}</div>
           ${c ? archBar(c) : ''}
-          ${c ? sPairs.filter((x) => x.a.id === id || x.b.id === id).slice(0, 2).map((x) => { const o = x.a.id === id ? x.b : x.a; return `<span class="slink" style="--k:${KINDS[x.kind]?.color ?? '#8a93a8'}" title="${x.title} : ${x.why.replace(/"/g, '&quot;')}">🔗 ${o.name} · ${KINDS[x.kind]?.label ?? ''}</span>`; }).join('') : ''}
+          ${c ? sPairs.filter((x) => x.a.id === id || x.b.id === id).slice(0, 2).map((x) => { const o = x.a.id === id ? x.b : x.a; return `<span class="slink" style="--k:${KINDS[x.kind]?.color ?? '#6b7280'}" title="${x.title} : ${x.why.replace(/"/g, '&quot;')}">🔗 ${o.name} · ${KINDS[x.kind]?.label ?? ''}</span>`; }).join('') : ''}
         </div>
         ${c ? '<button class="clear" title="Retirer">×</button>' : ''}`;
       s.onclick = (e) => {
@@ -194,7 +194,7 @@ function renderStep() {
 }
 
 const TIER_COLOR = [[2800, '#b65cff'], [2400, '#5b8cff'], [2000, '#2ec27e'], [1600, '#3fb8a6'], [1200, '#d4a837'], [800, '#9aa5b1'], [400, '#a0673c'], [0, '#7a7a7a']];
-const tierColor = (pts) => (pts == null ? '#3a4560' : pts >= 3600 ? '#f5d36b' : pts >= 3200 ? '#ff4d5e' : TIER_COLOR.find(([v]) => pts >= v)[1]);
+const tierColor = (pts) => (pts == null ? '#c3cad5' : pts >= 3600 ? '#f5d36b' : pts >= 3200 ? '#d64552' : TIER_COLOR.find(([v]) => pts >= v)[1]);
 
 function renderWr(ev) {
   const fc = playersForecast(state.players.blue, state.players.red);
@@ -233,16 +233,16 @@ function renderGauge(v, label) {
     return `<path d="M${x0},${y0} A${r},${r} 0 0 1 ${x1},${y1}" stroke="${col}" stroke-width="${w}" fill="none" stroke-linecap="butt"/>`;
   };
   const f = Math.max(0.001, Math.min(0.999, v / 100));
-  let s = arc(0, f, '#3b8cff') + arc(f, 1, '#ff4d5e');
-  for (const t of [0.25, 0.5, 0.75]) { const [a, b] = pt(t); const [c, d] = [cx + (r - w / 2 - 6) * Math.cos(Math.PI * (1 - t)), cy - (r - w / 2 - 6) * Math.sin(Math.PI * (1 - t))]; s += `<line x1="${a}" y1="${b}" x2="${c}" y2="${d}" stroke="#0b0f17" stroke-width="2"/>`; }
+  let s = arc(0, f, '#2f6fe0') + arc(f, 1, '#d64552');
+  for (const t of [0.25, 0.5, 0.75]) { const [a, b] = pt(t); const [c, d] = [cx + (r - w / 2 - 6) * Math.cos(Math.PI * (1 - t)), cy - (r - w / 2 - 6) * Math.sin(Math.PI * (1 - t))]; s += `<line x1="${a}" y1="${b}" x2="${c}" y2="${d}" stroke="#ffffff" stroke-width="2"/>`; }
   // repère blanc à la frontière bleu / rouge
   const [ix, iy] = [cx + (r - w / 2 - 4) * Math.cos(Math.PI * (1 - f)), cy - (r - w / 2 - 4) * Math.sin(Math.PI * (1 - f))];
   const [ox, oy] = [cx + (r + w / 2 + 4) * Math.cos(Math.PI * (1 - f)), cy - (r + w / 2 + 4) * Math.sin(Math.PI * (1 - f))];
-  s += `<line x1="${ix}" y1="${iy}" x2="${ox}" y2="${oy}" stroke="#e6e9f2" stroke-width="4" stroke-linecap="round"/>`;
-  s += `<text x="${cx}" y="${cy - 30}" text-anchor="middle" font-size="46" font-weight="900" fill="${v >= 50 ? '#3b8cff' : '#ff4d5e'}">${(v >= 50 ? v : 100 - v).toFixed(1)}%</text>`;
-  s += `<text x="${cx}" y="${cy - 8}" text-anchor="middle" font-size="12.5" fill="#8a93a8">${v === 50 ? 'égalité' : `pour l’équipe ${v >= 50 ? '1 (bleu)' : '2 (rouge)'}`}</text>`;
-  s += `<text x="${cx}" y="${cy + 12}" text-anchor="middle" font-size="11" fill="#c8aa6e" font-weight="700" letter-spacing="1">${label.toUpperCase()}</text>`;
-  s += `<text x="${cx - r}" y="${cy + 16}" text-anchor="middle" font-size="11" fill="#3b8cff" font-weight="700">ÉQ. 1</text><text x="${cx + r}" y="${cy + 16}" text-anchor="middle" font-size="11" fill="#ff4d5e" font-weight="700">ÉQ. 2</text>`;
+  s += `<line x1="${ix}" y1="${iy}" x2="${ox}" y2="${oy}" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>`;
+  s += `<text x="${cx}" y="${cy - 30}" text-anchor="middle" font-size="46" font-weight="900" fill="${v >= 50 ? '#2f6fe0' : '#d64552'}">${(v >= 50 ? v : 100 - v).toFixed(1)}%</text>`;
+  s += `<text x="${cx}" y="${cy - 8}" text-anchor="middle" font-size="12.5" fill="#6b7280">${v === 50 ? 'égalité' : `pour l’équipe ${v >= 50 ? '1 (bleu)' : '2 (rouge)'}`}</text>`;
+  s += `<text x="${cx}" y="${cy + 12}" text-anchor="middle" font-size="11" fill="#9a7a3c" font-weight="700" letter-spacing="1">${label.toUpperCase()}</text>`;
+  s += `<text x="${cx - r}" y="${cy + 16}" text-anchor="middle" font-size="11" fill="#2f6fe0" font-weight="700">ÉQ. 1</text><text x="${cx + r}" y="${cy + 16}" text-anchor="middle" font-size="11" fill="#d64552" font-weight="700">ÉQ. 2</text>`;
   $('gauge').innerHTML = s;
 }
 
@@ -306,8 +306,8 @@ function renderPentagon(ev) {
   const ANG = { e: -90, c: -18, d: 54, p: 126, s: 198 };
   const at = (k, r = R) => [C[0] + r * Math.cos((ANG[k] * Math.PI) / 180), C[1] + r * Math.sin((ANG[k] * Math.PI) / 180)];
   let s = '<defs>' + ORDER.map((k) => `<marker id="ar-${k}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0L10,5L0,10z" fill="${ARCH[k].color}"/></marker>`).join('') + '</defs>';
-  s += `<polygon points="${ORDER.map((k) => at(k).join(',')).join(' ')}" fill="#151c2c" stroke="#263049" stroke-width="1.5"/>`;
-  for (const f of [0.5]) s += `<polygon points="${ORDER.map((k) => at(k, R * f).join(',')).join(' ')}" fill="none" stroke="#263049" stroke-dasharray="3 4"/>`;
+  s += `<polygon points="${ORDER.map((k) => at(k).join(',')).join(' ')}" fill="#f4f6f9" stroke="#d9dee6" stroke-width="1.5"/>`;
+  for (const f of [0.5]) s += `<polygon points="${ORDER.map((k) => at(k, R * f).join(',')).join(' ')}" fill="none" stroke="#d9dee6" stroke-dasharray="3 4"/>`;
   // Flèches : contour = gros avantage, étoile = léger avantage
   ORDER.forEach((a, i) => {
     for (const [step, big] of [[1, true], [2, false]]) {
@@ -318,7 +318,7 @@ function renderPentagon(ev) {
     }
   });
   // Radar des deux équipes
-  for (const [sh, col] of [[ev.sharesRed, '255,77,94'], [ev.sharesBlue, '59,140,255']]) {
+  for (const [sh, col] of [[ev.sharesRed, '214,69,82'], [ev.sharesBlue, '47,111,224']]) {
     if (!sh) continue;
     const pts = ORDER.map((k) => at(k, R * Math.min(1, sh[k] * 2)).join(',')).join(' ');
     s += `<polygon points="${pts}" fill="rgba(${col},.22)" stroke="rgb(${col})" stroke-width="2"/>`;
@@ -352,15 +352,15 @@ function renderScaling() {
   const y = (v) => T + ((hi - v) * (H - T - B)) / (hi - lo);
   let s = '';
   for (const [m, lab] of [[14, 'Mid'], [20, 'Baron'], [25, 'Late']]) {
-    s += `<line x1="${x(m)}" x2="${x(m)}" y1="${T}" y2="${H - B}" stroke="#263049" stroke-dasharray="3 3"/>`;
-    s += `<text x="${x(m) + 3}" y="${T + 9}" fill="#8a93a8" font-size="9.5">${lab}</text>`;
+    s += `<line x1="${x(m)}" x2="${x(m)}" y1="${T}" y2="${H - B}" stroke="#d9dee6" stroke-dasharray="3 3"/>`;
+    s += `<text x="${x(m) + 3}" y="${T + 9}" fill="#6b7280" font-size="9.5">${lab}</text>`;
   }
-  s += `<line x1="${L}" x2="${W - Rr}" y1="${y(1)}" y2="${y(1)}" stroke="#8a93a8" stroke-width=".6"/>`;
-  for (const m of [5, 10, 15, 20, 25, 30, 35, 40]) s += `<text x="${x(m)}" y="${H - 8}" fill="#8a93a8" font-size="9.5" text-anchor="middle">${m}'</text>`;
-  s += `<text x="${L - 6}" y="${T + 10}" fill="#8a93a8" font-size="9.5" text-anchor="end">fort</text>`;
-  s += `<text x="${L - 6}" y="${H - B}" fill="#8a93a8" font-size="9.5" text-anchor="end">faible</text>`;
+  s += `<line x1="${L}" x2="${W - Rr}" y1="${y(1)}" y2="${y(1)}" stroke="#6b7280" stroke-width=".6"/>`;
+  for (const m of [5, 10, 15, 20, 25, 30, 35, 40]) s += `<text x="${x(m)}" y="${H - 8}" fill="#6b7280" font-size="9.5" text-anchor="middle">${m}'</text>`;
+  s += `<text x="${L - 6}" y="${T + 10}" fill="#6b7280" font-size="9.5" text-anchor="end">fort</text>`;
+  s += `<text x="${L - 6}" y="${H - B}" fill="#6b7280" font-size="9.5" text-anchor="end">faible</text>`;
   let any = false;
-  for (const [side, col] of [['red', '#ff4d5e'], ['blue', '#3b8cff']]) {
+  for (const [side, col] of [['red', '#d64552'], ['blue', '#2f6fe0']]) {
     if (!sides.includes(side)) continue;
     const tm = team(side);
     if (!tm.length) continue;
@@ -368,12 +368,12 @@ function renderScaling() {
     const pts = powerCurve(tm);
     s += `<polyline fill="none" stroke="${col}" stroke-width="2.6" stroke-linejoin="round" points="${pts.map(([m, v]) => `${x(m)},${y(v)}`).join(' ')}"/>`;
   }
-  if (any && sides.includes('blue')) s += `<circle cx="${W - 92}" cy="${T + 6}" r="4" fill="#3b8cff"/><text x="${W - 84}" y="${T + 10}" fill="#e6e9f2" font-size="10">Bleu</text>`;
-  if (any && sides.includes('red')) s += `<circle cx="${W - 46}" cy="${T + 6}" r="4" fill="#ff4d5e"/><text x="${W - 38}" y="${T + 10}" fill="#e6e9f2" font-size="10">Rouge</text>`;
+  if (any && sides.includes('blue')) s += `<circle cx="${W - 92}" cy="${T + 6}" r="4" fill="#2f6fe0"/><text x="${W - 84}" y="${T + 10}" fill="#1f2937" font-size="10">Bleu</text>`;
+  if (any && sides.includes('red')) s += `<circle cx="${W - 46}" cy="${T + 6}" r="4" fill="#d64552"/><text x="${W - 38}" y="${T + 10}" fill="#1f2937" font-size="10">Rouge</text>`;
   $('scalPick').innerHTML = [['both', 'Les deux'], ['mine', 'Ta compo'], ['theirs', 'Leur compo']]
     .map(([k, l]) => `<button class="chip ${state.scalShow === k ? 'on' : ''}" data-k="${k}">${l}</button>`).join('');
   $('scalPick').querySelectorAll('.chip').forEach((b) => (b.onclick = () => { state.scalShow = b.dataset.k; renderScaling(); }));
-  if (!any) s += `<text x="${W / 2}" y="${H / 2}" fill="#8a93a8" font-size="12" text-anchor="middle">Les courbes apparaissent avec les picks</text>`;
+  if (!any) s += `<text x="${W / 2}" y="${H / 2}" fill="#6b7280" font-size="12" text-anchor="middle">Les courbes apparaissent avec les picks</text>`;
   svg.innerHTML = s;
 }
 
@@ -500,6 +500,31 @@ function banRow(x, want) {
   const ctr = x.counter ? `<span class="bp-ctr" style="--a:${ARCH[x.arch].color}">${ARCH[x.arch].label} : ${x.counter === 1 ? 'gros' : 'léger'} avantage sur ta compo ${ARCH[want].label}</span>` : '';
   return `<button class="bp-r" data-id="${x.c.id}" title="Cliquer pour le bannir"><img src="${img(x.c.id)}" alt=""><div><b>${x.c.name}</b><span>${why}</span>${ctr}</div><em>Bannir</em></button>`;
 }
+// Bans pour protéger TA compo : quand tu as déjà pické (ex. tu fais ta draft en premier),
+// on cherche dans leurs pools les champions qui feraient le plus baisser ton winrate face à ta compo.
+function compBans(want) {
+  const me = state.mySide, other = me === 'blue' ? 'red' : 'blue';
+  const mine = team(me), theirs = team(other);
+  const open = state.roles[other].filter((r, i) => !state.slots[other][i]);
+  if (!mine.length || !open.length) return [];
+  const myWr = (th) => (me === 'blue' ? evaluate(mine, th).wr : 100 - evaluate(th, mine).wr);
+  const base = myWr(theirs);
+  const avail = pool(), cand = {};
+  for (const r of open) cand[r] = avail.map((c) => withComfort(c, other, r)).filter((c) => c.roles.includes(r) && !c.offmeta);
+  const pred = predictPicks(open, cand, rolePlayers(other));
+  const out = new Map();
+  for (const [r, list] of Object.entries(pred)) for (const x of list) {
+    const loss = base - myWr([...theirs, x.c]);
+    const a = champArch(x.c), rr = want ? Math.max(0, rel(a, want)) : 0;
+    const score = (Math.max(0, loss) + 1.5 * rr) * (0.45 + Math.sqrt(x.p));
+    if (score <= 0) continue;
+    const cur = out.get(x.c.id);
+    if (!cur || cur.score < score) out.set(x.c.id, { c: x.c, score, loss: +loss.toFixed(1), arch: a, counter: rr,
+      why: `${ROLE_LABEL[r]} · ${Math.round(x.p * 100)} % de chance de pick (${x.why === 'méta' ? 'méta du rôle' : x.why})` });
+  }
+  return [...out.values()].sort((a, b) => b.score - a.score);
+}
+
 function renderBanPlan() {
   const me = state.mySide, other = me === 'blue' ? 'red' : 'blue';
   // Bans conseillés uniquement en « draft depuis des joueurs », quand on connaît les pools adverses.
@@ -519,15 +544,24 @@ function renderBanPlan() {
   const slots = (from, to) => `<div class="bp-slots">${myBans.slice(from, to).map((id) => (id ? `<img src="${img(id)}" title="${state.P[id].name}">` : '<span></span>')).join('')}</div>`;
   const col = (title, sub, state_, body, from, to) => `<div class="bp-col ${state_}"><div class="bp-h"><b>${title}</b><em>${sub}</em>${slots(from, to)}</div>${body}</div>`;
   const rows = (n) => (list.length ? list.slice(0, n).map((x) => banRow(x, w.k)).join('') : '<p class="muted">Plus rien à bannir : leur équipe est complète.</p>');
-  const p1 = picks === 0
-    ? col('Phase 1', 'maintenant · 3 bans', 'now', rows(3 - done(0, 3).length + 2), 0, 3)
-    : col('Phase 1', 'terminée', 'past', `<p class="muted">${done(0, 3).length ? 'Tes bans de phase 1 sont enregistrés.' : 'Les picks ont commencé.'}</p>`, 0, 3);
-  const p2state = picks >= 6 && picks < 10 ? 'now' : picks >= 10 ? 'past' : 'next';
-  const p2 = col('Phase 2', p2state === 'now' ? 'maintenant · 2 bans' : p2state === 'past' ? 'terminée' : 'aperçu : se précise après les 3 premiers picks de chaque équipe', p2state,
-    p2state === 'past' ? '<p class="muted">Draft terminée.</p>' : rows(2 - done(3, 5).length + 1), 3, 5);
-  $('banPlan').innerHTML = p1 + p2;
+  // Les bans de base restent proposés tant que tes slots ne sont pas remplis, même si tu as pické avant de bannir.
+  const left1 = 3 - done(0, 3).length, left2 = 2 - done(3, 5).length;
+  const p1 = left1 > 0
+    ? col('Phase 1', picks === 0 ? 'maintenant · 3 bans' : `bans de base · ${left1} à faire`, 'now', rows(left1 + 2), 0, 3)
+    : col('Phase 1', 'faite', 'past', '<p class="muted">Tes 3 bans de phase 1 sont posés.</p>', 0, 3);
+  const p2state = left2 <= 0 || picks >= 10 ? 'past' : picks >= 6 ? 'now' : 'next';
+  const p2 = col('Phase 2', p2state === 'now' ? `maintenant · ${left2} ban${left2 > 1 ? 's' : ''}` : p2state === 'past' ? 'faite' : 'aperçu : se précise après les 3 premiers picks de chaque équipe', p2state,
+    p2state === 'past' ? '<p class="muted">Phase 2 terminée.</p>' : rows(left2 + 1), 3, 5);
+  // Ta compo est déjà (en partie) pickée : bans qui la protègent le mieux
+  const cb = compBans(w.k);
+  const mineIds = state.slots[me].filter(Boolean);
+  const p3 = mineIds.length && cb.length ? `<div class="bp-col bp-comp now"><div class="bp-h"><b>Contre ta compo</b>
+      <span class="bp-team">${mineIds.map((id) => `<img src="${img(id)}" title="${state.P[id].name}">`).join('')}</span>
+      <em>les champions de leurs pools qui la gênent le plus</em></div>
+      <div class="bp-list">${cb.slice(0, 6).map((x) => banRow({ ...x, why: x.why + (x.loss > 0 ? ` <span class="bp-loss">−${x.loss} % pour toi s’ils le prennent</span>` : '') }, w.k)).join('')}</div></div>` : '';
+  $('banPlan').innerHTML = p3 + p1 + p2;
   $('banPlan').querySelectorAll('.bp-r').forEach((b) => (b.onclick = () => {
-    const ph2 = picks > 0;
+    const ph2 = picks >= 6 || myBans.slice(0, 3).every(Boolean);
     let j = myBans.findIndex((id, i) => !id && (ph2 ? i >= 3 : i < 3));
     if (j < 0) j = myBans.findIndex((id) => !id);
     if (j < 0) { toast('Tes 5 bans sont déjà remplis (clic droit sur un ban pour le retirer)'); return; }
@@ -622,25 +656,25 @@ function renderSaves() {
 const WHO = { mine: ['toi', 'up'], theirs: ['eux', 'down'], even: ['disputé', ''], skip: ['à échanger', 'muted'], unknown: ['?', 'muted'] };
 
 function miniMap(mp, myJ) {
-  const col = (st) => (st === 'fort' ? '#5fe39a' : st === 'faible' ? '#ff6b7a' : st === 'égal' ? '#c8aa6e' : '#3a4560');
+  const col = (st) => (st === 'fort' ? '#1f9d5b' : st === 'faible' ? '#d64552' : st === 'égal' ? '#9a7a3c' : '#c3cad5');
   const L = mp.lanes;
-  let s = `<rect x="0" y="0" width="220" height="220" rx="14" fill="#0e1422"/>`;
-  s += `<path d="M10,210 L210,10" stroke="#1d2a44" stroke-width="26"/>`; // rivière (diagonale opposée)
-  s += `<path d="M10,10 L210,210" stroke="#13304a" stroke-width="16" opacity=".6"/>`;
+  let s = `<rect x="0" y="0" width="220" height="220" rx="14" fill="#eef1f5"/>`;
+  s += `<path d="M10,210 L210,10" stroke="#d3e2f4" stroke-width="26"/>`; // rivière (diagonale opposée)
+  s += `<path d="M10,10 L210,210" stroke="#c9d9ec" stroke-width="16" opacity=".6"/>`;
   const lane = (d, st, w = 9) => `<path d="${d}" stroke="${col(st)}" stroke-width="${w}" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/>`;
   s += lane('M22,198 L22,22 L198,22', L.T.state) + lane('M28,192 L192,28', L.M.state) + lane('M22,198 L198,198 L198,22', L.B.state);
-  s += `<circle cx="22" cy="198" r="14" fill="#3b8cff"/><text x="22" y="202" text-anchor="middle" font-size="10" font-weight="800" fill="#fff">TOI</text>`;
-  s += `<circle cx="198" cy="22" r="14" fill="#ff4d5e"/><text x="198" y="26" text-anchor="middle" font-size="9" font-weight="800" fill="#fff">EUX</text>`;
-  s += `<circle cx="150" cy="150" r="11" fill="#1b2232" stroke="#ff9f43" stroke-width="2"/><text x="150" y="154" text-anchor="middle" font-size="11">🐉</text>`;
-  s += `<circle cx="70" cy="70" r="11" fill="#1b2232" stroke="#b65cff" stroke-width="2"/><text x="70" y="74" text-anchor="middle" font-size="10">🪲</text>`;
+  s += `<circle cx="22" cy="198" r="14" fill="#2f6fe0"/><text x="22" y="202" text-anchor="middle" font-size="10" font-weight="800" fill="#fff">TOI</text>`;
+  s += `<circle cx="198" cy="22" r="14" fill="#d64552"/><text x="198" y="26" text-anchor="middle" font-size="9" font-weight="800" fill="#fff">EUX</text>`;
+  s += `<circle cx="150" cy="150" r="11" fill="#ffffff" stroke="#ff9f43" stroke-width="2"/><text x="150" y="154" text-anchor="middle" font-size="11">🐉</text>`;
+  s += `<circle cx="70" cy="70" r="11" fill="#ffffff" stroke="#b65cff" stroke-width="2"/><text x="70" y="74" text-anchor="middle" font-size="10">🪲</text>`;
   const lab = (x, y, t, st) => `<text x="${x}" y="${y}" text-anchor="middle" font-size="10.5" font-weight="700" fill="${col(st)}">${t}</text>`;
   s += lab(40, 112, 'TOP', L.T.state) + lab(112, 98, 'MID', L.M.state) + lab(150, 186, 'BOT', L.B.state);
   if (myJ && mp.strongSide && mp.strongSide !== 'M') {
     const toBot = mp.strongSide === 'B';
     const d = toBot ? 'M70,95 C95,120 110,140 140,158' : 'M140,125 C115,100 100,80 78,62';
-    s += `<path d="${d}" stroke="#e6e9f2" stroke-width="2.5" fill="none" stroke-dasharray="5 4" marker-end="url(#jarr)"/>`;
+    s += `<path d="${d}" stroke="#1f2937" stroke-width="2.5" fill="none" stroke-dasharray="5 4" marker-end="url(#jarr)"/>`;
   }
-  return `<svg viewBox="0 0 220 220" class="minimap"><defs><marker id="jarr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0L10,5L0,10z" fill="#e6e9f2"/></marker></defs>${s}</svg>`;
+  return `<svg viewBox="0 0 220 220" class="minimap"><defs><marker id="jarr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0L10,5L0,10z" fill="#1f2937"/></marker></defs>${s}</svg>`;
 }
 
 function renderAdvice() {
@@ -672,7 +706,7 @@ function renderAdvice() {
   const synM = teamSynergy(mine.map((x) => x.c)).pairs.slice(0, 4), synT = teamSynergy(theirs.map((x) => x.c)).pairs.slice(0, 2);
   const synCard = (x, enemy) => `<div class="sy ${enemy ? 'enemy' : ''}">
       <div class="sy-pics"><img src="${img(x.a.id)}"><span>+</span><img src="${img(x.b.id)}"></div>
-      <div class="sy-txt"><div class="sy-h"><b>${x.a.name} + ${x.b.name}</b><em style="--k:${KINDS[x.kind]?.color ?? '#8a93a8'}">${KINDS[x.kind]?.label ?? ''}</em></div>
+      <div class="sy-txt"><div class="sy-h"><b>${x.a.name} + ${x.b.name}</b><em style="--k:${KINDS[x.kind]?.color ?? '#6b7280'}">${KINDS[x.kind]?.label ?? ''}</em></div>
       <div class="sy-t">${x.title}</div><p>${x.why}</p>${enemy ? '<p class="sy-warn">À surveiller : sépare-les ou garde tes contrôles / flash pour ce combo.</p>' : ''}
       <span class="muted">${x.src}</span></div></div>`;
   const textSecs = plan.filter((sec) => ['Identité', 'Points faibles'].includes(sec.title));

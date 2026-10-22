@@ -1,7 +1,7 @@
 {
-  "version": "2.7.1",
-  "sha256": "502af1a676647ad1848ea880274ea6a0ee251c27e78bec6b1826bbe97c32e3a1",
-  "file": "draftlab-2.7.1.json.gz",
-  "notes": "Bans conseillés et op.gg uniquement en draft depuis des joueurs",
-  "date": "2026-10-21T18:16:53.702Z"
+  "version": "2.8.0",
+  "sha256": "aaf9a11dc50549d8545fc113ee26a7609340461b8a855d4b2ddb75f4d9c5f22a",
+  "file": "draftlab-2.8.0.json.gz",
+  "notes": "Thème clair et sobre · bans contre ta compo quand tu pickes en premier",
+  "date": "2026-10-22T16:02:15.900Z"
 }

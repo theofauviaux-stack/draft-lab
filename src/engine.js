@@ -18,11 +18,11 @@ export const ROLE_LABEL = { T: 'Top', J: 'Jungle', M: 'Mid', A: 'ADC', S: 'Suppo
 // Engage › Split › Poke › Peeling › Catch › Engage
 export const ORDER = ['e', 's', 'p', 'd', 'c'];
 export const ARCH = {
-  e: { label: 'Engage', color: '#ff5a3c', short: 'ENG', desc: 'forcer les teamfights' },
-  s: { label: 'Split', color: '#b65cff', short: 'SPL', desc: 'pression en side lane' },
-  p: { label: 'Poke', color: '#ffad3b', short: 'POK', desc: 'user avant le fight' },
-  d: { label: 'Peeling', color: '#5fe39a', short: 'PEE', desc: 'protéger le carry (peel)' },
-  c: { label: 'Catch', color: '#5b8cff', short: 'CAT', desc: 'attraper un joueur isolé' }
+  e: { label: 'Engage', color: '#e2502f', short: 'ENG', desc: 'forcer les teamfights' },
+  s: { label: 'Split', color: '#8e4fd6', short: 'SPL', desc: 'pression en side lane' },
+  p: { label: 'Poke', color: '#d98a0b', short: 'POK', desc: 'user avant le fight' },
+  d: { label: 'Peeling', color: '#1f9d5b', short: 'PEE', desc: 'protéger le carry (peel)' },
+  c: { label: 'Catch', color: '#3a6fd8', short: 'CAT', desc: 'attraper un joueur isolé' }
 };
 
 // +1 gros avantage, +0.5 léger, -0.5 léger désavantage, -1 gros désavantage, 0 miroir
