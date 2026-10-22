@@ -73,7 +73,20 @@ function applyTheme() {
   const b = $('themeBtn'); if (b) { b.textContent = state.theme === 'dark' ? '☀️' : '🌙'; b.title = state.theme === 'dark' ? 'Passer en mode clair' : 'Passer en mode sombre'; }
 }
 const img = (id) => (state.data ? `https://ddragon.leagueoflegends.com/cdn/${state.data.version}/img/champion/${id}.png` : '');
-const seq = () => PICKS;
+// Ordre d'une draft de tournoi : bans B R B R B R · picks B1 R1 R2 B2 B3 R3 · bans R B R B · picks R4 B4 B5 R5
+const TOURNEY = [
+  ['blueBans', 0], ['redBans', 0], ['blueBans', 1], ['redBans', 1], ['blueBans', 2], ['redBans', 2],
+  ['blue', 0], ['red', 0], ['red', 1], ['blue', 1], ['blue', 2], ['red', 2],
+  ['redBans', 3], ['blueBans', 3], ['redBans', 4], ['blueBans', 4],
+  ['red', 3], ['blue', 3], ['blue', 4], ['red', 4]
+];
+const seq = () => TOURNEY;
+const NO_BAN = '-'; // ban passé (comme un ban manqué en pro)
+function skipBan() {
+  const tg = target();
+  if (!tg || !tg[0].endsWith('Bans')) return;
+  state.slots[tg[0]][tg[1]] = NO_BAN; state.history.push(tg); state.selected = null; render();
+}
 const used = () => new Set(Object.values(state.slots).flat().filter(Boolean));
 // ---------- Joueurs (multi op.gg) ----------
 // Un champion du pool ne compte que s'il est joué à la lane du joueur
@@ -123,22 +136,29 @@ function place(id) {
   const [t, i] = tg;
   state.slots[t][i] = id;
   state.history.push(tg);
-  if (t === 'blue' || t === 'red') autoRole(t, i, id);
+  if (t === 'blue' || t === 'red') assignRoles(t);
   state.selected = null;
   render();
 }
-function autoRole(side, i, id) {
-  const roles = state.roles[side];
-  for (const r of state.P[id].roles) {
-    if (roles[i] === r) return;
-    const j = roles.indexOf(r);
-    if (j >= 0 && !state.slots[side][j]) { [roles[i], roles[j]] = [roles[j], roles[i]]; return; }
+// Rôles attribués automatiquement à toute l'équipe : on cherche la répartition des 5 rôles
+// qui colle le mieux aux champions déjà pickés (part de games à chaque rôle). Plus besoin de choisir le rôle.
+const fit = (c, r) => (c.roleShare?.[r] ?? (c.roles.includes(r) ? 50 : 0)) + (c.roles.includes(r) ? 10 : 0);
+const PERMS = (() => { const out = []; const go = (a, rest) => { if (!rest.length) return out.push(a); rest.forEach((r, k) => go([...a, r], rest.filter((_, j) => j !== k))); }; go([], ROLES); return out; })();
+function assignRoles(side) {
+  const ids = state.slots[side], cur = state.roles[side];
+  let best = cur, bestScore = -1;
+  for (const perm of PERMS) {
+    let sc = 0;
+    ids.forEach((id, i) => { if (id) sc += fit(state.P[id], perm[i]) + (perm[i] === cur[i] ? 0.01 : 0); });
+    if (sc > bestScore) { bestScore = sc; best = perm; }
   }
+  state.roles[side] = [...best];
 }
-function clearSlot(t, i) { state.slots[t][i] = null; state.history = state.history.filter(([a, b]) => !(a === t && b === i)); render(); }
+const openRoles = (side, skip = -1) => { const taken = state.slots[side].map((id, i) => (id && i !== skip ? state.roles[side][i] : null)).filter(Boolean); return ROLES.filter((r) => !taken.includes(r)); };
+function clearSlot(t, i) { state.slots[t][i] = null; state.history = state.history.filter(([a, b]) => !(a === t && b === i)); if (t === 'blue' || t === 'red') assignRoles(t); render(); }
 function undo() {
   const last = state.history.pop();
-  if (last) { state.slots[last[0]][last[1]] = null; state.selected = null; render(); }
+  if (last) { state.slots[last[0]][last[1]] = null; if (last[0] === 'blue' || last[0] === 'red') assignRoles(last[0]); state.selected = null; render(); }
 }
 function reset() {
   state.slots = emptySlots(); state.roles = { blue: [...ROLES], red: [...ROLES] };
@@ -173,8 +193,10 @@ function renderBans() {
     state.slots[`${side}Bans`].forEach((id, i) => {
       const b = document.createElement('div');
       b.className = 'ban' + (id ? ' filled' : '') + (tg && tg[0] === `${side}Bans` && tg[1] === i ? ' target' : '');
-      b.title = id ? `${state.P[id].name} (clic droit pour retirer)` : `${BAN_NO[side][i]}e ban de la draft (phase ${i < 3 ? 1 : 2}) — clique puis choisis un champion`;
-      b.innerHTML = id ? `<img src="${img(id)}" alt="">` : `<span class="ban-n">${BAN_NO[side][i]}</span>`;
+      const skipped = id === NO_BAN;
+      if (skipped) b.classList.add('skipped');
+      b.title = skipped ? 'Ban passé (clic droit pour annuler)' : id ? `${state.P[id].name} (clic droit pour retirer)` : `${BAN_NO[side][i]}e ban de la draft (phase ${i < 3 ? 1 : 2})`;
+      b.innerHTML = skipped ? '<span class="ban-n">∅</span>' : id ? `<img src="${img(id)}" alt="">` : `<span class="ban-n">${BAN_NO[side][i]}</span>`;
       if (i === 3) b.classList.add('ph2');
       b.onclick = () => select(`${side}Bans`, i);
       b.oncontextmenu = (e) => { e.preventDefault(); if (id) clearSlot(`${side}Bans`, i); };
@@ -197,7 +219,7 @@ function renderTeams() {
       const c = id ? state.P[id] : null;
       const s = document.createElement('div');
       s.className = 'slot' + (tg && tg[0] === side && tg[1] === i ? ' target' : '');
-      const roleSel = `<select data-i="${i}">${ROLES.map((r) => `<option value="${r}" ${state.roles[side][i] === r ? 'selected' : ''}>${ROLE_LABEL[r]}</option>`).join('')}</select>`;
+      const roleSel = c ? `<span class="rolebadge" title="Rôle attribué automatiquement">${ROLE_LABEL[state.roles[side][i]]}</span>` : '';
       s.innerHTML = `
         <div class="portrait">${c ? `<img src="${img(id)}" alt="">` : (side === 'blue' ? 'B' : 'R') + (i + 1)}</div>
         <div>
@@ -212,11 +234,6 @@ function renderTeams() {
         if (e.target.classList.contains('clear')) { clearSlot(side, i); return; }
         select(side, i);
       };
-      s.querySelector('select').onchange = (e) => {
-        const r = e.target.value, roles = state.roles[side], j = roles.indexOf(r);
-        if (j >= 0) roles[j] = roles[i];
-        roles[i] = r; render();
-      };
       el.appendChild(s);
     });
   }
@@ -225,8 +242,11 @@ function renderTeams() {
 function renderStep() {
   const tg = target(), el = $('stepInfo');
   if (!tg) { el.textContent = 'Draft terminée'; el.className = 'step'; return; }
-  const role = tg[0] === 'blue' || tg[0] === 'red' ? ` · ${ROLE_LABEL[state.roles[tg[0]][tg[1]]]}` : '';
-  el.textContent = (state.selected ? 'Modifier : ' : '') + stepLabel(tg) + role;
+  el.textContent = (state.selected ? 'Modifier : ' : '') + stepLabel(tg);
+  if (tg[0].endsWith('Bans') && !state.slots[tg[0]][tg[1]]) {
+    const b = document.createElement('button'); b.className = 'skipban'; b.textContent = 'Passer ce ban';
+    b.title = 'Aucun ban à cette étape (comme un ban manqué en pro)'; b.onclick = skipBan; el.appendChild(b);
+  }
   el.className = 'step ' + (tg[0].startsWith('blue') ? 'blue' : 'red');
 }
 
@@ -324,24 +344,31 @@ function currentContext() {
 function gridInfo() {
   const ctx = currentContext();
   if (!ctx || !ctx.isPick) return ctx ? { ctx, proj: new Map() } : null;
-  const strip = (arr, side) => (ctx.side === side && state.slots[side][ctx.tg[1]] ? arr.filter((c) => c.id !== state.slots[side][ctx.tg[1]]) : arr);
+  const replaced = state.slots[ctx.side][ctx.tg[1]] ? ctx.tg[1] : -1;
+  const open = openRoles(ctx.side, replaced);
+  const strip = (arr, side) => (ctx.side === side && replaced >= 0 ? arr.filter((c) => c.id !== state.slots[side][replaced]) : arr);
   const b = strip(team('blue'), 'blue'), r = strip(team('red'), 'red');
-  const cand = pool().map((c) => ({ ...withComfort(c, ctx.side, ctx.role), lane: ctx.role, po: pickPos(ctx.side, ctx.tg[1]) }));
-  const known = playerFor(ctx.side, ctx.role);
-  const proj = new Map(projectPicks(b, r, ctx.side, null, cand).map((x) => [x.c.id, {
-    ...x, inPool: x.c.comfort > 0, prio: x.wr + (known ? (x.c.comfort > 0 ? 1.5 * x.c.comfort : -5) : 0)
-  }]));
-  return { ctx, proj };
+  // chaque candidat est testé à son meilleur rôle encore libre
+  const roleFor = (c) => [...open].sort((x, y) => fit(c, y) - fit(c, x))[0];
+  const po = pickPos(ctx.side, ctx.tg[1]);
+  const cand = pool().map((c) => { const ln = roleFor(c); return { ...withComfort(c, ctx.side, ln), lane: ln, po }; });
+  const proj = new Map(projectPicks(b, r, ctx.side, null, cand).map((x) => {
+    const known = playerFor(ctx.side, x.c.lane);
+    return [x.c.id, { ...x, inPool: x.c.comfort > 0, prio: x.wr + (known ? (x.c.comfort > 0 ? 1.5 * x.c.comfort : -5) : 0) }];
+  }));
+  return { ctx, proj, open };
 }
 
 function renderGrid(info) {
   const el = $('grid'), u = used();
   const q = state.search.trim().toLowerCase();
   const ctx = info?.ctx;
-  const roleNeeded = state.roleFilter ?? (state.onlyRole && ctx?.isPick ? ctx.role : null);
+  const roleNeeded = state.roleFilter;
+  const openR = state.onlyRole && ctx?.isPick ? info?.open : null;
   let list = state.list.filter((c) =>
     (!q || c.name.toLowerCase().includes(q) || c.id.toLowerCase().includes(q)) &&
     (!roleNeeded || c.roles.includes(roleNeeded)) &&
+    (!openR || c.roles.some((r) => openR.includes(r))) &&
     (!state.archFilter || c[state.archFilter] >= 2));
   if (info?.proj) list = [...list].sort((a, b) => (info.proj.get(b.id)?.prio ?? 0) - (info.proj.get(a.id)?.prio ?? 0));
   el.innerHTML = '';
@@ -615,14 +642,14 @@ function renderBanPlan() {
     return `<div class="do-g ${g.ban ? 'isban' : 'ispick'}"><span class="do-ph">${g.ph}</span><div class="do-row">${groups.map((gr) => `<span class="do-grp ${gr.side} ${gr.side === me ? 'me' : ''}">${gr.steps.map(([t, i]) => {
       const id = state.slots[t][i], cur = nextBan && nextBan[0] === t && nextBan[1] === i;
       const lab = g.ban ? `${gr.side === 'blue' ? 'B' : 'R'}·${BAN_NO[gr.side][i]}` : `${gr.side === 'blue' ? 'B' : 'R'}${i + 1}`;
-      return `<i class="do-s ${id ? 'done' : ''} ${cur ? 'cur' : ''}" title="${g.ban ? `${BAN_NO[gr.side][i]}e ban` : `Pick ${lab}`} — ${gr.side === 'blue' ? 'bleu' : 'rouge'}${gr.side === me ? ' (toi)' : ''}">${id ? `<img src="${img(id)}">` : lab}</i>`;
+      return `<i class="do-s ${id ? 'done' : ''} ${cur ? 'cur' : ''}" title="${g.ban ? `${BAN_NO[gr.side][i]}e ban` : `Pick ${lab}`} — ${gr.side === 'blue' ? 'bleu' : 'rouge'}${gr.side === me ? ' (toi)' : ''}">${id === NO_BAN ? '∅' : id ? `<img src="${img(id)}">` : lab}</i>`;
     }).join('')}</span>`).join('<b class="do-sep">/</b>')}</div></div>`;
   }).join('<span class="do-arrow">→</span>');
   const enemyFirst = other === 'blue' ? 'B1 / B2 B3' : 'R1 R2 / R3', enemyLast = other === 'blue' ? 'B4 B5' : 'R4 / R5';
   const myP1 = BAN_NO[me].slice(0, 3).map((n) => n + 'e').join(', '), myP2 = BAN_NO[me].slice(3).map((n) => n + 'e').join(', ');
   const myBans = state.slots[`${me}Bans`];
   const done = (from, to) => myBans.slice(from, to).filter(Boolean);
-  const slots = (from, to) => `<div class="bp-slots">${myBans.slice(from, to).map((id) => (id ? `<img src="${img(id)}" title="${state.P[id].name}">` : '<span></span>')).join('')}</div>`;
+  const slots = (from, to) => `<div class="bp-slots">${myBans.slice(from, to).map((id) => (id && id !== NO_BAN ? `<img src="${img(id)}" title="${state.P[id].name}">` : '<span></span>')).join('')}</div>`;
   const col = (title, sub, state_, body, from, to) => `<div class="bp-col ${state_}"><div class="bp-h"><b>${title}</b><em>${sub}</em>${slots(from, to)}</div>${body}</div>`;
   const rows = (n) => (list.length ? list.slice(0, n).map((x) => banRow(x, w.k)).join('') : '<p class="muted">Plus rien à bannir : leur équipe est complète.</p>');
   // Les bans de base restent proposés tant que tes slots ne sont pas remplis, même si tu as pické avant de bannir.

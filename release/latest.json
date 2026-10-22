@@ -1,7 +1,7 @@
 {
-  "version": "2.14.1",
-  "sha256": "fb271899a05bba5850921a28bf62bad082afbdf2db000adee8e06f07af4adf63",
-  "file": "draftlab-2.14.1.json.gz",
-  "notes": "Retrait du bouton Voir le calcul",
-  "date": "2026-10-22T17:15:10.677Z"
+  "version": "2.15.0",
+  "sha256": "6dd15502c04630c78937d2ba846ecfa03dd87bdd16bd46c01862bbb65f9b7e75",
+  "file": "draftlab-2.15.0.json.gz",
+  "notes": "Ordre de draft de tournoi avec les bans · rôles attribués automatiquement",
+  "date": "2026-10-22T17:23:00.533Z"
 }

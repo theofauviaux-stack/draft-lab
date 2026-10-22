@@ -269,3 +269,8 @@ Seul un changement de version d'Electron demande de retélécharger l'applicatio
 - Winrate pro du patch par champion (lissé vers 50 % avec peu de games) : remplace en grande partie le winrate pro de la saison.
 - « Réponses en pro » : pour deux champions face à face en lane, on regarde d'abord les games où ils ont été pickés dans le même ordre que dans la draft (qui a répondu à qui), sinon toutes leurs games l'un contre l'autre.
 
+
+## Version 2.15 — ordre de tournoi et rôles automatiques
+
+- La draft suit l'ordre d'une draft de tournoi : bans B R B R B R, picks B1 R1 R2 B2 B3 R3, bans R B R B, picks R4 B4 B5 R5. « Passer ce ban » permet de ne pas bannir (ban manqué).
+- Plus de choix de rôle par champion : les rôles de toute l'équipe sont répartis automatiquement à chaque pick (la répartition qui colle le mieux aux champions pickés). La grille montre les champions jouables aux rôles encore libres, et chaque % est calculé au meilleur rôle libre du champion.
