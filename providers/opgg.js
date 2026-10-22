@@ -79,11 +79,13 @@ async function fetchPlayer(region, riotId, byKey) {
   const tier = solo?.tier_info?.tier ? `${solo.tier_info.tier[0]}${solo.tier_info.tier.slice(1).toLowerCase()}${solo.tier_info.division ? ' ' + solo.tier_info.division : ''}${solo.tier_info.lp != null ? ` ${solo.tier_info.lp} LP` : ''}` : 'Non classé';
   // On garde les champions qui représentent au moins 1 % des games ranked de la saison
   const total = season?.play || (season?.champion_stats ?? []).reduce((a, c) => a + c.play, 0);
-  const pool = (season?.champion_stats ?? [])
+  // tous les champions joués (pour pouvoir remettre un champion retiré avec ses vraies stats)
+  const all = (season?.champion_stats ?? [])
     .map((c) => ({ id: byKey.get(String(c.id)), games: c.play, wins: c.win, share: total ? +((c.play / total) * 100).toFixed(1) : 0 }))
-    .filter((c) => c.id && c.games > 0 && c.share >= 1)
+    .filter((c) => c.id && c.games > 0);
+  const pool = all.filter((c) => c.share >= 1)
     .sort((a, b) => b.games - a.games);
-  return { riotId: `${d.game_name ?? s.game_name}#${String(d.tagline ?? s.tagline).replace(/\s+/g, '')}`, tier, rank, pool, total, level: d.level };
+  return { riotId: `${d.game_name ?? s.game_name}#${String(d.tagline ?? s.tagline).replace(/\s+/g, '')}`, tier, rank, pool, all, total, level: d.level };
 }
 
 async function fetchTeam(input, champions, fallbackRegion) {

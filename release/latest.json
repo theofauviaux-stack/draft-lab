@@ -1,7 +1,7 @@
 {
-  "version": "2.16.0",
-  "sha256": "d407d59f755af0739b5624016d00878e80949ba7443bc79a12773c18e64d647e",
-  "file": "draftlab-2.16.0.json.gz",
-  "notes": "Choix de la lane pour les champions joués sur plusieurs lanes",
-  "date": "2026-10-22T17:32:23.163Z"
+  "version": "2.16.1",
+  "sha256": "3aabb32a703cadc67c4c751417707af1371f403836b7f80ab4b6d398ad4a5da7",
+  "file": "draftlab-2.16.1.json.gz",
+  "notes": "Champion rajouté au pool : vraies stats du joueur, sinon juste le champion",
+  "date": "2026-10-22T17:36:59.540Z"
 }

@@ -96,14 +96,14 @@ function fitsRole(id, role) {
   if (!c) return false;
   return c.roles.includes(role);
 }
-const rolePool = (p) => (p.pool ?? []).filter((e) => e.manual || fitsRole(e.id, p.role));
+const rolePool = (p) => (p.pool ?? []).filter((e) => e.manual || e.restored || fitsRole(e.id, p.role));
 const rolePlayers = (side) => state.players[side].map((p) => ({ ...p, pool: rolePool(p) })).filter((p) => p.pool.length);
 const playerFor = (side, role) => rolePlayers(side).find((p) => p.role === role);
 function withComfort(c, side, role) {
   const pl = role ? playerFor(side, role) : null;
   const e = pl?.pool?.find((x) => x.id === c.id);
   if (!e) return c;
-  return { ...c, comfort: comfortPts(e), comfortTxt: `${playerLabel(pl)} : ${e.games} games${e.manual ? ' (ajouté)' : `, ${Math.round((e.wins / e.games) * 100)} %`}` };
+  return { ...c, comfort: comfortPts(e), comfortTxt: e.games ? `${playerLabel(pl)} : ${e.games} games, ${Math.round((e.wins / e.games) * 100)} %` : `${playerLabel(pl)} : ajouté à la main` };
 }
 const pickPos = (side, i) => PICKS.findIndex(([t, j]) => t === side && j === i);
 const team = (side) => state.slots[side].map((id, i) => (id ? { ...withComfort(state.P[id], side, state.roles[side][i]), lane: state.roles[side][i], po: pickPos(side, i) } : null)).filter(Boolean);
@@ -245,7 +245,7 @@ function renderTeams() {
         <div class="portrait">${c ? `<img src="${img(id)}" alt="">` : (side === 'blue' ? 'B' : 'R') + (i + 1)}</div>
         <div>
           <div class="name">${c ? c.name : '<span class="muted">À choisir</span>'}</div>
-          <div class="meta">${roleSel}${(() => { const pl = c ? playerFor(side, state.roles[side][i]) : null; const e = pl?.pool?.find((x) => x.id === id); return e && !e.manual ? `<span class="pgw ${e.wins / e.games >= 0.5 ? 'up' : 'down'}" title="${playerLabel(pl)} : ${e.games} games, ${Math.round((e.wins / e.games) * 100)} % de victoires">${e.games} g · ${Math.round((e.wins / e.games) * 100)} %</span>` : ''; })()}${c?.wr != null ? `<span class="wrtag" title="Winrate estimé : games pro + Master+ (one-tricks atténués)">${c.wr.toFixed(1)} % WR</span>` : ''}</div>
+          <div class="meta">${roleSel}${(() => { const pl = c ? playerFor(side, state.roles[side][i]) : null; const e = pl?.pool?.find((x) => x.id === id); return e && e.games ? `<span class="pgw ${e.wins / e.games >= 0.5 ? 'up' : 'down'}" title="${playerLabel(pl)} : ${e.games} games, ${Math.round((e.wins / e.games) * 100)} % de victoires">${e.games} g · ${Math.round((e.wins / e.games) * 100)} %</span>` : ''; })()}${c?.wr != null ? `<span class="wrtag" title="Winrate estimé : games pro + Master+ (one-tricks atténués)">${c.wr.toFixed(1)} % WR</span>` : ''}</div>
           ${c ? archBar(c) : ''}
           ${c ? sPairs.filter((x) => x.a.id === id || x.b.id === id).slice(0, 2).map((x) => { const o = x.a.id === id ? x.b : x.a; return `<span class="slink" style="--k:${KINDS[x.kind]?.color ?? '#6b7280'}" title="${x.title} : ${x.why.replace(/"/g, '&quot;')}">🔗 ${o.name} · ${KINDS[x.kind]?.label ?? ''}</span>`; }).join('') : ''}
         </div>
@@ -545,8 +545,16 @@ function addToPool(side, i, name) {
   const p = state.players[side][i];
   p.pool ??= [];
   if (p.pool.some((e) => e.id === c.id)) { toast(`${c.name} est déjà dans le pool`); return; }
-  p.pool.push({ id: c.id, games: 15, wins: 8, manual: true });
-  toast(`${c.name} ajouté au pool de ${playerLabel(p)}`);
+  // On remet les vraies données du joueur si on les a (champion retiré, ou joué sous 1 % de ses games), sinon juste le champion
+  const known = (p.removed ?? []).find((e) => e.id === c.id) ?? (p.all ?? []).find((e) => e.id === c.id);
+  if (known && known.games) {
+    p.pool.push({ ...known, manual: false, restored: true });
+    p.removed = (p.removed ?? []).filter((e) => e.id !== c.id);
+    toast(`${c.name} remis dans le pool de ${playerLabel(p)} : ${known.games} games, ${Math.round((known.wins / known.games) * 100)} %`);
+  } else {
+    p.pool.push({ id: c.id, manual: true });
+    toast(`${c.name} ajouté au pool de ${playerLabel(p)} (aucune game trouvée)`);
+  }
   render();
 }
 function renderPlayers() {
@@ -562,7 +570,7 @@ function renderPlayers() {
     el.innerHTML = list.map((p, i) => {
       const pts = rankPoints(p.rank);
       const g = (p.rank?.wins ?? 0) + (p.rank?.losses ?? 0);
-      const shown = (p.pool ?? []).map((e, k) => ({ e, k })).filter(({ e }) => e.manual || fitsRole(e.id, p.role));
+      const shown = (p.pool ?? []).map((e, k) => ({ e, k })).filter(({ e }) => e.manual || e.restored || fitsRole(e.id, p.role));
       const hidden = (p.pool?.length ?? 0) - shown.length;
       return `
       <div class="prow">
@@ -577,7 +585,7 @@ function renderPlayers() {
           </div>
         </div>
         <div class="ppool">
-          ${shown.map(({ e, k }) => `<span class="pchamp ${e.manual ? 'manual' : ''}" title="${state.P[e.id]?.name ?? e.id} : ${e.games} games${e.manual ? ' (ajouté à la main)' : `, ${Math.round((e.wins / e.games) * 100)} %${e.share ? `, ${e.share} % de ses games` : ''}${e.src ? ` (${e.src})` : ''}`} — clic pour retirer" data-i="${i}" data-k="${k}"><img src="${img(e.id)}" alt=""><i>${e.manual ? '+' : e.games}</i>${!e.manual && e.games ? `<b class="${e.wins / e.games >= 0.5 ? 'up' : 'down'}">${Math.round((e.wins / e.games) * 100)}%</b>` : ''}</span>`).join('') || '<span class="muted pnone">aucun champion à ce rôle</span>'}
+          ${shown.map(({ e, k }) => `<span class="pchamp ${e.manual ? 'manual' : ''}" title="${state.P[e.id]?.name ?? e.id} : ${e.games ? `${e.games} games, ${Math.round((e.wins / e.games) * 100)} %${e.share ? `, ${e.share} % de ses games` : ''}${e.src ? ` (${e.src})` : ''}` : 'ajouté à la main, aucune game trouvée'} — clic pour retirer" data-i="${i}" data-k="${k}"><img src="${img(e.id)}" alt="">${e.games ? `<i>${e.games}</i>` : ''}${e.games ? `<b class="${e.wins / e.games >= 0.5 ? 'up' : 'down'}">${Math.round((e.wins / e.games) * 100)}%</b>` : ''}</span>`).join('') || '<span class="muted pnone">aucun champion à ce rôle</span>'}
           ${hidden > 0 ? `<span class="phidden" title="Champions joués à d’autres lanes, ignorés pour le rôle ${ROLE_LABEL[p.role]}">+${hidden} autres lanes</span>` : ''}
           <input class="padd" data-i="${i}" list="champList" placeholder="+ champion" />
         </div>
@@ -590,7 +598,12 @@ function renderPlayers() {
       arr[i].role = r; render();
     }));
     el.querySelectorAll('.pinput').forEach((inp) => (inp.onchange = () => { state.players[side][+inp.dataset.i].riotId = inp.value.trim(); }));
-    el.querySelectorAll('.pchamp').forEach((ch) => (ch.onclick = () => { state.players[side][+ch.dataset.i].pool.splice(+ch.dataset.k, 1); render(); }));
+    el.querySelectorAll('.pchamp').forEach((ch) => (ch.onclick = () => {
+      const p = state.players[side][+ch.dataset.i];
+      const [e] = p.pool.splice(+ch.dataset.k, 1);
+      if (e && e.games) (p.removed ??= []).push(e); // gardé pour pouvoir le remettre avec ses stats
+      render();
+    }));
     el.querySelectorAll('.padd').forEach((inp) => {
       const d = drafts[`${el.id}|${inp.dataset.i}`]; if (d) inp.value = d;
       const go = () => { const v = inp.value.trim(); if (!v) return; inp.value = ''; delete drafts[`${el.id}|${inp.dataset.i}`]; addToPool(side, +inp.dataset.i, v); };

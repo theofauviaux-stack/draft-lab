@@ -393,6 +393,7 @@ export function recommendBans(blue, red, side, pool, enemyPlayers = []) {
 // Points de maîtrise d'un joueur sur un champion, à partir de ses games et de son winrate.
 export const playerLabel = (p) => (p?.riotId || '').split('#')[0] || `Joueur ${ROLE_LABEL[p?.role] ?? ''}`.trim();
 export function comfortPts(entry) {
+  if (entry?.manual && !entry.games) return 1; // ajouté à la main sans stats : champion maîtrisé, sans plus
   if (!entry?.games) return 0;
   const g = entry.games, wr = (entry.wins / g) * 100;
   const base = g >= 30 ? 2 : g >= 15 ? 1.5 : g >= 6 ? 1 : g >= 2 ? 0.4 : 0.2;
@@ -407,9 +408,9 @@ export function targetBans(pool, enemyPlayers) {
       const c = byId.get(e.id);
       if (!c) continue;
       const score = comfortPts(e) * 1.5 + ((c.wr ?? 50) - 50) * 0.4 + (c.presence ?? 0) * 0.02;
-      const wr = Math.round((e.wins / e.games) * 100);
+      const wr = e.games ? Math.round((e.wins / e.games) * 100) : null;
       const cur = out.get(c.id);
-      if (!cur || cur.score < score) out.set(c.id, { c, score, wr: c.wr ?? 50, delta: 0, why: `${playerLabel(pl)} : ${e.games} games${e.manual ? ' (ajouté à la main)' : `, ${wr} % de victoires`}` });
+      if (!cur || cur.score < score) out.set(c.id, { c, score, wr: c.wr ?? 50, delta: 0, why: e.games ? `${playerLabel(pl)} : ${e.games} games, ${wr} % de victoires` : `${playerLabel(pl)} : ajouté à la main` });
     }
   }
   return [...out.values()].sort((a, b) => b.score - a.score);
@@ -429,14 +430,15 @@ export function predictPicks(openRoles, candidatesByRole, players = []) {
       ? (c.proRoleStats?.[r]?.picks ?? 0) + 0.02 * (c.presence ?? 0)
       : (c.pr || 0.3) * ((c.roleShare?.[r] ?? (c.roles.includes(r) ? 40 : 0)) / 100);
     const metaSum = cands.reduce((a, c) => a + meta(c), 0) || 1;
-    const poolSum = pl ? (pl.pool ?? []).reduce((a, e) => a + e.games, 0) || 1 : 1;
+    const gOf = (e) => e.games || (e.manual ? 10 : 0);
+    const poolSum = pl ? (pl.pool ?? []).reduce((a, e) => a + gOf(e), 0) || 1 : 1;
     const scored = cands.map((c) => {
       const e = pl?.pool?.find((x) => x.id === c.id);
       const m = meta(c) / metaSum;
-      const own = e ? e.games / poolSum : 0;
+      const own = e ? gOf(e) / poolSum : 0;
       const base = pl && pl.pool?.length ? 0.75 * own + 0.25 * m : m;
       const strength = Math.exp(((c.wr ?? 50) - 50) / 8);
-      return { c, raw: base * strength, why: e ? `${playerLabel(pl)} : ${e.games} games` : 'méta' };
+      return { c, raw: base * strength, why: e ? (e.games ? `${playerLabel(pl)} : ${e.games} games` : `${playerLabel(pl)} : ajouté à la main`) : 'méta' };
     }).filter((x) => x.raw > 0).sort((a, b) => b.raw - a.raw).slice(0, 8);
     const tot = scored.reduce((a, x) => a + x.raw, 0) || 1;
     out[r] = scored.map((x) => ({ c: x.c, p: x.raw / tot, why: x.why }));

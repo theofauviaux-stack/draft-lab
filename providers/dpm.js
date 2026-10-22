@@ -60,11 +60,14 @@ function mergePool(player, dpm, byKey) {
     if (!cur || s.games > cur.games) map.set(id, { id, games: s.games, wins: s.wins, src: cur ? 'op.gg + dpm' : 'dpm.lol' });
   }
   const total = Math.max(player.total || 0, dpmTotal);
+  const allMap = new Map((player.all ?? []).map((e) => [e.id, e]));
+  for (const e of map.values()) { const a = allMap.get(e.id); if (!a || e.games > a.games) allMap.set(e.id, e); }
+  const all = [...allMap.values()];
   const pool = [...map.values()]
     .map((e) => ({ ...e, share: +((e.games / total) * 100).toFixed(1) }))
     .filter((e) => e.manual || e.share >= 1)
     .sort((a, b) => b.games - a.games);
-  return { ...player, pool, total, dpm: `${dpmTotal} games solo + flex lues sur dpm.lol` };
+  return { ...player, pool, all, total, dpm: `${dpmTotal} games solo + flex lues sur dpm.lol` };
 }
 
 module.exports = { fetchDpm, mergePool };
