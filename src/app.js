@@ -881,7 +881,8 @@ async function load(force = false) {
 function initControls() {
   $('themeBtn').onclick = () => { state.theme = state.theme === 'dark' ? 'light' : 'dark'; savePrefs(); applyTheme(); render(); };
   $('mySide').onchange = (e) => { state.mySide = e.target.value; savePrefs(); render(); };
-  $('undo').onclick = undo; $('reset').onclick = openMenu;
+  $('undo').onclick = undo; $('menuBtn').onclick = openMenu;
+  $('reset').onclick = () => { reset(); toast('Nouvelle draft : mêmes joueurs, picks et bans vidés'); };
   document.querySelectorAll('.seg-b').forEach((b) => (b.onclick = () => { $('mySide').value = b.dataset.side; $('mySide').onchange({ target: $('mySide') }); }));
   $('startZero').onclick = startFromZero;
   $('startPlayers').onclick = () => { $('startMenu').classList.add('form'); $('startChoices').hidden = true; $('startForm').hidden = false; $('menuBlue').focus(); };

@@ -11,6 +11,7 @@
 <body>
   <header class="topbar">
     <div class="tb-group tb-brand">
+      <button id="menuBtn" class="tb-menu" title="Menu : draft de zéro, draft depuis des joueurs, drafts sauvegardées, quitter">☰ Menu</button>
       <div class="brand"><span class="logo">◆</span> Draft Lab</div>
       <div class="tb-meta"><span id="patchPill">Patch …</span><span class="tb-dot">·</span><button class="verpill" id="verPill" title="Version de l’application — cliquer pour chercher une mise à jour">v…</button></div>
     </div>
@@ -23,7 +24,7 @@
       </div>
       <select id="mySide" hidden><option value="blue">Côté bleu</option><option value="red">Côté rouge</option></select>
       <button id="undo" class="tb-btn" title="Annuler le dernier choix (Ctrl/Cmd+Z)">↶ Annuler</button>
-      <button id="reset" class="tb-btn tb-new" title="Retour au menu : draft de zéro ou depuis des joueurs">＋ Nouvelle draft</button>
+      <button id="reset" class="tb-btn tb-new" title="Vide la draft en gardant le même mode et les mêmes joueurs">＋ Nouvelle draft</button>
     </div>
     <div class="tb-group tb-tools">
       <button class="dalert" id="dataAlert" hidden></button>
