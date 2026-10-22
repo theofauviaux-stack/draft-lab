@@ -721,3 +721,8 @@ details.box > summary, .scal summary { cursor: pointer; }
 .start.form .st-map { transform: translate(-50%, -50%) perspective(1400px) rotateX(60deg) rotateZ(-45deg) scale(1.15); }
 .start.leaving .st-map { transform: translate(-50%, -50%) perspective(1400px) rotateX(20deg) rotateZ(-45deg) scale(1.8); opacity: 0; }
 .st-jungle circle { opacity: .55; }
+
+.st-quit { margin-top: 26px; padding: 9px 18px; border-radius: 999px; font-weight: 700; color: var(--red); border: 1px solid color-mix(in srgb, var(--red) 45%, transparent);
+  background: color-mix(in srgb, var(--panel) 85%, transparent); backdrop-filter: blur(8px); }
+.st-quit:hover { background: var(--red); color: #fff; border-color: var(--red); }
+.st-quit[hidden] { display: none; }

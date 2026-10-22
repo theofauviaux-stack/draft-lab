@@ -181,6 +181,8 @@ app.whenReady().then(() => {
   ipcMain.handle('update:last', () => lastUpdate);
   ipcMain.handle('update:check', () => autoUpdate(sendUpdate));
   ipcMain.handle('update:restart', () => { app.relaunch(); app.exit(0); });
+  // Quitter complètement : fenêtre principale, fenêtre cachée dpm.lol et tâches de fond (mises à jour, données)
+  ipcMain.handle('app:quit', () => { for (const w of BrowserWindow.getAllWindows()) { try { w.destroy(); } catch {} } app.exit(0); });
   setTimeout(() => autoUpdate(sendUpdate), 8000);
   setInterval(() => autoUpdate(sendUpdate), 6 * HOUR);
   ipcMain.handle('open:external', (_e, url) => {
@@ -197,4 +199,5 @@ app.whenReady().then(() => {
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
 
-app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+// Fermer la fenêtre quitte aussi l'application en arrière-plan (y compris sur Mac).
+app.on('window-all-closed', () => app.quit());

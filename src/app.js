@@ -867,6 +867,7 @@ function initControls() {
   $('menuBack').onclick = () => { $('startMenu').classList.remove('form'); $('startForm').hidden = true; $('startChoices').hidden = false; };
   $('menuGo').onclick = startFromPlayers;
   $('refresh').onclick = () => load(true);
+  if (api.quit) $('menuQuit').onclick = () => api.quit(); else $('menuQuit').hidden = true;
   $('search').oninput = (e) => { state.search = e.target.value; render(); };
   $('onlyRole').onchange = (e) => { state.onlyRole = e.target.checked; render(); };
   const rf = $('roleFilter');

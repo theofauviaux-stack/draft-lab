@@ -41,6 +41,7 @@
     ]
   };
   window.draftlab = {
+    quit() { const t = document.getElementById('toast'); t.textContent = 'Dans l’application, ce bouton ferme complètement Draft Lab'; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2600); },
     load: async () => snapshot(),
     refresh: async () => snapshot(),
     onUpdated: () => {},

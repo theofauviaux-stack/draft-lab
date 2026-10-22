@@ -1,7 +1,7 @@
 {
-  "version": "2.10.1",
-  "sha256": "7128f5eddfd5ee09a62ec492c645cf565ae3307ee8186805dd6db36d93a43184",
-  "file": "draftlab-2.10.1.json.gz",
-  "notes": "Menu de départ sans croix : on choisit l'un ou l'autre",
-  "date": "2026-10-22T16:29:33.028Z"
+  "version": "2.11.0",
+  "sha256": "2d2df414683b93b80dd2442bdd15221718783886af51f56618efc37d2c6420dc",
+  "file": "draftlab-2.11.0.json.gz",
+  "notes": "Bouton Quitter dans le menu · fermer la fenêtre quitte aussi l'app en arrière-plan",
+  "date": "2026-10-22T16:31:27.235Z"
 }
