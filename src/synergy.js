@@ -86,6 +86,21 @@ const AOE = new Set(['Orianna', 'MissFortune', 'Kennen', 'Seraphine', 'Rumble', 
 const KALISTA_SUPS = new Set(['Rell', 'Alistar', 'Taric', 'Nautilus', 'Leona', 'Thresh', 'Braum', 'Poppy', 'Rakan']);
 
 const key = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+// ---- Interactions mécaniques (kits qui se déclenchent l'un l'autre) ----
+// Champions qui enchaînent beaucoup d'attaques / d'effets à l'impact en peu de temps
+const MULTI_HIT = { Belveth: 'ses attaques en rafale (E « Tourbillon »)', MasterYi: 'Frappe Alpha et ses attaques rapides', KogMaw: 'ses attaques bio-arcaniques', Kaisa: 'ses attaques rapides', Zeri: 'ses tirs rapides', Jinx: 'sa minigun', Twitch: 'ses attaques empoisonnées', Vayne: 'ses attaques rapides', Kalista: 'ses lances rapides', Kindred: 'ses attaques rapides', Xayah: 'ses plumes', Yunara: 'ses attaques rapides', Nilah: 'ses attaques et son Q', Jax: 'ses attaques (Riposte)', Fiora: 'ses attaques rapides', Katarina: 'son ultime Lotus mortel (applique les effets à l’impact)', Varus: 'ses attaques chargées', Sivir: 'son W qui rebondit', Aphelios: 'ses attaques', Gwen: 'ses coups de ciseaux', Viego: 'ses attaques', Briar: 'sa frénésie', Udyr: 'ses attaques', Warwick: 'ses attaques', Yasuo: 'ses Q et attaques', Yone: 'ses attaques', Tristana: 'ses attaques rapides' };
+// Champions qui ralentissent de façon fiable (pour les combos « ralenti → immobilisé »)
+const SLOWERS = { Ashe: 'chaque auto-attaque (Tir de givre)', Nasus: 'Dépérissement (W)', Lulu: 'Lance-étincelles (Q)', Zilean: 'Distorsion temporelle (E)', Sejuani: 'Courroux hivernal', Trundle: 'Pilier de glace', Nunu: 'boule de neige (W)', Varus: 'Corruption (E)', Ryze: 'Flux runique', Rumble: 'Électro-harpon (E)', Swain: 'Nevermove', Taliyah: 'Remparts tissés', Lissandra: 'Éclat de glace (Q)', Anivia: 'Gelure', Singed: 'Colle (W)', Cassiopeia: 'Miasme (W)', Karma: 'Flamme intérieure (Q)', Malphite: 'Fracas sismique', Zyra: 'Racines épineuses' };
+function mechanics(x, y) {
+  const out = [];
+  if ((y.id === 'Braum') && MULTI_HIT[x.id]) out.push({ v: 1.4, kind: 'cc', title: 'Coups commotionnants', why: `Le passif de Braum se charge avec les attaques de ses alliés : ${x.name} pose les 4 marques très vite avec ${MULTI_HIT[x.id]}, la cible est étourdie presque à chaque engage.`, src: 'interaction de kits' });
+  if ((y.id === 'Sejuani') && MULTI_HIT[x.id]) out.push({ v: 1.4, kind: 'cc', title: 'Gel permanent', why: `Le passif de Sejuani fait geler la cible avec les attaques des alliés proches : ${x.name} applique le Givre en un instant avec ${MULTI_HIT[x.id]}, et Sejuani déclenche l’étourdissement (E) en boucle.`, src: 'interaction de kits' });
+  if (y.id === 'Seraphine' && SLOWERS[x.id] && x.id !== 'Seraphine') out.push({ v: 1.35, kind: 'cc', title: 'Ralenti → immobilisé', why: `${x.name} ralentit avec ${SLOWERS[x.id]} : le E de Séraphine (Coup de basse) enracine une cible déjà ralentie au lieu de la ralentir, et l’étourdit si elle est déjà immobilisée. Un seul E suffit à verrouiller la cible.`, src: 'interaction de kits' });
+  if (y.id === 'Yuumi' && MULTI_HIT[x.id]) out.push({ v: 1.1, kind: 'peel', title: 'Yuumi sur un hyper-attaquant', why: `Yuumi s’attache à ${x.name} : soins et vitesse d’attaque pendant que ${MULTI_HIT[x.id]} déchire la cible, très difficile à tuer.`, src: 'interaction de kits' });
+  if (y.id === 'Taric' && ['MasterYi', 'Ekko', 'Belveth', 'Kayn', 'Hecarim', 'JarvanIV', 'Vi', 'Nocturne'].includes(x.id)) out.push({ v: 1.2, kind: 'dive', title: 'Lien de Taric', why: `Taric se lie à ${x.name} (W) : son étourdissement part aussi de ${x.name}, et l’invulnérabilité (R) protège la plongée.`, src: 'interaction de kits' });
+  return out;
+}
+
 const TABLE = new Map();
 for (const [a, b, kind, v, title, why, src] of COMBOS) TABLE.set(key(a, b), { v, kind, title, why, src });
 
@@ -112,6 +127,7 @@ export function pair(a, b) {
   if (t && t.kind === 'jgl' && !((is(a, 'J') && is(b, 'S')) || (is(a, 'S') && is(b, 'J')))) t = null;
   if (t) hits.push(t);
   for (const [x, y] of [[a, b], [b, a]]) {
+    hits.push(...mechanics(x, y));
     const bt = is(x, 'A') && is(y, 'S') ? BOT.get(`${x.id}|${y.id}`) : null;
     if (bt) hits.push({ v: bt.v, kind: 'lane', title: 'Duo bot conseillé', why: `${y.name} fait partie des meilleurs supports de ${x.name} (n°${bt.rank}, profil ${bt.type}) : la lane gagne ses trades et contrôle la vague pour le drake.`, src: 'duo conseillé' });
     const jg = JUNGLE.get(`${x.id}|${y.id}`);

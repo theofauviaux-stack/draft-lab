@@ -1,7 +1,7 @@
 {
-  "version": "2.18.0",
-  "sha256": "2cb3bcbcd86a82515d2121c268f94eff7bf90b835e1a1f029e67a089768d4ba1",
-  "file": "draftlab-2.18.0.json.gz",
-  "notes": "Import de capture réparé, lanes stables (une ligne par lane), fenêtres réduites",
-  "date": "2026-10-22T21:30:56.411Z"
+  "version": "2.19.0",
+  "sha256": "53cc6b152723684170ed51897652905ed7136984f9bc8a5c33b6ee0d9231e414",
+  "file": "draftlab-2.19.0.json.gz",
+  "notes": "Partie en direct (soloQ) comme Porofessor · menu en carré · interactions de kits (Braum, Sejuani, Séraphine…)",
+  "date": "2026-10-22T22:10:14.971Z"
 }

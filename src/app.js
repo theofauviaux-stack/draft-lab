@@ -811,6 +811,7 @@ function startBackground() {
   for (const id of ['startZero', 'startPlayers']) $(id).onmouseleave = () => delete root.dataset.hover;
 }
 function openMenu() {
+  if (LIVE.on) stopLiveMode();
   $('startMenu').hidden = false;
   $('startMenu').classList.remove('leaving', 'form');
   startBackground();
@@ -851,6 +852,70 @@ async function startFromPlayers() {
   go.disabled = false; go.textContent = 'Lancer la draft';
   $('playersBox').open = true;
   closeMenu();
+}
+
+// ---------- Partie en direct (soloQ) ----------
+const LIVE = { on: false, sig: '', loaded: { blue: '', red: '' } };
+const champByKey = (k) => (k == null ? null : state.list.find((c) => String(c.key) === String(k))?.id ?? null);
+const champByName = (n) => (n ? state.P[n]?.id ?? findChamp(n)?.id ?? null : null);
+const LIVE_TXT = { NoClient: ['En attente du client League', 'Lance League of Legends sur cet ordinateur.'], None: ['Client connecté', 'En attente de la sélection des champions.'], Lobby: ['Client connecté', 'Dans le salon : lance la recherche.'], Matchmaking: ['Recherche de partie', 'La draft s’affichera dès la sélection des champions.'], ReadyCheck: ['Partie trouvée', 'Accepte la partie.'], ChampSelect: ['Sélection des champions en direct', 'Picks, bans et lanes mis à jour en temps réel.'], InProgress: ['Partie en cours', 'Les 10 joueurs viennent du jeu ; op.gg chargé pour les joueurs visibles.'], Error: ['Direct indisponible', ''] };
+function startLiveMode() {
+  if (!api.liveStart) { toast('Disponible uniquement dans l’application'); return; }
+  state.players = { blue: [], red: [] }; state.teamInput = { blue: '', red: '' }; state.flow = 'players';
+  LIVE.on = true; LIVE.sig = ''; LIVE.loaded = { blue: '', red: '' };
+  reset(); closeMenu();
+  $('liveBar').hidden = false; $('liveTitle').textContent = 'Connexion au client…'; $('liveText').textContent = '';
+  api.liveStart();
+}
+function stopLiveMode() { LIVE.on = false; api.liveStop?.(); $('liveBar').hidden = true; }
+function onLive(d) {
+  if (!LIVE.on) return;
+  const [t, sub] = LIVE_TXT[d.phase] ?? ['Client connecté', d.phase];
+  $('liveTitle').textContent = t; $('liveText').textContent = d.error ? `${sub} (${d.error})` : sub;
+  $('liveBar').dataset.phase = d.phase;
+  if (!d.teams) return;
+  const sig = JSON.stringify([d.teams, d.bans, d.mySide]);
+  if (sig === LIVE.sig) return;
+  LIVE.sig = sig;
+  state.mySide = d.mySide; $('mySide').value = d.mySide;
+  for (const side of ['blue', 'red']) {
+    const members = d.teams[side] ?? [];
+    const slots = Array(5).fill(null), roles = [...ROLES], lock = Array(5).fill(null);
+    const free = () => slots.findIndex((x, k) => !x && !lock[k]);
+    // une ligne par lane : chaque joueur va sur la ligne de sa lane quand on la connaît
+    for (const m of members) {
+      const id = m.champKey ? champByName(m.champKey) ?? champByName(m.champName) : champByKey(m.champ);
+      let k = m.role ? ROLES.indexOf(m.role) : -1;
+      if (k < 0 || slots[k] || lock[k]) k = free();
+      if (k < 0) continue;
+      if (m.role) lock[k] = m.role;
+      if (id && m.locked !== false) slots[k] = id;
+    }
+    state.slots[side] = slots; state.roles[side] = roles; state.lock[side] = lock.map((r, k) => (slots[k] && r ? r : null));
+    if (members.some((m) => !m.role)) assignRoles(side);
+    const bans = (d.bans?.[side] ?? []).map(champByKey).filter(Boolean).slice(0, 5);
+    state.slots[`${side}Bans`] = [...bans, ...Array(5 - bans.length).fill(null)];
+    // joueurs : op.gg pour ceux dont le nom est visible, les autres (mode streamer) sont ignorés
+    const visible = members.filter((m) => m.riotId);
+    const key = visible.map((m) => m.riotId).join(',');
+    state.players[side] = members.map((m, k) => {
+      const old = state.players[side].find((p) => p.riotId && p.riotId === m.riotId);
+      return old ? { ...old, role: m.role ?? old.role } : { riotId: m.riotId ?? '', role: m.role ?? ROLES[k], pool: [], hidden: !m.riotId, error: m.riotId ? null : 'nom masqué (mode streamer) : ignoré' };
+    });
+    if (key && key !== LIVE.loaded[side] && api.loadTeam) {
+      LIVE.loaded[side] = key;
+      api.loadTeam({ input: visible.map((m) => m.riotId).join(', '), region: (d.region || state.region || 'euw').toLowerCase() }).then((res) => {
+        if (!res || res.error || !LIVE.on) return;
+        for (const p of res.players ?? []) {
+          const m = visible.find((x) => x.riotId.toLowerCase().replace(/\s/g, '') === String(p.riotId).toLowerCase().replace(/\s/g, ''));
+          const k = state.players[side].findIndex((x) => x.riotId && m && x.riotId === m.riotId);
+          if (k >= 0) state.players[side][k] = { ...p, role: state.players[side][k].role };
+        }
+        render();
+      }).catch(() => {});
+    }
+  }
+  render();
 }
 
 // ---------- Draft depuis une capture de fin de game ----------
@@ -1012,6 +1077,11 @@ function askTopMid(side, done) {
   box.onclick = null;
 }
 
+function initLive() {
+  $('startLive').onclick = startLiveMode;
+  $('liveStop').onclick = () => { stopLiveMode(); toast('Direct arrêté'); };
+  api.onLive?.(onLive);
+}
 function initShot() {
   $('startShot').onclick = openShot;
   $('shotClose').onclick = () => { $('shotBox').hidden = true; };
@@ -1294,6 +1364,7 @@ function initUpdates() {
 applyTheme();
 initControls();
 initShot();
+initLive();
 initUpdates();
 openMenu();
 load();

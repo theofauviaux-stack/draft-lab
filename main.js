@@ -9,6 +9,7 @@ const { fetchTeam } = require('./providers/opgg');
 const { fetchDpm, mergePool } = require('./providers/dpm');
 const { autoUpdate } = require('./providers/updater');
 const { fetchProGames } = require('./providers/progames');
+const { startLive, stopLive } = require('./providers/live');
 
 const HOUR = 3600 * 1000;
 const STALE = { lolalytics: 6 * HOUR, golgg: 12 * HOUR, progames: 4 * HOUR };
@@ -197,6 +198,9 @@ app.whenReady().then(() => {
     try { const data = await fetchDetail(cid, lane); details.set(k, { at: Date.now(), data }); return data; }
     catch (e) { return c?.data ?? { error: e.message }; }
   });
+  // Partie en direct (client League / jeu sur cet ordinateur)
+  ipcMain.handle('live:start', () => { startLive((d) => { if (win && !win.isDestroyed()) win.webContents.send('live:update', d); }); return true; });
+  ipcMain.handle('live:stop', () => { stopLive(); return true; });
   // Mises à jour automatiques de l'application
   let lastUpdate = null;
   const sendUpdate = (st) => { lastUpdate = st; if (win && !win.isDestroyed()) win.webContents.send('update:status', st); };

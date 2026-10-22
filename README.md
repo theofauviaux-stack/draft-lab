@@ -285,3 +285,12 @@ Seul un changement de version d'Electron demande de retélécharger l'applicatio
 - Plaques : 5 plaques sur chaque tour T1, T2 et T3 depuis le patch 26.1.
 - 2.17.1 : import de capture — champions reconnus uniquement par l'image du portrait (jamais par le pseudo), lanes déduites des champions ; seule question posée : qui est top et qui est mid quand c'est ambigu.
 - 2.18 : import de capture réparé dans l'application (politique de sécurité qui bloquait l'image, cache des portraits, recherche affinée champion par champion : 10/10 sur un vrai tableau de fin de game). Équipes affichées sur une ligne fixe par lane ; un nouveau pick prend la meilleure lane libre sans déplacer les autres. Mise en page adaptée aux fenêtres non plein écran.
+
+## Version 2.19 — partie en direct et interactions de kits
+
+- « 🎮 Partie en direct (soloQ) » : comme Porofessor / dpm, l'app lit le client League ouvert sur l'ordinateur (API locale, rien n'est envoyé ailleurs).
+  - Sélection des champions : picks verrouillés, bans, lanes assignées, côté ; mise à jour toutes les 2 s.
+  - En jeu : les 10 joueurs et leurs champions (API du jeu, port 2999), lanes déduites (Smite = jungle).
+  - op.gg chargé pour chaque joueur dont le nom est visible ; les noms masqués (mode streamer, sélection anonyme) sont ignorés.
+- Menu en carré : 2 choix en haut, 2 en dessous.
+- Synergies d'interactions de kits : passif de Braum ou de Sejuani chargé par les attaques rapides d'un allié (Bel'Veth, Master Yi, Kog'Maw, Katarina R…), ralentissements (Ashe, Nasus, Lulu…) qui transforment le E de Séraphine en racine / étourdissement, Yuumi sur un hyper-attaquant, lien de Taric.
