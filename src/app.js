@@ -136,10 +136,18 @@ function place(id) {
   const [t, i] = tg;
   state.slots[t][i] = id;
   state.history.push(tg);
-  if (t === 'blue' || t === 'red') { state.lock[t][i] = null; assignRoles(t); }
+  let chosen = false;
+  if (t === 'blue' || t === 'red') {
+    const w = state.wantRole;
+    // lane choisie en cliquant sur sa ligne : on la garde si le champion la joue
+    if (w && w.side === t && w.i === i && (flexRoles(state.P[id]).includes(w.r) || state.P[id].roles.includes(w.r))) { state.lock[t][i] = w.r; chosen = true; }
+    else state.lock[t][i] = null;
+    if (chosen) assignRoles(t); else placeRole(t, i);
+  }
+  state.wantRole = null;
   state.selected = null;
   render();
-  if (t === 'blue' || t === 'red') askLane(t, i, false);
+  if ((t === 'blue' || t === 'red') && !chosen) askLane(t, i, false);
 }
 // Champion joué sur plusieurs lanes : on demande la lane (toutes les lanes sont proposées)
 const laneShare = (c, r) => Math.round(c.rolePct?.[r] ?? c.roleShare?.[r] ?? 0);
@@ -184,7 +192,17 @@ function assignRoles(side) {
   state.roles[side] = [...best];
 }
 const openRoles = (side, skip = -1) => { const taken = state.slots[side].map((id, i) => (id && i !== skip ? state.roles[side][i] : null)).filter(Boolean); return ROLES.filter((r) => !taken.includes(r)); };
-function clearSlot(t, i) { state.slots[t][i] = null; if (state.lock[t]) state.lock[t][i] = null; state.history = state.history.filter(([a, b]) => !(a === t && b === i)); if (t === 'blue' || t === 'red') assignRoles(t); render(); }
+// Un nouveau pick prend la meilleure lane libre SANS déplacer les champions déjà placés.
+// On ne réorganise toute l'équipe que s'il ne peut jouer aucune des lanes libres.
+function placeRole(side, i) {
+  const keep = state.lock[side].slice();
+  state.slots[side].forEach((id, k) => { if (id && k !== i && !state.lock[side][k]) state.lock[side][k] = state.roles[side][k]; });
+  assignRoles(side);
+  state.lock[side] = keep;
+  const c = state.P[state.slots[side][i]];
+  if (fit(c, state.roles[side][i]) < 15) assignRoles(side);
+}
+function clearSlot(t, i) { state.slots[t][i] = null; if (state.lock[t]) state.lock[t][i] = null; state.history = state.history.filter(([a, b]) => !(a === t && b === i)); render(); }
 function undo() {
   const last = state.history.pop();
   if (last) { state.slots[last[0]][last[1]] = null; if (state.lock[last[0]]) state.lock[last[0]][last[1]] = null; if (last[0] === 'blue' || last[0] === 'red') assignRoles(last[0]); state.selected = null; render(); }
@@ -243,16 +261,21 @@ function renderTeams() {
   const tg = target();
   for (const side of ['blue', 'red']) {
     const el = $(`${side}Team`); el.innerHTML = '';
+    el.classList.toggle('turn', !!tg && tg[0] === side);
     const sPairs = teamSynergy(team(side)).pairs;
-    state.slots[side].forEach((id, i) => {
+    // Une ligne fixe par lane (Top, Jungle, Mid, ADC, Support) : les champions ne « sautent » plus d'une ligne à l'autre
+    ROLES.map((r) => state.roles[side].indexOf(r)).forEach((i) => {
+      const id = state.slots[side][i];
+      const r = state.roles[side][i];
       const c = id ? state.P[id] : null;
       const s = document.createElement('div');
-      s.className = 'slot' + (tg && tg[0] === side && tg[1] === i ? ' target' : '');
-      const roleSel = c ? `<span class="rolebadge ${state.lock[side][i] ? 'locked' : ''}" title="${state.lock[side][i] ? 'Lane choisie' : 'Lane attribuée automatiquement'} — clic pour changer">${ROLE_LABEL[state.roles[side][i]]}</span>` : '';
+      // un pick n'appartient à aucune lane tant qu'il n'est pas fait : on ne surligne une ligne que si tu l'as choisie
+      s.className = 'slot' + (state.selected && state.selected[0] === side && state.selected[1] === i ? ' target' : '') + (c ? '' : ' empty');
+      const roleSel = c ? `<span class="rolebadge ${state.lock[side][i] ? 'locked' : ''}" title="${state.lock[side][i] ? 'Lane choisie' : 'Lane attribuée automatiquement'} — clic pour changer">${ROLE_LABEL[r]}</span>` : '';
       s.innerHTML = `
-        <div class="portrait">${c ? `<img src="${img(id)}" alt="">` : (side === 'blue' ? 'B' : 'R') + (i + 1)}</div>
+        <div class="portrait">${c ? `<img src="${img(id)}" alt="">` : `<span class="lane-ph">${ROLE_LABEL[r]}</span>`}</div>
         <div>
-          <div class="name">${c ? c.name : '<span class="muted">À choisir</span>'}</div>
+          <div class="name">${c ? c.name : `<span class="muted">${ROLE_LABEL[r]} · à choisir</span>`}</div>
           <div class="meta">${roleSel}${(() => { const pl = c ? playerFor(side, state.roles[side][i]) : null; const e = pl?.pool?.find((x) => x.id === id); return e && e.games ? `<span class="pgw ${e.wins / e.games >= 0.5 ? 'up' : 'down'}" title="${playerLabel(pl)} : ${e.games} games, ${Math.round((e.wins / e.games) * 100)} % de victoires">${e.games} g · ${Math.round((e.wins / e.games) * 100)} %</span>` : ''; })()}${c?.wr != null ? `<span class="wrtag" title="Winrate estimé : games pro + Master+ (one-tricks atténués)">${c.wr.toFixed(1)} % WR</span>` : ''}</div>
           ${c ? archBar(c) : ''}
           ${c ? sPairs.filter((x) => x.a.id === id || x.b.id === id).slice(0, 2).map((x) => { const o = x.a.id === id ? x.b : x.a; return `<span class="slink" style="--k:${KINDS[x.kind]?.color ?? '#6b7280'}" title="${x.title} : ${x.why.replace(/"/g, '&quot;')}">🔗 ${o.name} · ${KINDS[x.kind]?.label ?? ''}</span>`; }).join('') : ''}
@@ -262,6 +285,7 @@ function renderTeams() {
         if (e.target.tagName === 'SELECT' || e.target.tagName === 'OPTION') return;
         if (e.target.classList.contains('clear')) { clearSlot(side, i); return; }
         if (e.target.classList.contains('rolebadge')) { askLane(side, i, true); return; }
+        state.wantRole = c ? null : { side, i, r }; // clic sur une lane vide : le prochain champion ira à cette lane
         select(side, i);
       };
       el.appendChild(s);
@@ -304,7 +328,7 @@ function renderWr(ev) {
       <div class="sb-title">${side === 'blue' ? 'Équipe 1' : 'Équipe 2'} <span>${side === 'blue' ? 'côté bleu' : 'côté rouge'}${state.mySide === side ? ' · toi' : ''}</span></div>
       <div class="sb-pct">${pct.toFixed(1)}<small>%</small></div>
       <div class="sb-meta">${t ? `<span class="tier" style="--c:${tierColor(t.rank)}">${pointsLabel(t.rank)}</span>${t.wr != null ? `<span>${t.wr} % saison</span>` : ''}${t.hot ? `<span>🔥 ${t.hot} en forme</span>` : ''}` : '<span class="muted">joueurs inconnus</span>'}</div>
-      <div class="sb-picks">${state.slots[side].map((id, i) => `<div class="sb-pick ${id ? '' : 'empty'}" title="${id ? state.P[id].name : ''}">${id ? `<img src="${img(id)}" alt="">` : ''}<span>${ROLE_LABEL[state.roles[side][i]]}</span></div>`).join('')}</div>
+      <div class="sb-picks">${ROLES.map((r) => { const i = state.roles[side].indexOf(r), id = state.slots[side][i]; return `<div class="sb-pick ${id ? '' : 'empty'}" title="${id ? state.P[id].name : ''}">${id ? `<img src="${img(id)}" alt="">` : ''}<span>${ROLE_LABEL[r]}</span></div>`; }).join('')}</div>
       <div class="sb-players">${ROLES.map((r) => {
         const p = list.find((x) => x.role === r);
         const pts = p ? rankPoints(p.rank) : null;
@@ -837,6 +861,8 @@ const ICON_N = 20, ZOOMS = [0.45, 0.52, 0.6, 0.68, 0.76]; // centre de l'icône 
 function iconVec(source, sx, sy, sw, sh) {
   const cv = iconVec.cv ??= Object.assign(document.createElement('canvas'), { width: ICON_N, height: ICON_N });
   const ctx = iconVec.ctx ??= cv.getContext('2d', { willReadFrequently: true });
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  ctx.clearRect(0, 0, ICON_N, ICON_N);
   ctx.drawImage(source, sx, sy, sw, sh, 0, 0, ICON_N, ICON_N);
   const d = ctx.getImageData(0, 0, ICON_N, ICON_N).data, v = new Float32Array(ICON_N * ICON_N * 3);
   // une seule moyenne pour les 3 couleurs : on garde la teinte (très discriminante), on retire la luminosité
@@ -860,7 +886,8 @@ async function loadIcons() {
       try { for (const z of ZOOMS) { const w = im.width * z; out.push({ id: c.id, z, v: iconVec(im, (im.width - w) / 2, (im.height - w) / 2, w, w) }); } } catch {}
       res();
     };
-    im.onerror = res; im.src = img(c.id);
+    // URL distincte : sinon Chromium réutilise la version déjà affichée (sans autorisation de lecture) et le portrait est ignoré
+    im.onerror = res; const u = img(c.id); im.src = u.startsWith('data:') ? u : `${u}?read=1`;
   })));
   SHOT.icons = out; $('shotState').textContent = '';
   return out;
@@ -870,34 +897,35 @@ async function loadIcons() {
 function matchAt(x, y, exclude = new Set()) {
   const W = SHOT.img.width;
   const icons = SHOT.icons.filter((ic) => !exclude.has(ic.id));
-  const score = (v, list) => { const out = new Map(); for (const ic of list) { let c = 0; for (let j = 0; j < v.length; j++) c += v[j] * ic.v[j]; c /= v.length; const cur = out.get(ic.id); if (cur == null || c > cur) out.set(ic.id, c); } return out; };
-  // passe 1 : grossière (cadrage 0.6), décalages jusqu'à ±18 % de la taille
-  let best = null; const cand = new Map();
-  const z1 = icons.filter((ic) => ic.z === 0.6);
-  for (let s = W * 0.015; s <= W * 0.075; s *= 1.1) {
-    for (let dx = -0.18; dx <= 0.181; dx += 0.09) for (let dy = -0.18; dy <= 0.181; dy += 0.09) {
+  const corr = (v, u) => { let c = 0; for (let j = 0; j < v.length; j++) c += v[j] * u[j]; return c / v.length; };
+  // passe 1 : pour CHAQUE champion, sa meilleure position/taille autour du clic (cadrage 0.6)
+  const z1 = icons.filter((ic) => ic.z === 0.6), bestOf = new Map();
+  for (let s = W * 0.015; s <= W * 0.075; s *= 1.08) {
+    for (let dx = -0.2; dx <= 0.201; dx += 0.08) for (let dy = -0.2; dy <= 0.201; dy += 0.08) {
       const w = s * 0.6, v = iconVec(SHOT.img, x + dx * s - w / 2, y + dy * s - w / 2, w, w);
       if (v.sd < 6) continue;
-      for (const [id, c] of score(v, z1)) {
-        if (!best || c > best.c) best = { c, s, dx, dy };
-        if (!cand.has(id) || c > cand.get(id)) cand.set(id, c);
+      for (const ic of z1) { const c = corr(v, ic.v); const b = bestOf.get(ic.id); if (!b || c > b.c) bestOf.set(ic.id, { c, s, dx, dy }); }
+    }
+  }
+  if (!bestOf.size) return [];
+  // passe 2 : les 16 meilleurs, chacun affiné autour de SA position, avec tous les cadrages
+  const top = [...bestOf.entries()].sort((p, q) => q[1].c - p[1].c).slice(0, 16);
+  const res = new Map();
+  for (const [id, b0] of top) {
+    const mine = icons.filter((ic) => ic.id === id);
+    let best = -1;
+    for (let ks = 0.92; ks <= 1.081; ks += 0.04) for (let ox = -0.05; ox <= 0.051; ox += 0.025) for (let oy = -0.05; oy <= 0.051; oy += 0.025) {
+      const s = b0.s * ks, cx = x + (b0.dx + ox) * b0.s, cy = y + (b0.dy + oy) * b0.s;
+      for (const ic of mine) {
+        const w = s * ic.z, v = iconVec(SHOT.img, cx - w / 2, cy - w / 2, w, w);
+        if (v.sd < 6) continue;
+        const c = corr(v, ic.v); if (c > best) best = c;
       }
     }
+    res.set(id, best);
   }
-  if (!best) return [];
-  const top = new Set([...cand.entries()].sort((p, q) => q[1] - p[1]).slice(0, 14).map(([id]) => id));
-  const fine = icons.filter((ic) => top.has(ic.id));
-  // passe 2 : fine, autour de la meilleure position, tous les cadrages
-  const res = new Map();
-  for (let ks = 0.9; ks <= 1.101; ks += 0.05) for (let ox = -0.06; ox <= 0.061; ox += 0.03) for (let oy = -0.06; oy <= 0.061; oy += 0.03) {
-    const s = best.s * ks, cx = x + (best.dx + ox) * best.s, cy = y + (best.dy + oy) * best.s;
-    for (const z of ZOOMS) {
-      const w = s * z, v = iconVec(SHOT.img, cx - w / 2, cy - w / 2, w, w);
-      if (v.sd < 6) continue;
-      for (const [id, c] of score(v, fine.filter((ic) => ic.z === z))) if (!res.has(id) || c > res.get(id)) res.set(id, c);
-    }
-  }
-  return [...res.entries()].sort((p, q) => q[1] - p[1]).slice(0, 4).map(([id]) => id);
+  const out = [...res.entries()].sort((p, q) => q[1] - p[1]);
+  return out.slice(0, 4).map(([id]) => id);
 }
 function drawShot() {
   const cv = $('shotCanvas'), ctx = cv.getContext('2d');
@@ -925,9 +953,11 @@ function renderShotList() {
   $('shotUndo').disabled = !n;
 }
 async function setShotImage(file) {
-  const url = URL.createObjectURL(file);
+  // lecture en data URL (autorisée par la politique de sécurité de l'app), avec message si l'image est illisible
+  const url = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(file); });
   const im = new Image();
-  await new Promise((r) => { im.onload = r; im.src = url; });
+  const ok = await new Promise((r) => { im.onload = () => r(true); im.onerror = () => r(false); im.src = url; });
+  if (!ok) { toast('Image illisible : essaie en PNG ou JPG'); return; }
   SHOT.img = im; SHOT.clicks = [];
   const cv = $('shotCanvas'), maxW = Math.min(900, innerWidth * 0.62);
   SHOT.scale = Math.min(1, maxW / im.width);

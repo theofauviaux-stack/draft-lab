@@ -864,3 +864,36 @@ details.box > summary, .scal summary { cursor: pointer; }
 .la-opts .tm { display: flex; align-items: center; gap: 6px; font-size: 13px; margin: 2px 0; }
 .la-opts .tm img { width: 26px; height: 26px; border-radius: 6px; }
 .la-opts .tm small { color: var(--muted); font-weight: 700; }
+/* Lignes fixes par lane */
+.slot.empty { opacity: .8; }
+.lane-ph { font-size: 10.5px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .3px; }
+.team.turn { box-shadow: 0 0 0 2px var(--gold), 0 4px 16px #0001; border-radius: 14px; }
+
+/* ---- Fenêtre non plein écran : rien ne sort du cadre ---- */
+html, body { overflow-x: hidden; }
+.topbar button, .tb-meta, .brand, .seg-b { white-space: nowrap; }
+.tb-group { min-width: 0; }
+.tb-brand { overflow: hidden; }
+@media (max-width: 1400px) {
+  .tb-mode, .seg-l { display: none; }
+  .topbar { grid-template-columns: auto 1fr auto !important; gap: 10px; }
+  .tb-brand { gap: 10px; }
+}
+@media (max-width: 1250px) {
+  .tb-meta { display: none; }
+  .tb-btn, .tb-menu { padding: 6px 10px; }
+  /* le tableau de scores reste sur une ligne, en plus compact */
+  .scoreboard { grid-template-columns: 1fr minmax(300px, 360px) 1fr !important; gap: 10px; }
+  .sb-pct { font-size: 40px; } .sb-players { display: none; }
+  .wb-nums b.lead { font-size: 36px; } .wb-nums b { font-size: 24px; }
+  .board { grid-template-columns: 210px minmax(0, 1fr) 210px !important; }
+}
+@media (max-width: 1150px) {
+  .brand { font-size: 16px !important; }
+  .tb-new { font-size: 0; padding: 6px 12px; } .tb-new::before { content: '＋ Nouvelle'; font-size: 13px; }
+}
+.board > *, .scoreboard > *, .analysis > *, .card { min-width: 0; }
+.slot .name, .slot .meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.dorder, .banplan, .pl-objs, .pl-phases { min-width: 0; }
+.la-card { max-width: 94vw; }
+.shot-img canvas { max-width: 100%; height: auto; }

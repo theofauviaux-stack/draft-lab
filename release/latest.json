@@ -1,7 +1,7 @@
 {
-  "version": "2.17.2",
-  "sha256": "034387f07dc858696f6df54b8f600925f3c6aafc235135968b0b8ea69ccc9acb",
-  "file": "draftlab-2.17.2.json.gz",
-  "notes": "Import de capture : bouton Choisir un fichier réparé, zone de dépôt redessinée",
-  "date": "2026-10-22T18:19:45.457Z"
+  "version": "2.18.0",
+  "sha256": "2cb3bcbcd86a82515d2121c268f94eff7bf90b835e1a1f029e67a089768d4ba1",
+  "file": "draftlab-2.18.0.json.gz",
+  "notes": "Import de capture réparé, lanes stables (une ligne par lane), fenêtres réduites",
+  "date": "2026-10-22T21:30:56.411Z"
 }

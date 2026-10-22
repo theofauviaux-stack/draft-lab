@@ -284,3 +284,4 @@ Seul un changement de version d'Electron demande de retélécharger l'applicatio
 - Menu : liste dépliable de toutes les drafts sauvegardées, avec leurs picks.
 - Plaques : 5 plaques sur chaque tour T1, T2 et T3 depuis le patch 26.1.
 - 2.17.1 : import de capture — champions reconnus uniquement par l'image du portrait (jamais par le pseudo), lanes déduites des champions ; seule question posée : qui est top et qui est mid quand c'est ambigu.
+- 2.18 : import de capture réparé dans l'application (politique de sécurité qui bloquait l'image, cache des portraits, recherche affinée champion par champion : 10/10 sur un vrai tableau de fin de game). Équipes affichées sur une ligne fixe par lane ; un nouveau pick prend la meilleure lane libre sans déplacer les autres. Mise en page adaptée aux fenêtres non plein écran.
