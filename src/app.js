@@ -1,7 +1,7 @@
 import { teamSynergy, KINDS } from './synergy.js';
 import {
   ROLES, ROLE_LABEL, ARCH, ORDER, rel,
-  buildProfiles, evaluate, setDetailSource, recommend, recommendBans, projectPicks, gamePlan, powerCurve,
+  buildProfiles, evaluate, setDetailSource, applyProGames, proInfo, recommend, recommendBans, projectPicks, gamePlan, powerCurve,
   comfortPts, proposeDrafts, playerLabel, analyzeDraft, matchPlan, pentagonView, styleBreakdown, compLabel, playersForecast, combineWr, pointsLabel, rankPoints, RANK_OPTIONS, playerRating, dominant, teamShares, predictPicks, enemyScenarios, predictedBans
 } from './engine.js';
 
@@ -92,7 +92,8 @@ function withComfort(c, side, role) {
   if (!e) return c;
   return { ...c, comfort: comfortPts(e), comfortTxt: `${playerLabel(pl)} : ${e.games} games${e.manual ? ' (ajouté)' : `, ${Math.round((e.wins / e.games) * 100)} %`}` };
 }
-const team = (side) => state.slots[side].map((id, i) => (id ? { ...withComfort(state.P[id], side, state.roles[side][i]), lane: state.roles[side][i] } : null)).filter(Boolean);
+const pickPos = (side, i) => PICKS.findIndex(([t, j]) => t === side && j === i);
+const team = (side) => state.slots[side].map((id, i) => (id ? { ...withComfort(state.P[id], side, state.roles[side][i]), lane: state.roles[side][i], po: pickPos(side, i) } : null)).filter(Boolean);
 // Matchups et duos Master+ : chargés à la demande pour chaque champion pické, à sa lane
 const DET = new Map();
 setDetailSource((key, lane) => DET.get(`${key}|${lane}`)?.data ?? null);
@@ -270,18 +271,19 @@ function renderCalc(ev) {
   const sum = ev.factors.reduce((a, f) => a + f.value, 0);
   const champ = (c) => `<div class="cc-r"><img src="${img(c.id)}"><b>${c.name}</b>
     <span>${c.soloWr != null ? c.soloWr.toFixed(1) + ' %' : '—'}</span>
-    <span>${c.proWr != null ? `${c.proWr.toFixed(1)} % (${c.proPicks} g)` : '—'}</span>
+    <span>${c.proPatch ? `${c.proPatch.wr} % (${c.proPatch.n} g, patch)` : c.proWr != null ? `${c.proWr.toFixed(1)} % (${c.proPicks} g, saison)` : '—'}</span>
     <span class="cc-w">${Math.round((c.wPro ?? 0) * 100)} % pro</span>
     <em>${c.wr != null ? c.wr.toFixed(1) + ' %' : '—'}</em></div>`;
   el.innerHTML = `
     <div class="calc-eq">50 % <span>de base</span> ${ev.factors.map((f) => `<b class="${f.value >= 0 ? 'up' : 'down'}">${f.value >= 0 ? '+' : '−'} ${Math.abs(f.value).toFixed(1)}</b>`).join(' ')} = <strong>${(50 + sum).toFixed(1)} %</strong> <span>pour l’équipe 1 (bleu)</span></div>
     <div class="calc-f">${ev.factors.map((f) => `<div class="cf"><div class="cf-h"><span>${f.label}</span><b class="${f.value >= 0 ? 'up' : 'down'}">${f.value >= 0 ? '+' : ''}${f.value.toFixed(1)} bleu</b></div><p>${f.detail}</p></div>`).join('') || '<p class="muted">Aucun facteur notable.</p>'}</div>
     <h5>Force de chaque champion</h5>
-    <div class="cc"><div class="cc-r cc-h"><span></span><b>Champion</b><span>Master+</span><span>Pro (saison)</span><span>Mélange</span><em>Retenu</em></div>
+    <div class="cc"><div class="cc-r cc-h"><span></span><b>Champion</b><span>Master+</span><span>Pro</span><span>Mélange</span><em>Retenu</em></div>
       ${tB.map(champ).join('')}${tR.length ? '<div class="cc-sep">Équipe 2</div>' + tR.map(champ).join('') : ''}</div>
     <h5>Comment je calcule</h5>
     <ol class="calc-m">
-      <li><b>Force des champions.</b> Winrate Master+ (lolalytics) ramené à la moyenne de sa lane. Pour limiter l’effet des one-tricks (aucun site ne permet de les exclure), l’écart d’un champion peu joué est atténué : pickrate ÷ (pickrate + 1,2). Ce chiffre est mélangé au winrate pro de la saison (gol.gg, lissé vers 50 % quand il y a peu de games) avec un poids pro qui monte jusqu’à 50 % selon le nombre de games pro. Facteur = écart moyen entre les deux équipes × 0,6.</li>
+      <li><b>Force des champions.</b> Winrate Master+ (lolalytics) ramené à la moyenne de sa lane. Pour limiter l’effet des one-tricks (aucun site ne permet de les exclure), l’écart d’un champion peu joué est atténué : pickrate ÷ (pickrate + 1,2). Ce chiffre est mélangé au winrate pro <i>du patch joué en compétition</i> (lissé vers 50 % quand il y a peu de games, poids jusqu’à 50 % selon le nombre de games) et, un peu, à celui de la saison. Facteur = écart moyen entre les deux équipes × 0,6.</li>
+      <li><b>Réponses en pro</b> (gol.gg, games du dernier patch joué en compétition, plus le précédent s’il y a moins de 150 games) : pour deux champions face à face en lane, je regarde d’abord les games où ils ont été pickés <i>dans le même ordre</i> que dans ta draft (qui a répondu à qui), sinon toutes leurs games l’un contre l’autre. Écart à 50 % pondéré n ÷ (n + 6), × 0,35, plafonné à ±6.</li>
       <li><b>Face-à-face des lanes</b> (Master+, 30 derniers jours) : winrate du matchup − 50, pondéré par le nombre de games (n ÷ (n + 250)), × 0,55, plafonné à ±7. Au bot, ADC et support comptent contre l’ADC et le support adverses.</li>
       <li><b>Duos mesurés</b> (Master+) : écart du duo à son winrate attendu, pondéré n ÷ (n + 300), × 0,5, plafonné à ±4. Quand un duo est mesuré, la table de synergies théoriques pèse moitié moins.</li>
       <li><b>Pentagone des compos</b> (Engage › Split › Poke › Peeling › Catch) : avantage du style de chaque équipe sur l’autre, × 8, proportionnel au nombre de picks.</li>
@@ -324,7 +326,7 @@ function gridInfo() {
   if (!ctx || !ctx.isPick) return ctx ? { ctx, proj: new Map() } : null;
   const strip = (arr, side) => (ctx.side === side && state.slots[side][ctx.tg[1]] ? arr.filter((c) => c.id !== state.slots[side][ctx.tg[1]]) : arr);
   const b = strip(team('blue'), 'blue'), r = strip(team('red'), 'red');
-  const cand = pool().map((c) => ({ ...withComfort(c, ctx.side, ctx.role), lane: ctx.role }));
+  const cand = pool().map((c) => ({ ...withComfort(c, ctx.side, ctx.role), lane: ctx.role, po: pickPos(ctx.side, ctx.tg[1]) }));
   const known = playerFor(ctx.side, ctx.role);
   const proj = new Map(projectPicks(b, r, ctx.side, null, cand).map((x) => [x.c.id, {
     ...x, inPool: x.c.comfort > 0, prio: x.wr + (known ? (x.c.comfort > 0 ? 1.5 * x.c.comfort : -5) : 0)
@@ -891,6 +893,7 @@ function ingest(data) {
   const prevPatch = state.data?.patch;
   state.data = data;
   state.P = buildProfiles(data.champions, data.stats, data.pro, state.mode);
+  applyProGames(state.P, data.progames);
   state.list = Object.values(state.P).sort((a, b) => a.name.localeCompare(b.name, 'fr'));
   renderSources();
   fillPortraits();

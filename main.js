@@ -8,9 +8,10 @@ const { fetchGolgg } = require('./providers/golgg');
 const { fetchTeam } = require('./providers/opgg');
 const { fetchDpm, mergePool } = require('./providers/dpm');
 const { autoUpdate } = require('./providers/updater');
+const { fetchProGames } = require('./providers/progames');
 
 const HOUR = 3600 * 1000;
-const STALE = { lolalytics: 6 * HOUR, golgg: 12 * HOUR };
+const STALE = { lolalytics: 6 * HOUR, golgg: 12 * HOUR, progames: 4 * HOUR };
 const CHECK_EVERY = 2 * HOUR; // vérification automatique d'un nouveau patch
 
 let win;
@@ -23,10 +24,10 @@ function loadCache() {
   try { cache = JSON.parse(fs.readFileSync(cacheFile(), 'utf8')); } catch { cache = {}; }
   // Premier lancement : données livrées avec l'app, pour que tout marche tout de suite.
   // Elles sont remplacées dès que la synchronisation en fond a réussi.
-  if (!cache.ddragon || !cache.golgg || !cache.lolalytics) {
+  if (!cache.ddragon || !cache.golgg || !cache.lolalytics || !cache.progames) {
     try {
       const seed = JSON.parse(fs.readFileSync(path.join(__dirname, 'seed', 'seed.json'), 'utf8'));
-      for (const k of ['ddragon', 'lolalytics', 'golgg']) {
+      for (const k of ['ddragon', 'lolalytics', 'golgg', 'progames']) {
         if (!cache[k]) cache[k] = { ...seed[k], at: 0 }; // at: 0 => considéré comme à rafraîchir
       }
     } catch {}
@@ -78,6 +79,19 @@ async function sync({ force = false, tier = lastTier } = {}) {
         }
       })(),
       (async () => {
+        // 4) games pro récentes : ordre des picks, patch et vainqueur (seules les nouvelles sont lues)
+        const fresh = cache.progames?.at && now - cache.progames.at < STALE.progames;
+        if (!force && fresh) { sources.progames = { ok: true, at: cache.progames.at }; return; }
+        try {
+          const r = await fetchProGames(champions, cache.progames ?? {});
+          cache.progames = { at: now, games: r.games, matches: r.matches };
+          sources.progames = { ok: true, at: now };
+          partial(tier, sources);
+        } catch (e) {
+          sources.progames = { ok: !!cache.progames?.games, error: e.message, at: cache.progames?.at, cached: !!cache.progames };
+        }
+      })(),
+      (async () => {
         if (!force && !patchChanged && golFresh) { sources.golgg = { ok: true, at: cache.golgg.at }; return; }
         try {
           const r = await fetchGolgg(champions);
@@ -112,6 +126,7 @@ function snapshot(tier, sources) {
     version, patch, champions, tier,
     stats: cache.lolalytics?.key === lk ? cache.lolalytics.stats : {},
     pro: cache.golgg?.pro ?? {},
+    progames: cache.progames?.games ?? {},
     sources
   };
 }

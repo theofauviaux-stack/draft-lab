@@ -153,6 +153,69 @@ export function duoEdge(a, la, b, lb) {
   return { edge: d * shrink(n, 300), raw: +d.toFixed(1), n, wr: vals[0][2] };
 }
 const LN_FR = { T: 'Top', J: 'Jungle', M: 'Mid', A: 'ADC', S: 'Support' };
+// ---------- Games pro du patch (gol.gg) ----------
+// Ordre officiel : B1 R1 R2 B2 B3 R3 R4 B4 B5 R5
+const ORDER_POS = { b: [0, 3, 4, 7, 8], r: [1, 2, 5, 6, 9] };
+const ROLE_AT = ['T', 'J', 'M', 'A', 'S'];
+let PRO = { patches: [], games: 0, champ: {}, h2h: {}, resp: {} };
+const vnum = (p) => p.split('.').map(Number).reduce((a, x) => a * 100 + x, 0);
+// Choisit le patch joué en compétition (le plus récent), plus le précédent s'il y a trop peu de games,
+// puis calcule winrate pro par champion, face-à-face par lane et réponses (pick pris après, en face).
+export function applyProGames(P, games) {
+  const list = Object.values(games ?? {});
+  const byPatch = {};
+  for (const g of list) (byPatch[g.patch] ??= []).push(g);
+  const patches = Object.keys(byPatch).sort((a, b) => vnum(b) - vnum(a));
+  const use = [];
+  let n = 0;
+  for (const p of patches) { use.push(p); n += byPatch[p].length; if (n >= 150) break; }
+  const champ = {}, h2h = {}, resp = {};
+  const add = (o, a, b, win) => { const x = ((o[a] ??= {})[b] ??= { n: 0, w: 0 }); x.n++; if (win) x.w++; };
+  for (const p of use) for (const g of byPatch[p]) {
+    const pos = {}, role = {}, side = {};
+    g.bp.forEach((c, i) => { pos[c] = ORDER_POS.b[i]; side[c] = 'blue'; });
+    g.rp.forEach((c, i) => { pos[c] = ORDER_POS.r[i]; side[c] = 'red'; });
+    g.br.forEach((c, i) => { role[c] = ROLE_AT[i]; }); g.rr.forEach((c, i) => { role[c] = ROLE_AT[i]; });
+    for (const c of [...g.bp, ...g.rp]) { const x = (champ[c] ??= { n: 0, w: 0 }); x.n++; if (g.win === side[c]) x.w++; }
+    for (const a of g.bp) for (const b of g.rp) {
+      if (!role[a] || !role[b] || !LANE_OPP[role[a]].includes(role[b])) continue;
+      const aWin = g.win === 'blue';
+      add(h2h, a, b, aWin); add(h2h, b, a, !aWin);
+      const [first, second] = pos[a] < pos[b] ? [a, b] : [b, a];
+      add(resp, first, second, g.win === side[second]); // victoire du champion pris en réponse
+    }
+  }
+  PRO = { patches: use, games: n, champ, h2h, resp };
+  // Winrate pro du patch : remplace celui de la saison quand il y a assez de games
+  for (const c of Object.values(P)) {
+    const x = champ[c.id];
+    c.proPatch = x ? { n: x.n, wr: +((x.w / x.n) * 100).toFixed(1) } : null;
+    if (c.soloWr == null) continue;
+    const season = c.proWr, pw = x ? ((x.w + 0.5 * 8) / (x.n + 8)) * 100 : null;
+    const wPatch = x ? 0.5 * x.n / (x.n + 15) : 0;
+    const wSeason = season != null ? 0.15 * (c.proPicks / (c.proPicks + 200)) : 0;
+    let wr = c.soloWr * (1 - wPatch - wSeason) + (pw ?? 50) * wPatch + (season ?? 50) * wSeason;
+    c.wr = 50 + Math.max(-4, Math.min(4, wr - 50));
+    c.wPro = wPatch + wSeason;
+  }
+  return PRO;
+}
+export const proInfo = () => PRO;
+function proEdge(a, b) {
+  // Si l'ordre de pick est connu, on regarde d'abord les réponses dans le même ordre (a pris avant b, ou l'inverse)
+  if (a.po != null && b.po != null) {
+    const [first, second] = a.po < b.po ? [a, b] : [b, a];
+    const r = PRO.resp[first.id]?.[second.id];
+    if (r && r.n >= 2) {
+      const respWr = r.w / r.n, aWr = second === a ? respWr : 1 - respWr;
+      return { edge: (aWr - 0.5) * 100 * (r.n / (r.n + 6)), n: r.n, w: second === a ? r.w : r.n - r.w, resp: true, first, second, rw: r.w };
+    }
+  }
+  const h = PRO.h2h[a.id]?.[b.id];
+  if (!h || h.n < 2) return null;
+  return { edge: (h.w / h.n - 0.5) * 100 * (h.n / (h.n + 6)), n: h.n, w: h.w, resp: false };
+}
+
 function gmFactors(blue, red) {
   let lane = 0, duo = 0; const lt = [], dt = [];
   for (const a of blue) for (const b of red) {
@@ -172,7 +235,15 @@ function gmFactors(blue, red) {
       if (Math.abs(e.raw) >= 1.5) dt.push(`${a.name} + ${b.name} (${side}) ${e.raw > 0 ? '+' : ''}${e.raw}`);
     }
   }
-  return { lane: Math.max(-7, Math.min(7, lane * 0.55)), duo: Math.max(-4, Math.min(4, duo * 0.5)), lt, dt };
+  let pro = 0; const pt = [];
+  for (const a of blue) for (const b of red) {
+    if (!a.lane || !b.lane || !LANE_OPP[a.lane].includes(b.lane)) continue;
+    const e = proEdge(a, b);
+    if (!e) continue;
+    pro += e.edge;
+    pt.push(e.resp ? `${e.second.name} pris en réponse à ${e.first.name} : ${e.rw} victoire${e.rw > 1 ? 's' : ''} sur ${e.n}` : `${a.name} contre ${b.name} : ${e.w}/${e.n} pour ${a.name}`);
+  }
+  return { lane: Math.max(-7, Math.min(7, lane * 0.55)), duo: Math.max(-4, Math.min(4, duo * 0.5)), pro: Math.max(-6, Math.min(6, pro * 0.35)), lt, dt, pt };
 }
 
 export function evaluate(blue, red) {
@@ -199,6 +270,7 @@ export function evaluate(blue, red) {
   const synW = gm.dt.length || Math.abs(gm.duo) > 0.2 ? W.synergy * 0.55 : W.synergy;
   const synV = Math.max(-6, Math.min(6, (synB.total - synR.total) * synW));
   add('lanes', 'Face-à-face des lanes (Master+)', gm.lane, gm.lt.length ? gm.lt.slice(0, 4).join(' · ') : 'Winrates des matchups en Master+ (lolalytics), lissés selon le nombre de games');
+  if (PRO.games) add('pro', `Réponses en pro (patch ${PRO.patches.join(' / ')})`, gm.pro, gm.pt.length ? gm.pt.slice(0, 4).join(' · ') : `Face-à-face des lanes dans les ${PRO.games} games pro du patch, selon l’ordre de pick`);
   add('duos', 'Duos mesurés (Master+)', gm.duo, gm.dt.length ? gm.dt.slice(0, 4).join(' · ') : 'Synergie réelle des duos en Master+');
   const pairTxt = (pp) => pp.slice(0, 2).map((x) => `${x.a.name} + ${x.b.name} (${x.title})`).join(', ');
   add('synergy', 'Synergies entre champions', synV,

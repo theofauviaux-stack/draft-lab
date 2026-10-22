@@ -261,3 +261,11 @@ Seul un changement de version d'Electron demande de retélécharger l'applicatio
 - Winrate pro (gol.gg, saison) mélangé jusqu'à 50 % selon le nombre de games pro.
 - Face-à-face des lanes et duos mesurés en Master+ (échantillons plus grands qu'en GM+).
 - « 🔍 Voir le calcul » sous la balance : l'équation complète, chaque facteur, la force de chaque champion (Master+, pro, poids pro, retenu) et la méthode.
+
+## Version 2.14 — games pro du patch et réponses selon l'ordre de pick
+
+- Nouvelle source : les games pro récentes de gol.gg (45 derniers jours, tous les tournois), lues une par une : patch de la game, ordre des picks des deux équipes, rôles et vainqueur. Seules les nouvelles games sont téléchargées ensuite (cache).
+- On garde le dernier patch joué en compétition (et le précédent tant qu'il y a moins de 150 games) : par exemple 16.20 + 16.18.
+- Winrate pro du patch par champion (lissé vers 50 % avec peu de games) : remplace en grande partie le winrate pro de la saison.
+- « Réponses en pro » : pour deux champions face à face en lane, on regarde d'abord les games où ils ont été pickés dans le même ordre que dans la draft (qui a répondu à qui), sinon toutes leurs games l'un contre l'autre.
+- Tout est détaillé dans « 🔍 Voir le calcul ».

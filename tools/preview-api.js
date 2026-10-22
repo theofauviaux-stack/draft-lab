@@ -9,6 +9,7 @@
     champions: SEED.ddragon.champions,
     stats: SEED.lolalytics.stats,
     pro: SEED.golgg.pro,
+    progames: SEED.progames?.games ?? {},
     sources: {
       ddragon: { ok: true, at: T },
       lolalytics: { ok: true, at: T, patch: SEED.lolalytics.patch },
