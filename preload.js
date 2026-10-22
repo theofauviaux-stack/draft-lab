@@ -11,5 +11,6 @@ contextBridge.exposeInMainWorld('draftlab', {
   checkUpdate: () => ipcRenderer.invoke('update:check'),
   restart: () => ipcRenderer.invoke('update:restart'),
   quit: () => ipcRenderer.invoke('app:quit'),
+  detail: (cid, lane) => ipcRenderer.invoke('lola:detail', { cid, lane }),
   onUpdate: (cb) => ipcRenderer.on('update:status', (_e, st) => cb(st))
 });

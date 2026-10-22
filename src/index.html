@@ -10,23 +10,27 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="brand"><span class="logo">◆</span> Draft Lab</div>
-    <div class="pill" id="patchPill">Patch …</div>
-    <button class="verpill" id="verPill" title="Version de l’application — cliquer pour chercher une mise à jour">v…</button>
-    <button class="primary updbtn" id="updRestart" hidden title="Une nouvelle version est installée">⟳ Redémarrer maintenant</button>
-    <button class="dalert" id="dataAlert" hidden></button>
-    <div class="spacer"></div>
-    <label class="ctl">Je suis
-      <select id="mySide">
-        <option value="blue">Côté bleu</option>
-        <option value="red">Côté rouge</option>
-      </select>
-    </label>
-    <button id="themeBtn" class="themebtn" title="Changer de thème">🌙</button>
-    <button id="menuBtn" title="Menu de départ">☰ Menu</button>
-    <button id="undo" title="Annuler le dernier choix (Ctrl/Cmd+Z)">↶ Annuler</button>
-    <button id="reset">Nouvelle draft</button>
-    <button id="refresh" title="Recharge tout de suite les données du patch (champions Riot, winrates lolalytics, stats gol.gg). Elles se mettent déjà à jour seules toutes les 2 h.">⟳ Données</button>
+    <div class="tb-group tb-brand">
+      <div class="brand"><span class="logo">◆</span> Draft Lab</div>
+      <div class="tb-meta"><span id="patchPill">Patch …</span><span class="tb-dot">·</span><button class="verpill" id="verPill" title="Version de l’application — cliquer pour chercher une mise à jour">v…</button></div>
+    </div>
+    <div class="tb-group tb-draft">
+      <span class="tb-mode" id="flowChip" title="Type de draft — « Nouvelle draft » pour changer">Draft de zéro</span>
+      <div class="seg" role="group" aria-label="Mon côté">
+        <span class="seg-l">Je joue</span>
+        <button class="seg-b blue" data-side="blue">Bleu</button>
+        <button class="seg-b red" data-side="red">Rouge</button>
+      </div>
+      <select id="mySide" hidden><option value="blue">Côté bleu</option><option value="red">Côté rouge</option></select>
+      <button id="undo" class="tb-btn" title="Annuler le dernier choix (Ctrl/Cmd+Z)">↶ Annuler</button>
+      <button id="reset" class="tb-btn tb-new" title="Retour au menu : draft de zéro ou depuis des joueurs">＋ Nouvelle draft</button>
+    </div>
+    <div class="tb-group tb-tools">
+      <button class="dalert" id="dataAlert" hidden></button>
+      <button class="primary updbtn" id="updRestart" hidden title="Une nouvelle version est installée">⟳ Redémarrer maintenant</button>
+      <button id="refresh" class="tb-icon" title="Recharger les données du patch maintenant (elles se mettent à jour seules toutes les 2 h)">⟳</button>
+      <button id="themeBtn" class="tb-icon themebtn" title="Changer de thème">🌙</button>
+    </div>
   </header>
 
   <section class="tools">
@@ -96,7 +100,7 @@
       <div id="banPlan" class="banplan"></div>
     </div>
     <div class="card plan-card">
-      <div class="card-h"><h3>Plan de jeu</h3><span class="muted">pour ton côté (choix « Je suis » en haut)</span></div>
+      <div class="card-h"><h3>Plan de jeu</h3><span class="muted">pour ton côté (« Je joue » en haut)</span></div>
       <div id="advice" class="advice"></div>
     </div>
     <div class="card half">
@@ -114,7 +118,7 @@
   </section>
 
   <footer>
-    Données : Riot Data Dragon (patch & champions), lolalytics (soloQ Émeraude+), gol.gg (compétition, pour écarter les picks hors rôle), op.gg (pools des joueurs), ta feuille de compos (synergies)
+    Données : Riot Data Dragon (patch & champions), lolalytics (soloQ Émeraude+ et Grandmaster+ : winrates, face-à-face des lanes et duos), gol.gg (compétition : rôles et présence), op.gg (pools des joueurs), ta feuille de compos (synergies)
     et <span class="credit">guide support season 16 de coach k</span> (duos bot / jungle, counters et fiches support).
     Le pourcentage est une estimation de modèle, pas une certitude. Draft Lab n’est pas affilié à Riot Games.
   </footer>

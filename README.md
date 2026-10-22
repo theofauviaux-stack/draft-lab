@@ -246,3 +246,11 @@ Seul un changement de version d'Electron demande de retélécharger l'applicatio
 - Analyse limitée au plan de jeu : lanes, jungle, phases, objectifs simplifiés (à prioriser / si gratuit / à laisser), pentagone, synergies.
 - Pentagone : Protect devient Peeling. Courbe de scaling repliée, à ouvrir au clic (les deux compos, la tienne ou la leur).
 - Retirés : drafts proposées, suggestions par pick, matchup bot par niveau, évolution du winrate, détail du pourcentage, pronostic hors draft détaillé.
+
+## Version 2.12 — analyse Grandmaster+
+
+- Force des champions : moitié Émeraude+, moitié Grandmaster+ (écart à la moyenne GM+). Le winrate pro (gol.gg, toute la saison) ne sert plus que de départage ; le pro garde son rôle pour les rôles et la présence.
+- Face-à-face des lanes mesurés en GM+ (lolalytics, 30 derniers jours) : top, jungle, mid, et pour le bot ADC/support contre ADC/support. Lissés selon le nombre de games, ils corrigent le côté fort / faible du plan de jeu.
+- Duos mesurés en GM+ (ex. Zeri + Yuumi, Ashe + Séraphine) : quand la donnée existe, la table de synergies théoriques pèse moins.
+- Les % de winrate projeté sont de retour sur les portraits de la grille.
+- Barre du haut réorganisée : identité (patch, version) · draft (type, côté, annuler, nouvelle draft) · outils (données, thème).

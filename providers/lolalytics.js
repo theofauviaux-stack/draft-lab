@@ -70,6 +70,22 @@ async function fetchLane(patch, lane, tier, idx) {
   throw lastErr ?? new Error('aucune donnée');
 }
 
+async function fetchGmRel(patch, idx) {
+  const res = await Promise.allSettled(Object.keys(LANES).map((lane) => fetchLane(patch, lane, 'grandmaster_plus', idx)));
+  const acc = {};
+  for (const r of res) {
+    if (r.status !== 'fulfilled') continue;
+    const rows = Object.entries(r.value.data);
+    const tot = rows.reduce((a, [, x]) => a + (x.games || 1), 0) || 1;
+    const avg = rows.reduce((a, [, x]) => a + x.wr * (x.games || 1), 0) / tot;
+    for (const [id, x] of rows) {
+      const g = x.games || 0, a = (acc[id] ??= { s: 0, g: 0 });
+      a.s += (x.wr - avg) * g; a.g += g;
+    }
+  }
+  return Object.fromEntries(Object.entries(acc).filter(([, a]) => a.g > 0).map(([id, a]) => [id, +((a.s / a.g) * (a.g / (a.g + 300))).toFixed(2)]));
+}
+
 async function fetchLolalytics(patch, tier, champions) {
   const idx = championIndex(champions);
   const results = await Promise.allSettled(
@@ -102,7 +118,39 @@ async function fetchLolalytics(patch, tier, champions) {
   for (const [id, s] of Object.entries(stats)) {
     final[id] = { wr: +(s.wrSum / s.w).toFixed(2), pr: +s.pr.toFixed(2), roles: s.roles, roleWr: s.roleWr };
   }
+  // Grandmaster+ : écart de chaque champion au winrate moyen de sa lane, lissé selon le nombre de games
+  try {
+    const gm = await fetchGmRel(patch, idx);
+    for (const [id, rel] of Object.entries(gm)) if (final[id]) final[id].gmRel = rel;
+  } catch {}
   return { stats: final, lanes: okLanes, patch: usedPatch };
 }
 
-module.exports = { fetchLolalytics, extract };
+// Détail d'un champion à sa lane, en Grandmaster+ sur les 30 derniers jours :
+// face-à-face contre chaque lane adverse utile (counter) et duos avec ses alliés (build-team).
+const LANE_NAME = { T: 'top', J: 'jungle', M: 'middle', A: 'bottom', S: 'support' };
+const OPP = { T: ['T'], J: ['J'], M: ['M'], A: ['A', 'S'], S: ['S', 'A'] };
+const SLUG = { monkeyking: 'wukong' };
+const slug = (id) => { const s = String(id).toLowerCase().replace(/[^a-z0-9]/g, ''); return SLUG[s] ?? s; };
+async function fetchDetail(champId, lane, tier = 'grandmaster_plus') {
+  const base = `https://a1.lolalytics.com/mega/?v=1&patch=30&c=${slug(champId)}&lane=${LANE_NAME[lane]}&tier=${tier}&queue=ranked&region=all`;
+  const vs = {}, team = {};
+  let gm = null;
+  await Promise.all([
+    ...OPP[lane].map(async (o) => {
+      const j = await get(`${base}&ep=counter&vslane=${LANE_NAME[o]}`);
+      if (o === lane && j.stats) gm = { wr: +j.stats.wr, avg: +j.stats.avgWr, rel: +(+j.stats.wr - +j.stats.avgWr).toFixed(2) };
+      vs[o] = Object.fromEntries((j.counters ?? []).filter((x) => x.n >= 20).map((x) => [x.cid, [x.vsWr, x.n]]));
+    }),
+    (async () => {
+      const j = await get(`${base}&ep=build-team`);
+      for (const [ln, rows] of Object.entries(j.team ?? {})) {
+        const L = Object.entries(LANE_NAME).find(([, v]) => v === ln)?.[0];
+        if (L) team[L] = Object.fromEntries(rows.filter((r) => r[5] >= 30).map((r) => [r[0], [r[1], r[3], r[5]]]));
+      }
+    })()
+  ]);
+  return { vs, team, gm };
+}
+
+module.exports = { fetchLolalytics, extract, fetchDetail };

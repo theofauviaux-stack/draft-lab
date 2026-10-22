@@ -1,7 +1,7 @@
 import { teamSynergy, KINDS } from './synergy.js';
 import {
   ROLES, ROLE_LABEL, ARCH, ORDER, rel,
-  buildProfiles, evaluate, recommend, recommendBans, projectPicks, gamePlan, powerCurve,
+  buildProfiles, evaluate, setDetailSource, recommend, recommendBans, projectPicks, gamePlan, powerCurve,
   comfortPts, proposeDrafts, playerLabel, analyzeDraft, matchPlan, pentagonView, styleBreakdown, compLabel, playersForecast, combineWr, pointsLabel, rankPoints, RANK_OPTIONS, playerRating, dominant, teamShares, predictPicks, enemyScenarios, predictedBans
 } from './engine.js';
 
@@ -92,7 +92,20 @@ function withComfort(c, side, role) {
   if (!e) return c;
   return { ...c, comfort: comfortPts(e), comfortTxt: `${playerLabel(pl)} : ${e.games} games${e.manual ? ' (ajouté)' : `, ${Math.round((e.wins / e.games) * 100)} %`}` };
 }
-const team = (side) => state.slots[side].map((id, i) => (id ? withComfort(state.P[id], side, state.roles[side][i]) : null)).filter(Boolean);
+const team = (side) => state.slots[side].map((id, i) => (id ? { ...withComfort(state.P[id], side, state.roles[side][i]), lane: state.roles[side][i] } : null)).filter(Boolean);
+// Matchups et duos GM+ : chargés à la demande pour chaque champion pické, à sa lane
+const DET = new Map();
+setDetailSource((key, lane) => DET.get(`${key}|${lane}`)?.data ?? null);
+function ensureDetails() {
+  if (!api.detail) return;
+  for (const side of ['blue', 'red']) state.slots[side].forEach((id, i) => {
+    if (!id) return;
+    const c = state.P[id], lane = state.roles[side][i], k = `${c.key}|${lane}`;
+    if (DET.has(k)) return;
+    DET.set(k, { loading: true });
+    api.detail(c.id, lane).then((d) => { DET.set(k, { data: d && !d.error ? d : null }); render(); }).catch(() => DET.set(k, { data: null }));
+  });
+}
 const nextStep = () => seq().find(([t, i]) => !state.slots[t][i]) ?? null;
 const target = () => state.selected ?? nextStep();
 const pool = () => { const u = used(); return state.list.filter((c) => !u.has(c.id)); };
@@ -139,12 +152,15 @@ function select(t, i) {
 // ---------- Rendu ----------
 function render() {
   if (!state.data) return;
+  ensureDetails();
   renderBans(); renderTeams(); renderStep();
   const ev = evaluate(team('blue'), team('red'));
   renderWr(ev);
   renderGrid(gridInfo());
   $('playersBox').hidden = state.flow !== 'players';
   document.body.classList.toggle('flow-zero', state.flow !== 'players');
+  $('flowChip').textContent = state.flow === 'players' ? '⚔ Draft depuis des joueurs' : '✦ Draft de zéro';
+  document.querySelectorAll('.seg-b').forEach((b) => b.classList.toggle('on', b.dataset.side === state.mySide));
   renderPlayers(); renderSaves(); renderBanPlan();
   renderPentagon(ev); renderScaling(); renderAdvice();
 }
@@ -273,14 +289,17 @@ function currentContext() {
 }
 
 // Grille : les champions du joueur à ce rôle passent en premier (★), sans projection de pick.
+// Grille : % = winrate projeté de ce côté si on prend ce champion à ce slot ; les champions du joueur (★) passent en premier.
 function gridInfo() {
   const ctx = currentContext();
-  if (!ctx) return null;
-  const proj = new Map();
-  for (const c of state.list) {
-    const cc = withComfort(c, ctx.side, ctx.role);
-    proj.set(c.id, { prio: (cc.comfort > 0 ? 100 + cc.comfort * 10 : 0) + (c.wr ?? 50) / 10, inPool: cc.comfort > 0 });
-  }
+  if (!ctx || !ctx.isPick) return ctx ? { ctx, proj: new Map() } : null;
+  const strip = (arr, side) => (ctx.side === side && state.slots[side][ctx.tg[1]] ? arr.filter((c) => c.id !== state.slots[side][ctx.tg[1]]) : arr);
+  const b = strip(team('blue'), 'blue'), r = strip(team('red'), 'red');
+  const cand = pool().map((c) => ({ ...withComfort(c, ctx.side, ctx.role), lane: ctx.role }));
+  const known = playerFor(ctx.side, ctx.role);
+  const proj = new Map(projectPicks(b, r, ctx.side, null, cand).map((x) => [x.c.id, {
+    ...x, inPool: x.c.comfort > 0, prio: x.wr + (known ? (x.c.comfort > 0 ? 1.5 * x.c.comfort : -5) : 0)
+  }]));
   return { ctx, proj };
 }
 
@@ -301,6 +320,7 @@ function renderGrid(info) {
     t.className = 'tile' + (u.has(c.id) ? ' used' : '') + (c.offmeta ? ' offmeta' : '');
     const pj = info?.proj?.get(c.id);
     t.innerHTML = `<img loading="lazy" src="${img(c.id)}" alt="">
+      ${pj?.wr != null ? `<span class="proj ${pj.delta >= 0 ? 'up' : 'down'}" title="Winrate projeté de ton côté avec ce pick">${pj.wr.toFixed(1)}%</span>` : ''}
       ${pj?.inPool ? '<span class="star" title="Dans le pool du joueur">★</span>' : ''}
       <div class="dots">${ORDER.filter((k) => c[k] >= 2).map((k) => `<i style="background:${ARCH[k].color}"></i>`).join('')}</div>
       <div class="nm">${c.name}</div>`;
@@ -665,7 +685,7 @@ function startFromZero() {
   state.players = { blue: [], red: [] }; state.teamInput = { blue: '', red: '' }; state.flow = 'zero';
   $('opggBlue').value = ''; $('opggRed').value = '';
   reset(); closeMenu();
-  toast('Draft de zéro : bans et plan de jeu selon la méta du patch');
+  toast('Draft de zéro : winrate et plan de jeu selon la méta du patch');
 }
 async function startFromPlayers() {
   const blue = $('menuBlue').value.trim(), red = $('menuRed').value.trim();
@@ -767,7 +787,7 @@ function renderAdvice() {
   const laneRow = (k) => {
     const l = mp.lanes[k];
     const pics = (arr) => arr.map((c) => `<img src="${img(c.id)}" title="${c.name}">`).join('');
-    return `<div class="ln ${l.state}"><span class="ln-n">${LN[k]}</span><span class="ln-p">${pics(l.mine)}</span><b>${l.state === 'inconnu' ? '—' : l.state === 'fort' ? 'Côté fort' : l.state === 'faible' ? 'Côté faible' : 'Égal'}</b><span class="ln-p">${pics(l.theirs)}</span></div>`;
+    return `<div class="ln ${l.state}" title="${l.gm ?? ''}"><span class="ln-n">${LN[k]}</span><span class="ln-p">${pics(l.mine)}</span><b>${l.state === 'inconnu' ? '—' : l.state === 'fort' ? 'Côté fort' : l.state === 'faible' ? 'Côté faible' : 'Égal'}</b><span class="ln-p">${pics(l.theirs)}</span></div>`;
   };
   const myJ = mine.find((x) => x.role === 'J')?.c;
   const phaseCard = (p) => {
@@ -852,16 +872,17 @@ function ingest(data) {
 
 async function load(force = false) {
   if (!state.data) $('patchPill').textContent = 'Chargement…';
-  if (force) { $('refresh').disabled = true; $('refresh').textContent = '⟳ …'; }
+  if (force) { $('refresh').disabled = true; $('refresh').textContent = '…'; }
   try { ingest(await (force ? api.refresh({ tier: state.tier }) : api.load({ tier: state.tier }))); if (force) toast('Données actualisées'); }
   catch (e) { toast('Erreur de chargement : ' + e.message); }
-  finally { $('refresh').disabled = false; $('refresh').textContent = '⟳ Données'; }
+  finally { $('refresh').disabled = false; $('refresh').textContent = '⟳'; }
 }
 
 function initControls() {
   $('themeBtn').onclick = () => { state.theme = state.theme === 'dark' ? 'light' : 'dark'; savePrefs(); applyTheme(); render(); };
   $('mySide').onchange = (e) => { state.mySide = e.target.value; savePrefs(); render(); };
-  $('undo').onclick = undo; $('reset').onclick = openMenu; $('menuBtn').onclick = openMenu;
+  $('undo').onclick = undo; $('reset').onclick = openMenu;
+  document.querySelectorAll('.seg-b').forEach((b) => (b.onclick = () => { $('mySide').value = b.dataset.side; $('mySide').onchange({ target: $('mySide') }); }));
   $('startZero').onclick = startFromZero;
   $('startPlayers').onclick = () => { $('startMenu').classList.add('form'); $('startChoices').hidden = true; $('startForm').hidden = false; $('menuBlue').focus(); };
   $('menuBack').onclick = () => { $('startMenu').classList.remove('form'); $('startForm').hidden = true; $('startChoices').hidden = false; };
@@ -904,7 +925,7 @@ function initControls() {
 
 // ---------- Mises à jour de l'application ----------
 function initUpdates() {
-  if (!api.version) { $('verPill').hidden = true; return; }
+  if (!api.version) { $('verPill').hidden = true; document.querySelector('.tb-dot').hidden = true; return; }
   api.version().then((v) => { $('verPill').textContent = 'v' + v; });
   const show = (st) => {
     if (!st) return;

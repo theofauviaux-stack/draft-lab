@@ -1,7 +1,7 @@
 {
-  "version": "2.11.0",
-  "sha256": "2d2df414683b93b80dd2442bdd15221718783886af51f56618efc37d2c6420dc",
-  "file": "draftlab-2.11.0.json.gz",
-  "notes": "Bouton Quitter dans le menu · fermer la fenêtre quitte aussi l'app en arrière-plan",
-  "date": "2026-10-22T16:31:27.235Z"
+  "version": "2.12.0",
+  "sha256": "2687a4a9e195211033e9dc9a92de5cf6978ae3eb7d0f2d3cdcd712e269107df9",
+  "file": "draftlab-2.12.0.json.gz",
+  "notes": "Analyse GM+ : face-à-face des lanes et duos mesurés · % de nouveau sur la grille · nouvelle barre du haut",
+  "date": "2026-10-22T16:43:23.292Z"
 }

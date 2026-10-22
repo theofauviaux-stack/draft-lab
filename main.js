@@ -3,7 +3,7 @@ const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { fetchDDragon } = require('./providers/ddragon');
-const { fetchLolalytics } = require('./providers/lolalytics');
+const { fetchLolalytics, fetchDetail } = require('./providers/lolalytics');
 const { fetchGolgg } = require('./providers/golgg');
 const { fetchTeam } = require('./providers/opgg');
 const { fetchDpm, mergePool } = require('./providers/dpm');
@@ -173,6 +173,14 @@ app.whenReady().then(() => {
       res.players = res.players.map((p) => (p.error && p.pool?.length ? { ...p, error: null, tier: p.tier ?? 'rang inconnu (données dpm.lol)' } : p));
       return res;
     } catch (e) { return { error: e.message }; }
+  });
+  // Matchups et duos GM+ d'un champion à sa lane (mis en cache 24 h)
+  const details = new Map();
+  ipcMain.handle('lola:detail', async (_e, { cid, lane }) => {
+    const k = `${cid}|${lane}`, c = details.get(k);
+    if (c && Date.now() - c.at < 24 * HOUR) return c.data;
+    try { const data = await fetchDetail(cid, lane); details.set(k, { at: Date.now(), data }); return data; }
+    catch (e) { return c?.data ?? { error: e.message }; }
   });
   // Mises à jour automatiques de l'application
   let lastUpdate = null;

@@ -75,16 +75,18 @@ export function buildProfiles(champions, stats = {}, pro = {}, mode = MODE) {
     prof.proRoles = proPct ? ROLES.filter((r) => (p.roles[r]?.picks ?? 0) >= Math.max(10, 0.1 * proPicks)) : [];
     // Winrate pro "lissé" : peu de games = on reste proche de 50 %
     const proWr = p?.wr != null && proPicks ? (p.wr * proPicks + 50 * 40) / (proPicks + 40) : null;
-    const soloWr = s?.wr ?? null;
+    // soloQ : moitié Émeraude+, moitié Grandmaster+ (écart à la moyenne GM+) quand on l'a
+    const soloWr = s?.wr == null ? null : s.gmRel != null ? 0.5 * s.wr + 0.5 * (50 + s.gmRel) : s.wr;
     let wr = null;
-    if (soloWr != null && proWr != null) wr = mode === 'pro' ? 0.7 * proWr + 0.3 * soloWr : 0.75 * soloWr + 0.25 * proWr;
+    // Winrate pro : simple départage (il dépend surtout du niveau des équipes et mélange toute la saison)
+    if (soloWr != null && proWr != null) wr = mode === 'pro' ? 0.7 * proWr + 0.3 * soloWr : 0.9 * soloWr + 0.1 * proWr;
     else wr = soloWr ?? proWr;
     if (wr != null) wr = 50 + Math.max(-4, Math.min(4, wr - 50));
     // En mode pro : un champion quasiment jamais joué en compétition est signalé (et pas proposé)
     const offmeta = mode === 'pro' && hasPro && proPicks < 5;
     NAMES[c.id] = c.name;
     map[c.id] = {
-      ...prof, id: c.id, name: c.name, offmeta,
+      ...prof, id: c.id, key: +c.key, name: c.name, offmeta,
       wr, soloWr, proWr, pr: s?.pr ?? 0,
       presence: p?.presence ?? 0, proPicks, proRoleStats: p?.roles ?? null
     };
@@ -119,6 +121,59 @@ function damagePenalty(s) {
 const frontPenalty = (s) => (s.n >= 4 && s.f < 3 ? -W.frontline : 0);
 const engagePenalty = (s) => (s.n >= 4 && s.e + s.c < 3 ? -W.engageTool : 0);
 
+// ---------- Données GM+ (lolalytics) : face-à-face par lane et duos ----------
+// DETAIL(key, lane) renvoie { vs: { lane: { cid: [vsWr, n] } }, team: { lane: { cid: [wr, d2, n] } } } ou null.
+let DETAIL = () => null;
+export const setDetailSource = (fn) => { DETAIL = fn; };
+const LANE_OPP = { T: ['T'], J: ['J'], M: ['M'], A: ['A', 'S'], S: ['S', 'A'] };
+const shrink = (n, k) => n / (n + k);
+// Avantage (en points de winrate) de a (à sa lane) contre b (à la sienne), vu des deux côtés quand c'est possible.
+export function laneEdge(a, la, b, lb) {
+  const vals = [];
+  const da = DETAIL(a.key, la)?.vs?.[lb]?.[b.key];
+  if (da) vals.push([da[0] - 50, da[1]]);
+  const db = DETAIL(b.key, lb)?.vs?.[la]?.[a.key];
+  if (db) vals.push([50 - db[0], db[1]]);
+  if (!vals.length) return null;
+  const n = vals.reduce((x, v) => x + v[1], 0);
+  const edge = vals.reduce((x, v) => x + v[0] * v[1], 0) / n;
+  return { edge: edge * shrink(n, 250), raw: +edge.toFixed(1), n };
+}
+// Synergie mesurée d'un duo (écart au winrate attendu des deux champions)
+export function duoEdge(a, la, b, lb) {
+  const vals = [];
+  const da = DETAIL(a.key, la)?.team?.[lb]?.[b.key];
+  if (da) vals.push([da[1], da[2], da[0]]);
+  const db = DETAIL(b.key, lb)?.team?.[la]?.[a.key];
+  if (db) vals.push([db[1], db[2], db[0]]);
+  if (!vals.length) return null;
+  const n = Math.max(...vals.map((v) => v[1]));
+  const d = vals.reduce((x, v) => x + v[0], 0) / vals.length;
+  return { edge: d * shrink(n, 300), raw: +d.toFixed(1), n, wr: vals[0][2] };
+}
+const LN_FR = { T: 'Top', J: 'Jungle', M: 'Mid', A: 'ADC', S: 'Support' };
+function gmFactors(blue, red) {
+  let lane = 0, duo = 0; const lt = [], dt = [];
+  for (const a of blue) for (const b of red) {
+    if (!a.lane || !b.lane || !LANE_OPP[a.lane].includes(b.lane)) continue;
+    const e = laneEdge(a, a.lane, b, b.lane);
+    if (!e) continue;
+    lane += e.edge;
+    if (Math.abs(e.raw) >= 2) lt.push(`${a.name} ${e.raw > 0 ? '>' : '<'} ${b.name} (${(50 + e.raw).toFixed(0)} %, ${e.n} games)`);
+  }
+  for (const [side, t, sg] of [['bleu', blue, 1], ['rouge', red, -1]]) {
+    for (let i = 0; i < t.length; i++) for (let j = i + 1; j < t.length; j++) {
+      const a = t[i], b = t[j];
+      if (!a.lane || !b.lane) continue;
+      const e = duoEdge(a, a.lane, b, b.lane);
+      if (!e || e.n < 40) continue;
+      duo += sg * e.edge;
+      if (Math.abs(e.raw) >= 1.5) dt.push(`${a.name} + ${b.name} (${side}) ${e.raw > 0 ? '+' : ''}${e.raw}`);
+    }
+  }
+  return { lane: Math.max(-7, Math.min(7, lane * 0.55)), duo: Math.max(-4, Math.min(4, duo * 0.5)), lt, dt };
+}
+
 export function evaluate(blue, red) {
   const B = teamStats(blue), R = teamStats(red);
   const sb = shares(B), sr = shares(R);
@@ -138,7 +193,12 @@ export function evaluate(blue, red) {
   if (B.hasWr || R.hasWr) add('strength', MODE === 'pro' ? 'Force des champions (compétition)' : 'Force des champions (soloQ)', (B.wr - R.wr) * W.strength,
     MODE === 'pro' ? 'Winrates pro gol.gg de la saison (lissés quand il y a peu de games)' : 'Winrates soloQ lolalytics du patch actuel');
   const synB = teamSynergy(blue), synR = teamSynergy(red);
-  const synV = Math.max(-6, Math.min(6, (synB.total - synR.total) * W.synergy));
+  const gm = gmFactors(blue, red);
+  // quand les duos sont mesurés en GM+, la table de synergies théoriques pèse moins
+  const synW = gm.dt.length || Math.abs(gm.duo) > 0.2 ? W.synergy * 0.55 : W.synergy;
+  const synV = Math.max(-6, Math.min(6, (synB.total - synR.total) * synW));
+  add('lanes', 'Face-à-face des lanes (GM+)', gm.lane, gm.lt.length ? gm.lt.slice(0, 4).join(' · ') : 'Winrates des matchups en Grandmaster+ (lolalytics), lissés selon le nombre de games');
+  add('duos', 'Duos mesurés (GM+)', gm.duo, gm.dt.length ? gm.dt.slice(0, 4).join(' · ') : 'Synergie réelle des duos en Grandmaster+');
   const pairTxt = (pp) => pp.slice(0, 2).map((x) => `${x.a.name} + ${x.b.name} (${x.title})`).join(', ');
   add('synergy', 'Synergies entre champions', synV,
     [synB.pairs.length ? `Bleu : ${pairTxt(synB.pairs)}` : '', synR.pairs.length ? `Rouge : ${pairTxt(synR.pairs)}` : ''].filter(Boolean).join(' · ') || 'Aucune synergie notable');
@@ -810,12 +870,29 @@ export function matchPlan(mine, theirs) {
     return laneEarly(at(roster, lane), lane);
   };
   const lanes = {};
+  // Face-à-face mesurés en GM+ (lolalytics) : ils corrigent l'estimation théorique de la lane
+  const measured = (L) => {
+    const roles = L === 'B' ? ['A', 'S'] : [L];
+    let sum = 0, any = false, best = null;
+    for (const ra of roles) for (const rb of roles) {
+      const a = at(mine, ra), b = at(theirs, rb);
+      if (!a || !b) continue;
+      const e = laneEdge(a, ra, b, rb);
+      if (!e) continue;
+      any = true; sum += e.edge;
+      if (!best || Math.abs(e.raw) > Math.abs(best.raw)) best = { ...e, a, b };
+    }
+    return any ? { sum, best } : null;
+  };
   for (const L of ['T', 'M', 'B']) {
     const a = laneVal(mine, L), b = laneVal(theirs, L);
-    const edge = a != null && b != null ? a - b : null;
+    const th = a != null && b != null ? a - b : null;
+    const m = th != null ? measured(L) : null;
+    const edge = th == null ? null : m ? +(th * 0.4 + m.sum / 30).toFixed(3) : th;
     lanes[L] = { edge, state: edge == null ? 'inconnu' : edge > 0.07 ? 'fort' : edge < -0.07 ? 'faible' : 'égal',
       mine: L === 'B' ? [at(mine, 'A'), at(mine, 'S')].filter(Boolean) : [at(mine, L)].filter(Boolean),
-      theirs: L === 'B' ? [at(theirs, 'A'), at(theirs, 'S')].filter(Boolean) : [at(theirs, L)].filter(Boolean) };
+      theirs: L === 'B' ? [at(theirs, 'A'), at(theirs, 'S')].filter(Boolean) : [at(theirs, L)].filter(Boolean),
+      gm: m?.best ? `GM+ : ${m.best.a.name} ${(50 + m.best.raw).toFixed(0)} % contre ${m.best.b.name} (${m.best.n} games)` : null };
   }
   const known = Object.entries(lanes).filter(([, v]) => v.edge != null);
   const strong = known.length ? known.reduce((a, b) => (b[1].edge > a[1].edge ? b : a)) : null;
