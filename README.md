@@ -274,3 +274,4 @@ Seul un changement de version d'Electron demande de retélécharger l'applicatio
 
 - La draft suit l'ordre d'une draft de tournoi : bans B R B R B R, picks B1 R1 R2 B2 B3 R3, bans R B R B, picks R4 B4 B5 R5. « Passer ce ban » permet de ne pas bannir (ban manqué).
 - Plus de choix de rôle par champion : les rôles de toute l'équipe sont répartis automatiquement à chaque pick (la répartition qui colle le mieux aux champions pickés). La grille montre les champions jouables aux rôles encore libres, et chaque % est calculé au meilleur rôle libre du champion.
+- 2.16 : quand un champion se joue sur 2 ou 3 lanes encore libres (Poppy, Sylas, Vel'Koz…), l'appli demande sa lane (avec la part de games à chaque lane). La lane choisie est verrouillée ; un clic sur le badge de rôle d'un champion permet de la changer.

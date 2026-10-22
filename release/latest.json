@@ -1,7 +1,7 @@
 {
-  "version": "2.15.1",
-  "sha256": "747e38f3a2590344ccc5025614f90ac1fc5f75188f1d7471c9ff065f80cd6602",
-  "file": "draftlab-2.15.1.json.gz",
-  "notes": "Nombre de games et winrate visibles sur les pools · ajout de champion fiable",
-  "date": "2026-10-22T17:27:52.750Z"
+  "version": "2.16.0",
+  "sha256": "d407d59f755af0739b5624016d00878e80949ba7443bc79a12773c18e64d647e",
+  "file": "draftlab-2.16.0.json.gz",
+  "notes": "Choix de la lane pour les champions joués sur plusieurs lanes",
+  "date": "2026-10-22T17:32:23.163Z"
 }

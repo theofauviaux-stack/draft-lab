@@ -49,7 +49,7 @@ const state = {
   selected: null, history: [],
   search: '', roleFilter: null, archFilter: null, onlyRole: true,
   players: { blue: [], red: [] }, teamInput: { blue: '', red: '' }, region: 'euw',
-  wantArch: null, scalShow: 'both',
+  wantArch: null, scalShow: 'both', lock: { blue: Array(5).fill(null), red: Array(5).fill(null) },
   flow: 'zero' // 'zero' = draft de zéro (sans op.gg), 'players' = draft depuis des joueurs
 };
 function emptySlots() {
@@ -136,9 +136,28 @@ function place(id) {
   const [t, i] = tg;
   state.slots[t][i] = id;
   state.history.push(tg);
-  if (t === 'blue' || t === 'red') assignRoles(t);
+  if (t === 'blue' || t === 'red') { state.lock[t][i] = null; assignRoles(t); }
   state.selected = null;
   render();
+  if (t === 'blue' || t === 'red') askLane(t, i, false);
+}
+// Champion joué sur 2 ou 3 lanes encore libres : on demande la lane
+function askLane(side, i, force) {
+  const id = state.slots[side][i]; if (!id) return;
+  const c = state.P[id];
+  const open = openRoles(side, i);
+  const opts = force ? ROLES.filter((r) => open.includes(r)) : open.filter((r) => c.roles.includes(r));
+  if (!force && opts.length < 2) return;
+  const share = (r) => Math.round(c.roleShare?.[r] ?? 0);
+  const box = $('laneAsk');
+  box.innerHTML = `<div class="la-card"><img src="${img(id)}" alt=""><div class="la-body">
+      <b>Sur quelle lane joue ${c.name} ?</b><span class="muted">${side === 'blue' ? 'Équipe 1' : 'Équipe 2'} · ${force ? 'changer la lane' : 'champion joué sur plusieurs lanes'}</span>
+      <div class="la-opts">${[...opts].sort((a, b) => share(b) - share(a)).map((r) => `<button data-r="${r}">${ROLE_LABEL[r]}${share(r) ? `<small>${share(r)} % des games</small>` : ''}</button>`).join('')}</div></div></div>`;
+  box.hidden = false;
+  box.querySelectorAll('button').forEach((b) => (b.onclick = () => {
+    state.lock[side][i] = b.dataset.r; assignRoles(side); box.hidden = true; render();
+  }));
+  box.onclick = (e) => { if (e.target === box) box.hidden = true; };
 }
 // Rôles attribués automatiquement à toute l'équipe : on cherche la répartition des 5 rôles
 // qui colle le mieux aux champions déjà pickés (part de games à chaque rôle). Plus besoin de choisir le rôle.
@@ -147,7 +166,9 @@ const PERMS = (() => { const out = []; const go = (a, rest) => { if (!rest.lengt
 function assignRoles(side) {
   const ids = state.slots[side], cur = state.roles[side];
   let best = cur, bestScore = -1;
+  const lk = state.lock?.[side] ?? [];
   for (const perm of PERMS) {
+    if (lk.some((r, i) => r && ids[i] && perm[i] !== r)) continue;
     let sc = 0;
     ids.forEach((id, i) => { if (id) sc += fit(state.P[id], perm[i]) + (perm[i] === cur[i] ? 0.01 : 0); });
     if (sc > bestScore) { bestScore = sc; best = perm; }
@@ -155,13 +176,13 @@ function assignRoles(side) {
   state.roles[side] = [...best];
 }
 const openRoles = (side, skip = -1) => { const taken = state.slots[side].map((id, i) => (id && i !== skip ? state.roles[side][i] : null)).filter(Boolean); return ROLES.filter((r) => !taken.includes(r)); };
-function clearSlot(t, i) { state.slots[t][i] = null; state.history = state.history.filter(([a, b]) => !(a === t && b === i)); if (t === 'blue' || t === 'red') assignRoles(t); render(); }
+function clearSlot(t, i) { state.slots[t][i] = null; if (state.lock[t]) state.lock[t][i] = null; state.history = state.history.filter(([a, b]) => !(a === t && b === i)); if (t === 'blue' || t === 'red') assignRoles(t); render(); }
 function undo() {
   const last = state.history.pop();
-  if (last) { state.slots[last[0]][last[1]] = null; if (last[0] === 'blue' || last[0] === 'red') assignRoles(last[0]); state.selected = null; render(); }
+  if (last) { state.slots[last[0]][last[1]] = null; if (state.lock[last[0]]) state.lock[last[0]][last[1]] = null; if (last[0] === 'blue' || last[0] === 'red') assignRoles(last[0]); state.selected = null; render(); }
 }
 function reset() {
-  state.slots = emptySlots(); state.roles = { blue: [...ROLES], red: [...ROLES] };
+  state.slots = emptySlots(); state.roles = { blue: [...ROLES], red: [...ROLES] }; state.lock = { blue: Array(5).fill(null), red: Array(5).fill(null) };
   state.history = []; state.selected = null; render();
 }
 function select(t, i) {
@@ -219,7 +240,7 @@ function renderTeams() {
       const c = id ? state.P[id] : null;
       const s = document.createElement('div');
       s.className = 'slot' + (tg && tg[0] === side && tg[1] === i ? ' target' : '');
-      const roleSel = c ? `<span class="rolebadge" title="Rôle attribué automatiquement">${ROLE_LABEL[state.roles[side][i]]}</span>` : '';
+      const roleSel = c ? `<span class="rolebadge ${state.lock[side][i] ? 'locked' : ''}" title="${state.lock[side][i] ? 'Lane choisie' : 'Lane attribuée automatiquement'} — clic pour changer">${ROLE_LABEL[state.roles[side][i]]}</span>` : '';
       s.innerHTML = `
         <div class="portrait">${c ? `<img src="${img(id)}" alt="">` : (side === 'blue' ? 'B' : 'R') + (i + 1)}</div>
         <div>
@@ -232,6 +253,7 @@ function renderTeams() {
       s.onclick = (e) => {
         if (e.target.tagName === 'SELECT' || e.target.tagName === 'OPTION') return;
         if (e.target.classList.contains('clear')) { clearSlot(side, i); return; }
+        if (e.target.classList.contains('rolebadge')) { askLane(side, i, true); return; }
         select(side, i);
       };
       el.appendChild(s);
@@ -792,7 +814,7 @@ function saveDraft() {
   const list = readSaves();
   const entry = {
     id: Date.now(), name, date: Date.now(), flow: state.flow, mySide: state.mySide,
-    slots: structuredClone(state.slots), roles: structuredClone(state.roles), history: structuredClone(state.history),
+    slots: structuredClone(state.slots), roles: structuredClone(state.roles), lock: structuredClone(state.lock), history: structuredClone(state.history),
     players: structuredClone(state.players), teamInput: { ...state.teamInput }
   };
   const same = list.findIndex((x) => x.name === name);
@@ -803,7 +825,7 @@ function loadDraft(id) {
   const d = readSaves().find((x) => x.id === id);
   if (!d) return;
   Object.assign(state, {
-    mySide: d.mySide, slots: d.slots, roles: d.roles, history: d.history ?? [],
+    mySide: d.mySide, slots: d.slots, roles: d.roles, lock: d.lock ?? { blue: Array(5).fill(null), red: Array(5).fill(null) }, history: d.history ?? [],
     players: d.players ?? { blue: [], red: [] }, teamInput: d.teamInput ?? { blue: '', red: '' }, selected: null,
     flow: d.flow ?? ([...(d.players?.blue ?? []), ...(d.players?.red ?? [])].some((p) => p.riotId || p.pool?.length) ? 'players' : 'zero')
   });

@@ -793,3 +793,17 @@ details.box > summary, .scal summary { cursor: pointer; }
 .pgw.up { color: var(--good); } .pgw.down { color: var(--red); }
 .tile .proj { color: #fff; }
 .tile .proj.up { color: #7ff0b0; } .tile .proj.down { color: #ff9aa5; }
+
+/* Choix de lane pour un champion flex */
+.laneask { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: rgba(20, 24, 34, .28); backdrop-filter: blur(2px); }
+.laneask[hidden] { display: none; }
+.la-card { display: flex; gap: 16px; align-items: center; background: var(--panel); border: 2px solid var(--gold); border-radius: 16px; padding: 18px 20px; box-shadow: 0 20px 60px #0003; animation: stIn .25s ease-out both; }
+.la-card > img { width: 72px; height: 72px; border-radius: 12px; }
+.la-body { display: flex; flex-direction: column; gap: 6px; }
+.la-body b { font-size: 16px; }
+.la-opts { display: flex; gap: 8px; margin-top: 6px; }
+.la-opts button { display: flex; flex-direction: column; align-items: center; padding: 8px 16px; border-radius: 10px; font-weight: 800; font-size: 14px; border: 2px solid var(--line); }
+.la-opts button small { font-size: 10.5px; font-weight: 600; color: var(--muted); }
+.la-opts button:hover { border-color: var(--gold); background: var(--hover); }
+.rolebadge { cursor: pointer; } .rolebadge:hover { border-color: var(--gold); color: var(--gold); }
+.rolebadge.locked { color: var(--text); border-color: var(--gold); }
