@@ -965,3 +965,6 @@ html, body { overflow-x: hidden; }
 .lr-w { font-size: 12px; font-weight: 700; color: var(--text); }
 .lr-m { font-size: 11px; font-weight: 600; }
 .lr-m.up { color: #1f9d55; } .lr-m.down { color: var(--red); }
+/* une ligne par lane, de même hauteur des deux côtés : chaque champion reste en face de son vis-à-vis, sans trou */
+.board > .team { display: grid; grid-template-rows: repeat(5, minmax(0, 1fr)); gap: 8px; align-self: stretch; }
+.board > .team > .slot { height: 100%; min-height: 0; align-content: center; box-sizing: border-box; }

@@ -1,7 +1,7 @@
 {
-  "version": "2.22.1",
-  "sha256": "3b47ee8b43c78a12fc239d736398bc5f92bf1bcdd2091f79c61db018d24fbb2c",
-  "file": "draftlab-2.22.1.json.gz",
-  "notes": "Capture : repères invisibles sur l'image",
-  "date": "2026-10-22T23:32:32.613Z"
+  "version": "2.22.2",
+  "sha256": "6cca5aabef39cf364eeb18d4761a170515a0c19e2e0abd7a4978401de6a95858",
+  "file": "draftlab-2.22.2.json.gz",
+  "notes": "Lanes alignées : chaque case de champion a la même hauteur que son vis-à-vis, sans trou",
+  "date": "2026-10-22T23:34:30.531Z"
 }
