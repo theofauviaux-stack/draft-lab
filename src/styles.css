@@ -784,3 +784,12 @@ details.box > summary, .scal summary { cursor: pointer; }
 .ban.skipped { border-style: solid; opacity: .6; }
 .step { display: flex; align-items: center; justify-content: center; }
 .ban.skipped::after { display: none; } .ban.skipped .ban-n { font-size: 16px; }
+
+/* Pool des joueurs : nombre de games et winrate lisibles, sans prendre de place */
+.pchamp i { color: #fff !important; background: #000000b3 !important; }
+.pchamp b { position: absolute; left: -2px; top: -4px; font-size: 8.5px; font-weight: 800; padding: 0 3px; border-radius: 3px; background: var(--panel); border: 1px solid var(--line); line-height: 12px; }
+.pchamp b.up { color: var(--good); } .pchamp b.down { color: var(--red); }
+.pgw { font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: var(--panel-2); }
+.pgw.up { color: var(--good); } .pgw.down { color: var(--red); }
+.tile .proj { color: #fff; }
+.tile .proj.up { color: #7ff0b0; } .tile .proj.down { color: #ff9aa5; }

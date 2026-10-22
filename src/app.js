@@ -224,7 +224,7 @@ function renderTeams() {
         <div class="portrait">${c ? `<img src="${img(id)}" alt="">` : (side === 'blue' ? 'B' : 'R') + (i + 1)}</div>
         <div>
           <div class="name">${c ? c.name : '<span class="muted">À choisir</span>'}</div>
-          <div class="meta">${roleSel}${c?.wr != null ? `<span class="wrtag" title="Winrate estimé : games pro + Master+ (one-tricks atténués)">${c.wr.toFixed(1)} % WR</span>` : ''}</div>
+          <div class="meta">${roleSel}${(() => { const pl = c ? playerFor(side, state.roles[side][i]) : null; const e = pl?.pool?.find((x) => x.id === id); return e && !e.manual ? `<span class="pgw ${e.wins / e.games >= 0.5 ? 'up' : 'down'}" title="${playerLabel(pl)} : ${e.games} games, ${Math.round((e.wins / e.games) * 100)} % de victoires">${e.games} g · ${Math.round((e.wins / e.games) * 100)} %</span>` : ''; })()}${c?.wr != null ? `<span class="wrtag" title="Winrate estimé : games pro + Master+ (one-tricks atténués)">${c.wr.toFixed(1)} % WR</span>` : ''}</div>
           ${c ? archBar(c) : ''}
           ${c ? sPairs.filter((x) => x.a.id === id || x.b.id === id).slice(0, 2).map((x) => { const o = x.a.id === id ? x.b : x.a; return `<span class="slink" style="--k:${KINDS[x.kind]?.color ?? '#6b7280'}" title="${x.title} : ${x.why.replace(/"/g, '&quot;')}">🔗 ${o.name} · ${KINDS[x.kind]?.label ?? ''}</span>`; }).join('') : ''}
         </div>
@@ -509,16 +509,31 @@ function ensureRoster(side) {
   list.sort((a, b) => ROLES.indexOf(a.role) - ROLES.indexOf(b.role));
   return list;
 }
+const nrm = (t) => String(t).toLowerCase().normalize('NFD').replace(/[^a-z0-9]/g, '');
+function findChamp(name) {
+  const q = nrm(name);
+  if (!q) return null;
+  return state.list.find((x) => nrm(x.name) === q || nrm(x.id) === q)
+    ?? (() => { const m = state.list.filter((x) => nrm(x.name).startsWith(q) || nrm(x.id).startsWith(q)); return m.length === 1 ? m[0] : null; })()
+    ?? (() => { const m = state.list.filter((x) => nrm(x.name).includes(q)); return m.length === 1 ? m[0] : null; })();
+}
 function addToPool(side, i, name) {
-  const c = state.list.find((x) => x.name.toLowerCase() === name.trim().toLowerCase() || x.id.toLowerCase() === name.trim().toLowerCase());
-  if (!c) { toast(`Champion introuvable : ${name}`); return; }
+  const c = findChamp(name);
+  if (!c) { toast(`Champion introuvable ou ambigu : ${name}`); return; }
   const p = state.players[side][i];
   p.pool ??= [];
   if (p.pool.some((e) => e.id === c.id)) { toast(`${c.name} est déjà dans le pool`); return; }
   p.pool.push({ id: c.id, games: 15, wins: 8, manual: true });
+  toast(`${c.name} ajouté au pool de ${playerLabel(p)}`);
   render();
 }
 function renderPlayers() {
+  // le panneau est redessiné souvent (données en fond) : on garde ce qui est en cours de saisie
+  const act = document.activeElement;
+  const keep = act && (act.classList.contains('padd') || act.classList.contains('pinput')) && act.closest('.plist')
+    ? { list: act.closest('.plist').id, cls: act.classList.contains('padd') ? 'padd' : 'pinput', i: act.dataset.i, v: act.value, a: act.selectionStart, b: act.selectionEnd } : null;
+  const drafts = {};
+  document.querySelectorAll('.padd').forEach((x) => { if (x.value) drafts[`${x.closest('.plist')?.id}|${x.dataset.i}`] = x.value; });
   for (const side of ['blue', 'red']) {
     const el = $(side === 'blue' ? 'playersBlue' : 'playersRed');
     const list = ensureRoster(side);
@@ -540,7 +555,7 @@ function renderPlayers() {
           </div>
         </div>
         <div class="ppool">
-          ${shown.map(({ e, k }) => `<span class="pchamp ${e.manual ? 'manual' : ''}" title="${state.P[e.id]?.name ?? e.id} : ${e.games} games${e.manual ? ' (ajouté à la main)' : `, ${Math.round((e.wins / e.games) * 100)} %${e.share ? `, ${e.share} % de ses games` : ''}${e.src ? ` (${e.src})` : ''}`} — clic pour retirer" data-i="${i}" data-k="${k}"><img src="${img(e.id)}" alt=""><i>${e.manual ? '+' : e.games}</i></span>`).join('') || '<span class="muted pnone">aucun champion à ce rôle</span>'}
+          ${shown.map(({ e, k }) => `<span class="pchamp ${e.manual ? 'manual' : ''}" title="${state.P[e.id]?.name ?? e.id} : ${e.games} games${e.manual ? ' (ajouté à la main)' : `, ${Math.round((e.wins / e.games) * 100)} %${e.share ? `, ${e.share} % de ses games` : ''}${e.src ? ` (${e.src})` : ''}`} — clic pour retirer" data-i="${i}" data-k="${k}"><img src="${img(e.id)}" alt=""><i>${e.manual ? '+' : e.games}</i>${!e.manual && e.games ? `<b class="${e.wins / e.games >= 0.5 ? 'up' : 'down'}">${Math.round((e.wins / e.games) * 100)}%</b>` : ''}</span>`).join('') || '<span class="muted pnone">aucun champion à ce rôle</span>'}
           ${hidden > 0 ? `<span class="phidden" title="Champions joués à d’autres lanes, ignorés pour le rôle ${ROLE_LABEL[p.role]}">+${hidden} autres lanes</span>` : ''}
           <input class="padd" data-i="${i}" list="champList" placeholder="+ champion" />
         </div>
@@ -555,10 +570,17 @@ function renderPlayers() {
     el.querySelectorAll('.pinput').forEach((inp) => (inp.onchange = () => { state.players[side][+inp.dataset.i].riotId = inp.value.trim(); }));
     el.querySelectorAll('.pchamp').forEach((ch) => (ch.onclick = () => { state.players[side][+ch.dataset.i].pool.splice(+ch.dataset.k, 1); render(); }));
     el.querySelectorAll('.padd').forEach((inp) => {
-      const go = () => { if (inp.value.trim()) { const v = inp.value; inp.value = ''; addToPool(side, +inp.dataset.i, v); } };
-      inp.addEventListener('change', go);
-      inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+      const d = drafts[`${el.id}|${inp.dataset.i}`]; if (d) inp.value = d;
+      const go = () => { const v = inp.value.trim(); if (!v) return; inp.value = ''; delete drafts[`${el.id}|${inp.dataset.i}`]; addToPool(side, +inp.dataset.i, v); };
+      // ajout dès qu'un champion de la liste est choisi, ou avec Entrée
+      inp.addEventListener('input', () => { if (state.list.some((x) => x.name === inp.value)) go(); });
+      inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
+      inp.addEventListener('blur', () => { if (findChamp(inp.value)) go(); });
     });
+  }
+  if (keep) {
+    const el = document.querySelector(`#${keep.list} .${keep.cls}[data-i="${keep.i}"]`);
+    if (el) { el.value = keep.v; el.focus(); try { el.setSelectionRange(keep.a, keep.b); } catch {} }
   }
 }
 

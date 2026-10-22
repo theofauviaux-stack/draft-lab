@@ -1,7 +1,7 @@
 {
-  "version": "2.15.0",
-  "sha256": "6dd15502c04630c78937d2ba846ecfa03dd87bdd16bd46c01862bbb65f9b7e75",
-  "file": "draftlab-2.15.0.json.gz",
-  "notes": "Ordre de draft de tournoi avec les bans · rôles attribués automatiquement",
-  "date": "2026-10-22T17:23:00.533Z"
+  "version": "2.15.1",
+  "sha256": "747e38f3a2590344ccc5025614f90ac1fc5f75188f1d7471c9ff065f80cd6602",
+  "file": "draftlab-2.15.1.json.gz",
+  "notes": "Nombre de games et winrate visibles sur les pools · ajout de champion fiable",
+  "date": "2026-10-22T17:27:52.750Z"
 }
