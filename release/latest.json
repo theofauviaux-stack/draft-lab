@@ -1,7 +1,7 @@
 {
-  "version": "2.22.0",
-  "sha256": "1436a32d167e2dc51366e5f9de4b232f5150cfd4463f341cb8f56cc3fac90040",
-  "file": "draftlab-2.22.0.json.gz",
-  "notes": "Direct : meilleures réponses pour ton pick (matchup, compo, pool) ; plus de trou sous les champions choisis ; courbe de scaling toujours affichée, lissée et pleine hauteur ; pentagone plus lisible",
-  "date": "2026-10-22T23:28:02.304Z"
+  "version": "2.22.1",
+  "sha256": "3b47ee8b43c78a12fc239d736398bc5f92bf1bcdd2091f79c61db018d24fbb2c",
+  "file": "draftlab-2.22.1.json.gz",
+  "notes": "Capture : repères invisibles sur l'image",
+  "date": "2026-10-22T23:32:32.613Z"
 }

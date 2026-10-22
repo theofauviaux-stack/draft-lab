@@ -1114,20 +1114,11 @@ async function autoShot() {
 }
 function drawShot() {
   const cv = $('shotCanvas'), ctx = cv.getContext('2d');
+  // les repères (cases, numéros) ne sont pas dessinés : l’image reste telle quelle
   ctx.drawImage(SHOT.img, 0, 0, cv.width, cv.height);
-  SHOT.clicks.forEach((c, k) => {
-    const x = c.x * SHOT.scale, y = c.y * SHOT.scale;
-    if (c.box) { ctx.strokeStyle = k < 5 ? '#2f6fe0' : '#d64552'; ctx.lineWidth = 2; ctx.strokeRect((c.box.cx - c.box.w / 2) * SHOT.scale, (c.box.cy - c.box.h / 2) * SHOT.scale, c.box.w * SHOT.scale, c.box.h * SHOT.scale); }
-    ctx.fillStyle = k < 5 ? '#2f6fe0' : '#d64552'; ctx.beginPath(); ctx.arc(x, y, 11, 0, 7); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(String(k + 1), x, y + 4);
-  });
 }
 function renderShotList() {
   const n = SHOT.clicks.length;
-  for (const [k, b] of (SHOT.bans ?? []).entries()) { /* bans dessinés en pointillés */
-    const ctx = $('shotCanvas').getContext('2d'); ctx.setLineDash([4, 3]); ctx.strokeStyle = k < 5 ? '#2f6fe0' : '#d64552'; ctx.lineWidth = 1.5;
-    ctx.strokeRect((b.box.cx - b.box.w / 2) * SHOT.scale, (b.box.cy - b.box.h / 2) * SHOT.scale, b.box.w * SHOT.scale, b.box.h * SHOT.scale); ctx.setLineDash([]);
-  }
   $('shotHelp').innerHTML = !SHOT.img ? 'Choisis, glisse ou colle (Ctrl/Cmd + V) une capture : tableau de fin de game ou écran d’un drafter.'
     : SHOT.auto === 'ok' && n === 10 ? 'Analyse automatique terminée : les 10 champions ont été repérés et reconnus. Vérifie, corrige si besoin (clic sur un autre choix ou tape un nom), puis lance l’analyse.'
     : SHOT.auto === 'fail' && !n ? 'Je n’ai pas trouvé automatiquement les 10 champions sur cette image : <b>clique sur chacun</b> (équipe bleue d’abord).'
