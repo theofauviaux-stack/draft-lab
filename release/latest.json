@@ -1,7 +1,7 @@
 {
-  "version": "2.23.1",
-  "sha256": "cc8801a67145db5b6ac70fb1f4095dc0420a7ad0365da31e52991628275c1154",
-  "file": "draftlab-2.23.1.json.gz",
-  "notes": "Drafts sauvegardées : portraits des champions de retour dans le menu",
-  "date": "2026-10-22T23:45:31.180Z"
+  "version": "2.23.2",
+  "sha256": "446ff94e83d5bf906eab5a4055d828ca254a6030bad942d7d9b4b2855b0cec5f",
+  "file": "draftlab-2.23.2.json.gz",
+  "notes": "Icônes de lanes de même taille côté bleu et rouge",
+  "date": "2026-10-22T23:53:20.869Z"
 }
