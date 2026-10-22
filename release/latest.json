@@ -1,7 +1,7 @@
 {
-  "version": "2.9.0",
-  "sha256": "59dd2aa84a759ecd305ad98cafb1f34ac6b3f53b5e7f09d5932e82116ae59c80",
-  "file": "draftlab-2.9.0.json.gz",
-  "notes": "Mode clair / sombre · alerte unique si les données ne sont plus à jour · nouvelle balance de winrate",
-  "date": "2026-10-22T16:11:58.809Z"
+  "version": "2.10.0",
+  "sha256": "c6373ef7fd4182fda04791da5022579aa05f56f7d894ac421cf770d55cf0f9c2",
+  "file": "draftlab-2.10.0.json.gz",
+  "notes": "Nouveau menu de départ plein écran avec fond interactif",
+  "date": "2026-10-22T16:26:04.846Z"
 }

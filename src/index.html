@@ -119,22 +119,53 @@
     Le pourcentage est une estimation de modèle, pas une certitude. Draft Lab n’est pas affilié à Riot Games.
   </footer>
 
-  <div id="startMenu" class="overlay" hidden>
-    <div class="menu">
-      <button id="menuClose" class="menu-x" title="Fermer (Échap)">×</button>
-      <h1><span class="logo">◆</span> Draft Lab</h1>
-      <p class="muted">Comment veux-tu préparer ta draft ?</p>
-      <div id="startChoices" class="choices">
-        <button id="startZero" class="choice">
+  <div id="startMenu" class="start" hidden>
+    <!-- Fond interactif : carte stylisée + portraits + particules, en parallaxe avec la souris -->
+    <div class="st-bg" aria-hidden="true">
+      <canvas id="stParticles" class="st-particles"></canvas>
+      <div class="st-layer st-far" id="stPortraits"></div>
+      <svg class="st-map" viewBox="0 0 600 600" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <radialGradient id="gBlue" cx="0" cy="1" r="0.9"><stop offset="0" stop-color="#2f6fe0" stop-opacity=".55"/><stop offset="1" stop-color="#2f6fe0" stop-opacity="0"/></radialGradient>
+          <radialGradient id="gRed" cx="1" cy="0" r="0.9"><stop offset="0" stop-color="#d64552" stop-opacity=".55"/><stop offset="1" stop-color="#d64552" stop-opacity="0"/></radialGradient>
+          <linearGradient id="gRiver" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4aa3df" stop-opacity=".0"/><stop offset=".5" stop-color="#4aa3df" stop-opacity=".45"/><stop offset="1" stop-color="#4aa3df" stop-opacity=".0"/></linearGradient>
+        </defs>
+        <rect width="600" height="600" class="st-ground"/>
+        <rect class="st-glow-b" width="600" height="600" fill="url(#gBlue)"/>
+        <rect class="st-glow-r" width="600" height="600" fill="url(#gRed)"/>
+        <path d="M40,560 L560,40" stroke="url(#gRiver)" stroke-width="70" class="st-river"/>
+        <g class="st-lanes" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M70,530 L70,70 L530,70" class="ln-top"/>
+          <path d="M85,515 L515,85" class="ln-mid"/>
+          <path d="M70,530 L530,530 L530,70" class="ln-bot"/>
+        </g>
+        <g class="st-jungle"><circle cx="190" cy="250" r="16"/><circle cx="260" cy="400" r="14"/><circle cx="410" cy="350" r="16"/><circle cx="340" cy="200" r="14"/><circle cx="170" cy="380" r="10"/><circle cx="430" cy="220" r="10"/></g>
+        <g class="st-obj"><circle cx="420" cy="420" r="20" class="o-drake"/><circle cx="180" cy="180" r="20" class="o-baron"/></g>
+        <g class="st-towers"></g>
+        <circle cx="70" cy="530" r="34" class="st-base b"/><circle cx="530" cy="70" r="34" class="st-base r"/>
+        <circle cx="70" cy="530" r="34" class="st-pulse b"/><circle cx="530" cy="70" r="34" class="st-pulse r"/>
+      </svg>
+      <div class="st-vignette"></div>
+    </div>
+    <div class="st-content">
+      <button id="menuClose" class="st-x" title="Fermer (Échap)">×</button>
+      <div class="st-brand"><span class="logo">◆</span> Draft Lab</div>
+      <p class="st-sub">Comment veux-tu préparer ta draft&nbsp;?</p>
+      <div id="startChoices" class="st-choices">
+        <button id="startZero" class="st-card zero">
+          <span class="st-ic">✦</span>
           <b>Draft de zéro</b>
-          <span>Draft vierge : plan de jeu, pentagone des compos et bans selon la méta du patch.</span>
+          <span class="st-desc">Draft vierge : winrate en direct, plan de jeu et pentagone des compos selon la méta du patch.</span>
+          <span class="st-go">Commencer →</span>
         </button>
-        <button id="startPlayers" class="choice">
+        <button id="startPlayers" class="st-card players">
+          <span class="st-ic">⚔</span>
           <b>Draft depuis des joueurs</b>
-          <span>Colle les liens multi op.gg des deux équipes : pools des joueurs, picks adverses probables et bans ciblés sur leurs champions.</span>
+          <span class="st-desc">Colle les multi op.gg des deux équipes : pools des joueurs, picks adverses probables et bans ciblés.</span>
+          <span class="st-go">Charger les équipes →</span>
         </button>
       </div>
-      <div id="startForm" class="start-form" hidden>
+      <div id="startForm" class="start-form st-form" hidden>
         <label class="blue">Équipe 1 — côté bleu<input id="menuBlue" placeholder="Lien multi op.gg ou Nom#TAG, Nom#TAG…" /></label>
         <label class="red">Équipe 2 — côté rouge<input id="menuRed" placeholder="Lien multi op.gg ou Nom#TAG, Nom#TAG…" /></label>
         <div class="form-row">
@@ -144,7 +175,7 @@
         <p class="muted">Ordre des joueurs : Top, Jungle, Mid, ADC, Support (modifiable ensuite). La région est lue dans le lien op.gg ; le menu ne sert que si tu colles des noms.</p>
         <div class="form-row"><button id="menuBack">Retour</button><button id="menuGo" class="primary">Lancer la draft</button></div>
       </div>
-      <div id="menuSaves" class="menu-saves"></div>
+      <div id="menuSaves" class="menu-saves st-saves"></div>
     </div>
   </div>
 

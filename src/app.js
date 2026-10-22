@@ -600,8 +600,53 @@ function renderBanPlan() {
 }
 
 // ---------- Menu de départ ----------
+// Fond du menu : parallaxe à la souris, portraits flottants et particules
+let stAnim = null;
+function fillPortraits() {
+  const pf = $('stPortraits');
+  if (state.list.length && !pf.childElementCount) {
+    const pick = [...state.list].sort(() => Math.random() - 0.5).slice(0, 16);
+    pf.innerHTML = pick.map((c, i) => {
+      const x = (i % 8) * 12.5 + 3 + Math.random() * 5, y = i < 8 ? 6 + Math.random() * 14 : 72 + Math.random() * 14;
+      return `<img src="${img(c.id)}" style="left:${x}%;top:${y}%;--d:${(Math.random() * 6).toFixed(1)}s;--s:${(0.8 + Math.random() * 0.6).toFixed(2)}" alt="">`;
+    }).join('');
+  }
+}
+let stFit = false;
+function startBackground() {
+  const root = $('startMenu');
+  fillPortraits();
+  root.onmousemove = (e) => {
+    root.style.setProperty('--mx', ((e.clientX / innerWidth) - 0.5).toFixed(3));
+    root.style.setProperty('--my', ((e.clientY / innerHeight) - 0.5).toFixed(3));
+  };
+  const cv = $('stParticles'), ctx = cv.getContext('2d');
+  const fit = () => { cv.width = innerWidth; cv.height = innerHeight; };
+  fit(); if (!stFit) { addEventListener('resize', fit); stFit = true; }
+  const parts = Array.from({ length: 70 }, () => ({ x: Math.random() * innerWidth, y: Math.random() * innerHeight, r: 0.6 + Math.random() * 2, v: 0.15 + Math.random() * 0.5, a: Math.random() }));
+  cancelAnimationFrame(stAnim);
+  const tick = () => {
+    if (root.hidden) return;
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    const gold = getComputedStyle(document.documentElement).getPropertyValue('--gold').trim() || '#9a7a3c';
+    for (const p of parts) {
+      p.y -= p.v; p.x += Math.sin((p.y + p.a * 100) / 60) * 0.3;
+      if (p.y < -5) { p.y = cv.height + 5; p.x = Math.random() * cv.width; }
+      ctx.globalAlpha = 0.25 + 0.5 * Math.abs(Math.sin(p.y / 80 + p.a * 6));
+      ctx.fillStyle = gold; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill();
+    }
+    stAnim = requestAnimationFrame(tick);
+  };
+  tick();
+  // survol d'une carte : la carte du fond s'éclaire du côté correspondant
+  $('startZero').onmouseenter = () => root.dataset.hover = 'zero';
+  $('startPlayers').onmouseenter = () => root.dataset.hover = 'players';
+  for (const id of ['startZero', 'startPlayers']) $(id).onmouseleave = () => delete root.dataset.hover;
+}
 function openMenu() {
   $('startMenu').hidden = false;
+  $('startMenu').classList.remove('leaving', 'form');
+  startBackground();
   $('startForm').hidden = true; $('startChoices').hidden = false;
   $('menuBlue').value = state.teamInput.blue ?? ''; $('menuRed').value = state.teamInput.red ?? '';
   $('menuSide').value = state.mySide; $('menuRegion').value = state.region;
@@ -610,7 +655,12 @@ function openMenu() {
     saves.map((d) => `<button class="msave" data-id="${d.id}">${d.name.replace(/</g, '&lt;')}</button>`).join('') : '';
   $('menuSaves').querySelectorAll('.msave').forEach((b) => (b.onclick = () => { loadDraft(+b.dataset.id); closeMenu(); }));
 }
-const closeMenu = () => { $('startMenu').hidden = true; };
+const closeMenu = () => {
+  const m = $('startMenu');
+  if (m.hidden) return;
+  m.classList.add('leaving');
+  setTimeout(() => { m.hidden = true; m.classList.remove('leaving'); }, 420);
+};
 function startFromZero() {
   state.players = { blue: [], red: [] }; state.teamInput = { blue: '', red: '' }; state.flow = 'zero';
   $('opggBlue').value = ''; $('opggRed').value = '';
@@ -794,6 +844,7 @@ function ingest(data) {
   state.P = buildProfiles(data.champions, data.stats, data.pro, state.mode);
   state.list = Object.values(state.P).sort((a, b) => a.name.localeCompare(b.name, 'fr'));
   renderSources();
+  fillPortraits();
   $('champList').innerHTML = state.list.map((c) => `<option value="${c.name}"></option>`).join('');
   if (prevPatch && prevPatch !== data.patch) toast(`Nouveau patch ${data.patch} détecté — données mises à jour`);
   render();
@@ -812,8 +863,8 @@ function initControls() {
   $('mySide').onchange = (e) => { state.mySide = e.target.value; savePrefs(); render(); };
   $('undo').onclick = undo; $('reset').onclick = openMenu; $('menuBtn').onclick = openMenu;
   $('startZero').onclick = startFromZero;
-  $('startPlayers').onclick = () => { $('startChoices').hidden = true; $('startForm').hidden = false; $('menuBlue').focus(); };
-  $('menuBack').onclick = () => { $('startForm').hidden = true; $('startChoices').hidden = false; };
+  $('startPlayers').onclick = () => { $('startMenu').classList.add('form'); $('startChoices').hidden = true; $('startForm').hidden = false; $('menuBlue').focus(); };
+  $('menuBack').onclick = () => { $('startMenu').classList.remove('form'); $('startForm').hidden = true; $('startChoices').hidden = false; };
   $('menuGo').onclick = startFromPlayers;
   $('menuClose').onclick = closeMenu; $('refresh').onclick = () => load(true);
   $('search').oninput = (e) => { state.search = e.target.value; render(); };
