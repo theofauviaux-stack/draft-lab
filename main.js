@@ -1,5 +1,5 @@
 // Processus principal Electron : fenêtre, cache disque, synchronisation des données.
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { fetchDDragon } = require('./providers/ddragon');
@@ -151,12 +151,55 @@ async function quickLoad(tier) {
   return snap;
 }
 
+// ---- Taille de la fenêtre : plein écran ou tailles fixes en 16:9 ----
+// L'interface est toujours dessinée pour 1600 px de large puis mise à l'échelle :
+// elle reste identique (rien ne se décale), quelle que soit la taille choisie.
+const BASE_W = 1600;
+const WIN_FILE = () => path.join(app.getPath('userData'), 'window.json');
+function winSizes() {
+  const wa = screen.getPrimaryDisplay().workAreaSize;
+  const presets = [[1600, 900], [1920, 1080], [2240, 1260], [2560, 1440], [3200, 1800], [3840, 2160]];
+  const list = presets.filter(([w, h]) => w <= wa.width && h <= wa.height - 30).map(([w, h]) => ({ id: `${w}x${h}`, w, h, label: `${w} × ${h}` }));
+  if (!list.length) { // petit écran : la plus grande fenêtre 16:9 qui tient
+    const w = Math.floor(Math.min(wa.width, ((wa.height - 30) * 16) / 9) / 16) * 16, h = (w * 9) / 16;
+    list.push({ id: `${w}x${h}`, w, h, label: `${w} × ${h}` });
+  }
+  return [{ id: 'full', label: 'Plein écran' }, ...list];
+}
+function readWinPref() { try { return JSON.parse(fs.readFileSync(WIN_FILE(), 'utf8')).size; } catch { return null; } }
+function applyZoom() {
+  if (!win || win.isDestroyed()) return;
+  const [cw] = win.getContentSize();
+  win.webContents.setZoomFactor(Math.max(0.3, cw / BASE_W));
+}
+let lastWindowed = null;
+function setWinSize(id, save = true) {
+  const sizes = winSizes();
+  const opt = sizes.find((o) => o.id === id) ?? sizes[1] ?? sizes[0];
+  if (save) try { fs.writeFileSync(WIN_FILE(), JSON.stringify({ size: opt.id })); } catch {}
+  if (opt.id === 'full') { win.setResizable(true); win.setFullScreen(true); } // macOS : le plein écran demande une fenêtre redimensionnable
+  else {
+    lastWindowed = opt.id;
+    const apply = () => { win.setResizable(true); win.setContentSize(opt.w, opt.h); win.setResizable(false); win.center(); applyZoom(); };
+    if (win.isFullScreen()) { win.once('leave-full-screen', () => setTimeout(apply, 50)); win.setFullScreen(false); } else apply();
+  }
+  setTimeout(applyZoom, 300);
+  return opt.id;
+}
+const currentWinSize = () => (win.isFullScreen() ? 'full' : lastWindowed);
+
 function createWindow() {
+  const sizes = winSizes();
+  const pref = readWinPref();
+  const first = sizes.find((o) => o.id === pref) ?? sizes[1] ?? sizes[0];
+  const start = first.id === 'full' ? (sizes[1] ?? { w: 1600, h: 900 }) : first;
   win = new BrowserWindow({
-    width: 1480,
-    height: 940,
-    minWidth: 1100,
-    minHeight: 720,
+    width: start.w,
+    height: start.h,
+    useContentSize: true,
+    resizable: false,
+    maximizable: false,
+    fullscreenable: true,
     backgroundColor: '#f4f5f7',
     title: 'Draft Lab',
     autoHideMenuBar: true,
@@ -167,7 +210,19 @@ function createWindow() {
       nodeIntegration: false
     }
   });
+  lastWindowed = start.id ?? null;
   win.loadFile(path.join(__dirname, 'src', 'index.html'));
+  if (first.id === 'full') { win.setResizable(true); win.setFullScreen(true); }
+  // mise à l'échelle : au chargement, à chaque changement de taille, et si l'utilisateur tente de zoomer
+  win.webContents.on('did-finish-load', applyZoom);
+  win.webContents.on('zoom-changed', () => setTimeout(applyZoom, 0));
+  win.webContents.setVisualZoomLevelLimits(1, 1).catch(() => {});
+  for (const ev of ['resize', 'enter-full-screen', 'leave-full-screen']) win.on(ev, () => { setTimeout(applyZoom, 60); win.webContents.send('window:changed', currentWinSize()); });
+  // en quittant le plein écran (Échap, bouton vert…), on revient à la dernière taille fixe
+  win.on('leave-full-screen', () => {
+    try { fs.writeFileSync(WIN_FILE(), JSON.stringify({ size: lastWindowed ?? 'full' })); } catch {}
+    setTimeout(() => { const o = winSizes().find((x) => x.id === lastWindowed) ?? winSizes()[1]; if (o?.w) { win.setResizable(true); win.setContentSize(o.w, o.h); win.setResizable(false); win.center(); applyZoom(); } }, 80);
+  });
   // fermer aussi la fenêtre cachée de dpm.lol quand on ferme l'app
   win.on('closed', () => { for (const w of BrowserWindow.getAllWindows()) { try { w.destroy(); } catch {} } });
 }
@@ -204,6 +259,8 @@ app.whenReady().then(() => {
   // Mises à jour automatiques de l'application
   let lastUpdate = null;
   const sendUpdate = (st) => { lastUpdate = st; if (win && !win.isDestroyed()) win.webContents.send('update:status', st); };
+  ipcMain.handle('window:sizes', () => ({ current: currentWinSize(), options: winSizes().map(({ id, label }) => ({ id, label })) }));
+  ipcMain.handle('window:set', (_e, id) => setWinSize(id));
   ipcMain.handle('app:version', () => global.DRAFTLAB_VERSION || app.getVersion());
   ipcMain.handle('update:last', () => lastUpdate);
   ipcMain.handle('update:check', () => autoUpdate(sendUpdate));

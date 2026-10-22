@@ -1136,7 +1136,21 @@ function askTopMid(side, done) {
   box.onclick = null;
 }
 
+// Taille de la fenêtre (application) : plein écran ou tailles fixes, interface mise à l'échelle
+async function initWinSize() {
+  if (!api.windowSizes) return;
+  const sel = $('winSize');
+  const fill = async () => {
+    const { current, options } = await api.windowSizes();
+    sel.innerHTML = options.map((o) => `<option value="${o.id}">${o.label}</option>`).join('');
+    sel.value = current ?? options[0].id;
+  };
+  await fill(); $('winSizeBox').hidden = false;
+  sel.onchange = () => api.setWindowSize(sel.value);
+  api.onWindowChanged?.(() => fill());
+}
 function initLive() {
+  initWinSize();
   $('startLive').onclick = startLiveMode;
   $('liveStop').onclick = () => { stopLiveMode(); toast('Direct arrêté'); };
   api.onLive?.(onLive);

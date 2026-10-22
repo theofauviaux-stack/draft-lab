@@ -930,3 +930,7 @@ html, body { overflow-x: hidden; }
 .sl-bans span.r { border-left-color: var(--red); }
 .sl-bans img, .sl-bans i { width: 26px; height: 26px; border-radius: 5px; filter: grayscale(.6); display: block; background: var(--line); }
 .sl-bans .sl-noban { margin-left: auto; font-size: 12px; padding: 3px 9px; }
+/* choix de la taille de fenêtre */
+.tb-size { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 8px 0 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel); color: var(--text); font-size: 14px; cursor: pointer; }
+.tb-size select { border: 0; background: transparent; color: var(--text); font-weight: 600; font-size: 12.5px; font-family: inherit; outline: none; cursor: pointer; padding: 0; }
+.tb-size[hidden] { display: none; }

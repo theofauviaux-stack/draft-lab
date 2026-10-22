@@ -1,7 +1,7 @@
 {
-  "version": "2.20.0",
-  "sha256": "9ce8a7cbfd8554262baa78ba0978cd443e74118602145c9a6ede31adca2725dc",
-  "file": "draftlab-2.20.0.json.gz",
-  "notes": "Capture : analyse automatique sans clic (cases repérées par formes et couleurs), bandeaux des drafters reconnus via les illustrations, bans grisés repérés ; direct : bans conservés en jeu",
-  "date": "2026-10-22T22:39:39.684Z"
+  "version": "2.21.0",
+  "sha256": "680a7ab3ecd70f1450b38fefbd59a0545af71bb2c5d6618fc8464adc62673e96",
+  "file": "draftlab-2.21.0.json.gz",
+  "notes": "Taille de fenêtre fixe (plein écran, 1600×900 ou plus selon l'écran) avec mise à l'échelle de l'interface",
+  "date": "2026-10-22T23:13:44.975Z"
 }
