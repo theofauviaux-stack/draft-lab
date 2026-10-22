@@ -141,7 +141,7 @@ function createWindow() {
     height: 940,
     minWidth: 1100,
     minHeight: 720,
-    backgroundColor: '#0b0f17',
+    backgroundColor: '#f4f5f7',
     title: 'Draft Lab',
     autoHideMenuBar: true,
     webPreferences: {

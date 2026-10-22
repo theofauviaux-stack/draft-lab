@@ -57,12 +57,21 @@ function emptySlots() {
 }
 try {
   const saved = JSON.parse(localStorage.getItem('draftlab-prefs') ?? '{}');
-  Object.assign(state, { mySide: saved.mySide ?? state.mySide, wantArch: saved.wantArch ?? null });
+  Object.assign(state, { mySide: saved.mySide ?? state.mySide, wantArch: saved.wantArch ?? null, theme: saved.theme ?? 'light' });
 } catch {}
 // Une seule base de données : soloQ Émeraude+ (lolalytics), complétée par la compétition (gol.gg) pour écarter les picks hors rôle.
-const savePrefs = () => { try { localStorage.setItem('draftlab-prefs', JSON.stringify({ mySide: state.mySide, wantArch: state.wantArch })); } catch {} };
+const savePrefs = () => { try { localStorage.setItem('draftlab-prefs', JSON.stringify({ mySide: state.mySide, wantArch: state.wantArch, theme: state.theme })); } catch {} };
 
 const $ = (id) => document.getElementById(id);
+// ---------- Thème clair / sombre ----------
+// Les dessins SVG sont écrits avec les couleurs du thème clair ; en sombre on les remplace.
+const DARK_MAP = { '#6b7280': '#8a93a8', '#1f2937': '#e6e9f2', '#d9dee6': '#263049', '#c3cad5': '#3a4560', '#ffffff': '#151c2c',
+  '#f4f6f9': '#151c2c', '#eef1f5': '#0e1422', '#d3e2f4': '#1d2a44', '#c9d9ec': '#13304a' };
+const themed = (svg) => (state.theme === 'dark' ? svg.replace(/#[0-9a-f]{6}\b/gi, (h) => DARK_MAP[h.toLowerCase()] ?? h) : svg);
+function applyTheme() {
+  document.documentElement.dataset.theme = state.theme;
+  const b = $('themeBtn'); if (b) { b.textContent = state.theme === 'dark' ? '☀️' : '🌙'; b.title = state.theme === 'dark' ? 'Passer en mode clair' : 'Passer en mode sombre'; }
+}
 const img = (id) => (state.data ? `https://ddragon.leagueoflegends.com/cdn/${state.data.version}/img/champion/${id}.png` : '');
 const seq = () => PICKS;
 const used = () => new Set(Object.values(state.slots).flat().filter(Boolean));
@@ -237,24 +246,21 @@ function renderWr(ev) {
 }
 
 function renderGauge(v, label) {
-  const cx = 160, cy = 160, r = 130, w = 26;
-  const pt = (frac) => { const a = Math.PI * (1 - frac); return [cx + r * Math.cos(a), cy - r * Math.sin(a)]; };
-  const arc = (f0, f1, col) => {
-    const [x0, y0] = pt(f0), [x1, y1] = pt(f1);
-    return `<path d="M${x0},${y0} A${r},${r} 0 0 1 ${x1},${y1}" stroke="${col}" stroke-width="${w}" fill="none" stroke-linecap="butt"/>`;
-  };
-  const f = Math.max(0.001, Math.min(0.999, v / 100));
-  let s = arc(0, f, '#2f6fe0') + arc(f, 1, '#d64552');
-  for (const t of [0.25, 0.5, 0.75]) { const [a, b] = pt(t); const [c, d] = [cx + (r - w / 2 - 6) * Math.cos(Math.PI * (1 - t)), cy - (r - w / 2 - 6) * Math.sin(Math.PI * (1 - t))]; s += `<line x1="${a}" y1="${b}" x2="${c}" y2="${d}" stroke="#ffffff" stroke-width="2"/>`; }
-  // repère blanc à la frontière bleu / rouge
-  const [ix, iy] = [cx + (r - w / 2 - 4) * Math.cos(Math.PI * (1 - f)), cy - (r - w / 2 - 4) * Math.sin(Math.PI * (1 - f))];
-  const [ox, oy] = [cx + (r + w / 2 + 4) * Math.cos(Math.PI * (1 - f)), cy - (r + w / 2 + 4) * Math.sin(Math.PI * (1 - f))];
-  s += `<line x1="${ix}" y1="${iy}" x2="${ox}" y2="${oy}" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>`;
-  s += `<text x="${cx}" y="${cy - 30}" text-anchor="middle" font-size="46" font-weight="900" fill="${v >= 50 ? '#2f6fe0' : '#d64552'}">${(v >= 50 ? v : 100 - v).toFixed(1)}%</text>`;
-  s += `<text x="${cx}" y="${cy - 8}" text-anchor="middle" font-size="12.5" fill="#6b7280">${v === 50 ? 'égalité' : `pour l’équipe ${v >= 50 ? '1 (bleu)' : '2 (rouge)'}`}</text>`;
-  s += `<text x="${cx}" y="${cy + 12}" text-anchor="middle" font-size="11" fill="#9a7a3c" font-weight="700" letter-spacing="1">${label.toUpperCase()}</text>`;
-  s += `<text x="${cx - r}" y="${cy + 16}" text-anchor="middle" font-size="11" fill="#2f6fe0" font-weight="700">ÉQ. 1</text><text x="${cx + r}" y="${cy + 16}" text-anchor="middle" font-size="11" fill="#d64552" font-weight="700">ÉQ. 2</text>`;
-  $('gauge').innerHTML = s;
+  const lead = v >= 50 ? 'blue' : 'red', gap = Math.abs(v - 50);
+  const verdict = gap < 1.5 ? 'Draft équilibrée' : gap < 4 ? 'Léger avantage' : gap < 8 ? 'Avantage net' : 'Gros avantage';
+  const who = gap < 1.5 ? '' : lead === 'blue' ? 'Équipe 1' : 'Équipe 2';
+  const icons = (side) => state.slots[side].filter(Boolean).slice(0, 5).map((id) => `<img src="${img(id)}" alt="">`).join('');
+  $('gauge').innerHTML = `
+    <div class="wb-label">${label}</div>
+    <div class="wb-nums"><b class="b ${lead === 'blue' ? 'lead' : ''}">${v.toFixed(1)}<small>%</small></b><span class="wb-vs">VS</span><b class="r ${lead === 'red' ? 'lead' : ''}">${(100 - v).toFixed(1)}<small>%</small></b></div>
+    <div class="wb-track">
+      <div class="wb-fill b" style="width:${v}%"><span class="wb-ic">${icons('blue')}</span></div>
+      <div class="wb-fill r" style="width:${100 - v}%"><span class="wb-ic">${icons('red')}</span></div>
+      <div class="wb-mid"></div>
+      <div class="wb-mark" style="left:${v}%"></div>
+    </div>
+    <div class="wb-scale"><span>Éq. 1</span><span>50 / 50</span><span>Éq. 2</span></div>
+    <div class="wb-verdict ${gap < 1.5 ? '' : lead}">${verdict}${who ? ` pour l’${who.toLowerCase()}` : ''}</div>`;
 }
 
 function currentContext() {
@@ -339,7 +345,7 @@ function renderPentagon(ev) {
     s += `<circle cx="${vx}" cy="${vy}" r="6" fill="${ARCH[k].color}"/>`;
     s += `<text x="${lx}" y="${ly + 4}" fill="${ARCH[k].color}" font-size="13" font-weight="800" text-anchor="middle">${ARCH[k].label}</text>`;
   }
-  svg.innerHTML = s;
+  svg.innerHTML = themed(s);
   const fmt = (sh) => (sh ? ORDER.map((k) => `<span style="color:${ARCH[k].color}">${ARCH[k].short} ${Math.round(sh[k] * 100)}%</span>`).join(' · ') : '—');
   const tB = team('blue'), tR = team('red');
   const lb = tB.length ? compLabel(tB) : null, lr = tR.length ? compLabel(tR) : null;
@@ -385,7 +391,7 @@ function renderScaling() {
     .map(([k, l]) => `<button class="chip ${state.scalShow === k ? 'on' : ''}" data-k="${k}">${l}</button>`).join('');
   $('scalPick').querySelectorAll('.chip').forEach((b) => (b.onclick = () => { state.scalShow = b.dataset.k; renderScaling(); }));
   if (!any) s += `<text x="${W / 2}" y="${H / 2}" fill="#6b7280" font-size="12" text-anchor="middle">Les courbes apparaissent avec les picks</text>`;
-  svg.innerHTML = s;
+  svg.innerHTML = themed(s);
 }
 
 const roster = (side) => state.slots[side].map((id, i) => (id ? { c: state.P[id], role: state.roles[side][i] } : null)).filter(Boolean);
@@ -698,7 +704,7 @@ function miniMap(mp, myJ) {
     const d = toBot ? 'M70,95 C95,120 110,140 140,158' : 'M140,125 C115,100 100,80 78,62';
     s += `<path d="${d}" stroke="#1f2937" stroke-width="2.5" fill="none" stroke-dasharray="5 4" marker-end="url(#jarr)"/>`;
   }
-  return `<svg viewBox="0 0 220 220" class="minimap"><defs><marker id="jarr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0L10,5L0,10z" fill="#1f2937"/></marker></defs>${s}</svg>`;
+  return themed(`<svg viewBox="0 0 220 220" class="minimap"><defs><marker id="jarr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0L10,5L0,10z" fill="#1f2937"/></marker></defs>${s}</svg>`);
 }
 
 function renderAdvice() {
@@ -764,24 +770,18 @@ function renderAdvice() {
     <div class="pl-text">${textSecs.map((sec) => `<div class="plan-sec"><h4>${sec.title}</h4>${sec.items.map((t) => `<p>${t}</p>`).join('')}</div>`).join('')}</div>`;
 }
 
+// Plus de pastilles par source : une seule alerte quand les données ne sont plus à jour.
 function renderSources() {
-  const s = state.data.sources, el = $('sources');
-  const items = [
-    ['ddragon', 'Riot', 'https://developer.riotgames.com/docs/lol#data-dragon'],
-    ['lolalytics', 'lolalytics', 'https://lolalytics.com'],
-    ['golgg', 'gol.gg', 'https://gol.gg/esports/home/']
-  ];
-  el.innerHTML = '';
-  for (const [k, label, url] of items) {
-    const st = s[k] ?? {};
-    const b = document.createElement('span');
-    // Clignote seulement s'il n'y a encore AUCUNE donnée ; sinon la mise à jour se fait en silence.
-    b.className = 'src ' + (st.loading && !st.ok ? 'loading' : st.ok ? 'ok' : st.cached ? 'cached' : 'ko');
-    const when = st.at ? new Date(st.at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : 'fournies avec l’app';
-    b.title = st.loading ? (st.ok ? `Données utilisables (${when}), vérification d’une mise à jour en fond…` : 'Premier chargement en cours…') : st.ok ? `À jour (${when})${st.patch && st.patch !== state.data.patch ? ` — stats du patch ${st.patch}, le patch ${state.data.patch} n’a pas encore assez de parties` : ''}` : st.cached ? `Hors ligne, cache du ${when} : ${st.error}` : `Indisponible : ${st.error ?? 'inconnu'}`;
-    b.textContent = label;
-    b.onclick = () => api.open(url);
-    el.appendChild(b);
+  const s = state.data.sources ?? {}, el = $('dataAlert');
+  const DAY = 24 * 3600 * 1000;
+  const names = { ddragon: 'Riot', lolalytics: 'lolalytics', golgg: 'gol.gg' };
+  const bad = Object.entries(names).map(([k, n]) => [n, s[k] ?? {}]).filter(([, st]) => !st.loading && (!st.ok || (st.at && Date.now() - st.at > 2 * DAY)));
+  if (!bad.length) { el.hidden = true; }
+  else {
+    el.hidden = false;
+    el.textContent = '⚠ Données pas à jour';
+    el.title = bad.map(([n, st]) => `${n} : ${st.ok ? `dernière mise à jour le ${new Date(st.at).toLocaleDateString('fr-FR')}` : st.cached ? `hors ligne, on utilise les données du ${st.at ? new Date(st.at).toLocaleDateString('fr-FR') : '?'}` : `indisponible (${st.error ?? 'erreur'})`}`).join('\n') + '\nClique pour réessayer.';
+    el.onclick = () => load(true);
   }
   $('patchPill').textContent = `Patch ${state.data.patch}`;
 }
@@ -808,6 +808,7 @@ async function load(force = false) {
 }
 
 function initControls() {
+  $('themeBtn').onclick = () => { state.theme = state.theme === 'dark' ? 'light' : 'dark'; savePrefs(); applyTheme(); render(); };
   $('mySide').onchange = (e) => { state.mySide = e.target.value; savePrefs(); render(); };
   $('undo').onclick = undo; $('reset').onclick = openMenu; $('menuBtn').onclick = openMenu;
   $('startZero').onclick = startFromZero;
@@ -878,6 +879,7 @@ function initUpdates() {
   $('updRestart').onclick = () => api.restart();
 }
 
+applyTheme();
 initControls();
 initUpdates();
 openMenu();

@@ -14,7 +14,7 @@
     <div class="pill" id="patchPill">Patch …</div>
     <button class="verpill" id="verPill" title="Version de l’application — cliquer pour chercher une mise à jour">v…</button>
     <button class="primary updbtn" id="updRestart" hidden title="Une nouvelle version est installée">⟳ Redémarrer maintenant</button>
-    <div class="sources" id="sources"></div>
+    <button class="dalert" id="dataAlert" hidden></button>
     <div class="spacer"></div>
     <label class="ctl">Je suis
       <select id="mySide">
@@ -22,6 +22,7 @@
         <option value="red">Côté rouge</option>
       </select>
     </label>
+    <button id="themeBtn" class="themebtn" title="Changer de thème">🌙</button>
     <button id="menuBtn" title="Menu de départ">☰ Menu</button>
     <button id="undo" title="Annuler le dernier choix (Ctrl/Cmd+Z)">↶ Annuler</button>
     <button id="reset">Nouvelle draft</button>
@@ -65,7 +66,7 @@
   <section class="scoreboard" id="scoreboard">
     <div class="sb-team blue" id="sbBlue"></div>
     <div class="sb-center">
-      <svg id="gauge" viewBox="0 0 320 185"></svg>
+      <div id="gauge" class="wb"></div>
       <div class="sb-bars" id="sbBars"></div>
     </div>
     <div class="sb-team red" id="sbRed"></div>
