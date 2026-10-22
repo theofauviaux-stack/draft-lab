@@ -283,3 +283,4 @@ Seul un changement de version d'Electron demande de retélécharger l'applicatio
 - Draft depuis une capture (tableau de fin de game ou drafter) : on clique sur les 10 portraits, chaque champion est reconnu (recherche en 2 passes, teinte conservée), avec 3 alternatives et une saisie pour corriger. Rôles attribués automatiquement.
 - Menu : liste dépliable de toutes les drafts sauvegardées, avec leurs picks.
 - Plaques : 5 plaques sur chaque tour T1, T2 et T3 depuis le patch 26.1.
+- 2.17.1 : import de capture — champions reconnus uniquement par l'image du portrait (jamais par le pseudo), lanes déduites des champions ; seule question posée : qui est top et qui est mid quand c'est ambigu.

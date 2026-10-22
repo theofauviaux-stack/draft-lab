@@ -1,7 +1,7 @@
 {
-  "version": "2.17.0",
-  "sha256": "f34f30a13e97c452f2d10096e7e528a703011c6ea0aa3084f5560fc57426cbea",
-  "file": "draftlab-2.17.0.json.gz",
-  "notes": "Synergies selon les vraies lanes · draft depuis une capture (fin de game ou drafter) · drafts sauvegardées dépliables · 5 plaques par tour",
-  "date": "2026-10-22T18:06:11.165Z"
+  "version": "2.17.1",
+  "sha256": "b93896b49b42662480d48a1f4196cef1e08c948507c144c26ee714c6b625badf",
+  "file": "draftlab-2.17.1.json.gz",
+  "notes": "Import de capture : lanes déduites des champions, question seulement pour top/mid",
+  "date": "2026-10-22T18:13:27.992Z"
 }

@@ -854,3 +854,6 @@ details.box > summary, .scal summary { cursor: pointer; }
 .sl-alt { display: flex; gap: 3px; } .sl-alt img { width: 22px; height: 22px; border-radius: 4px; opacity: .65; cursor: pointer; } .sl-alt img:hover { opacity: 1; outline: 2px solid var(--gold); }
 .sl-in { width: 82px; font-size: 11px; padding: 3px 5px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); }
 .sb-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; gap: 10px; }
+.la-opts .tm { display: flex; align-items: center; gap: 6px; font-size: 13px; margin: 2px 0; }
+.la-opts .tm img { width: 26px; height: 26px; border-radius: 6px; }
+.la-opts .tm small { color: var(--muted); font-weight: 700; }

@@ -944,11 +944,41 @@ function applyShot() {
   state.slots = emptySlots(); state.roles = { blue: [...ROLES], red: [...ROLES] };
   state.lock = { blue: Array(5).fill(null), red: Array(5).fill(null) }; state.history = []; state.selected = null;
   SHOT.clicks.forEach((c, k) => { const side = k < 5 ? 'blue' : 'red'; state.slots[side][k % 5] = c.id; });
-  assignRoles('blue'); assignRoles('red'); // rôles déduits des champions (clic sur un badge de rôle pour corriger)
+  // Rôles déduits uniquement des champions reconnus sur l'image (jamais des pseudos)
+  assignRoles('blue'); assignRoles('red');
   for (const side of ['blueBans', 'redBans']) state.slots[side] = Array(5).fill(NO_BAN);
   state.flow = state.flow === 'players' ? 'players' : 'zero';
   $('shotBox').hidden = true; closeMenu(); render();
-  toast('Draft importée : rôles attribués automatiquement, clic sur un badge de rôle pour corriger');
+  // seule question possible : qui est top et qui est mid, quand les deux champions jouent les deux lanes
+  const ask = ['blue', 'red'].filter(topMidAmbiguous);
+  const next = () => { const side = ask.shift(); if (side) askTopMid(side, next); else toast('Draft importée : lanes déduites des champions'); };
+  next();
+}
+const slotOf = (side, r) => state.roles[side].findIndex((x, i) => x === r && state.slots[side][i]);
+function topMidAmbiguous(side) {
+  const iT = slotOf(side, 'T'), iM = slotOf(side, 'M');
+  if (iT < 0 || iM < 0) return false;
+  const a = state.P[state.slots[side][iT]], b = state.P[state.slots[side][iM]];
+  // ambigu si chacun joue aussi l'autre lane, ou si l'échange ne change presque rien
+  const swapLoss = fit(a, 'T') + fit(b, 'M') - fit(a, 'M') - fit(b, 'T');
+  return (flexRoles(a).includes('M') && flexRoles(b).includes('T')) || swapLoss < 15;
+}
+function askTopMid(side, done) {
+  const iT = slotOf(side, 'T'), iM = slotOf(side, 'M');
+  const a = state.P[state.slots[side][iT]], b = state.P[state.slots[side][iM]];
+  const box = $('laneAsk');
+  const opt = (t, m, main) => `<button data-t="${t.id}" class="${main ? 'main' : ''}">${main ? '<em>Le plus probable</em>' : ''}<span class="tm"><img src="${img(t.id)}">${t.name} <small>Top</small></span><span class="tm"><img src="${img(m.id)}">${m.name} <small>Mid</small></span></button>`;
+  box.innerHTML = `<div class="la-card"><div class="la-body">
+      <b>Qui joue top et qui joue mid ?</b><span class="muted">${side === 'blue' ? 'Équipe 1 (bleue)' : 'Équipe 2 (rouge)'} · ${a.name} et ${b.name} peuvent jouer les deux lanes</span>
+      <div class="la-opts">${opt(a, b, true)}${opt(b, a, false)}</div></div></div>`;
+  box.hidden = false;
+  box.querySelectorAll('button').forEach((btn) => (btn.onclick = () => {
+    const top = btn.dataset.t;
+    state.lock[side][iT] = state.slots[side][iT] === top ? 'T' : 'M';
+    state.lock[side][iM] = state.slots[side][iM] === top ? 'T' : 'M';
+    assignRoles(side); box.hidden = true; render(); done();
+  }));
+  box.onclick = null;
 }
 
 function initShot() {
