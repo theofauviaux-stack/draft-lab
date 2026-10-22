@@ -26,6 +26,16 @@ const api = window.draftlab ?? {
 
 // ---------- Ordres de draft ----------
 // La draft commence directement par les picks (ordre officiel) ; les bans se remplissent à côté, avec les conseils.
+// Ordre officiel : bans B R B R B R · picks B1 / R1 R2 / B2 B3 / R3 · bans R B R B · picks R4 / B4 B5 / R5
+const BAN_NO = { blue: [1, 3, 5, 8, 10], red: [2, 4, 6, 7, 9] };
+const DRAFT_ORDER = [
+  { ph: 'Bans phase 1', ban: true, steps: [['blueBans', 0], ['redBans', 0], ['blueBans', 1], ['redBans', 1], ['blueBans', 2], ['redBans', 2]] },
+  { ph: 'Picks phase 1', steps: [['blue', 0], ['red', 0], ['red', 1], ['blue', 1], ['blue', 2], ['red', 2]] },
+  { ph: 'Bans phase 2', ban: true, steps: [['redBans', 3], ['blueBans', 3], ['redBans', 4], ['blueBans', 4]] },
+  { ph: 'Picks phase 2', steps: [['red', 3], ['blue', 3], ['blue', 4], ['red', 4]] }
+];
+// Picks regroupés par tour : bleu B1 / B2 B3 / B4 B5, rouge R1 R2 / R3 / R4 / R5
+const pickTag = (side, idxs) => idxs.map((i) => `${side === 'blue' ? 'B' : 'R'}${i + 1}`).join(' ');
 const PICKS = [['blue', 0], ['red', 0], ['red', 1], ['blue', 1], ['blue', 2], ['red', 2], ['red', 3], ['blue', 3], ['blue', 4], ['red', 4]];
 const stepLabel = ([t, i]) => (t.endsWith('Bans') ? `Ban ${t.startsWith('blue') ? 'bleu' : 'rouge'} ${i + 1}` : `Pick ${t === 'blue' ? 'bleu' : 'rouge'} ${i + 1}`);
 const shortLabel = ([t, i]) => (t.endsWith('Bans') ? null : `${t === 'blue' ? 'B' : 'R'}${i + 1}`);
@@ -137,8 +147,9 @@ function renderBans() {
     state.slots[`${side}Bans`].forEach((id, i) => {
       const b = document.createElement('div');
       b.className = 'ban' + (id ? ' filled' : '') + (tg && tg[0] === `${side}Bans` && tg[1] === i ? ' target' : '');
-      b.title = id ? `${state.P[id].name} (clic droit pour retirer)` : `Ban ${i + 1}`;
-      if (id) b.innerHTML = `<img src="${img(id)}" alt="">`;
+      b.title = id ? `${state.P[id].name} (clic droit pour retirer)` : `${BAN_NO[side][i]}e ban de la draft (phase ${i < 3 ? 1 : 2}) — clique puis choisis un champion`;
+      b.innerHTML = id ? `<img src="${img(id)}" alt="">` : `<span class="ban-n">${BAN_NO[side][i]}</span>`;
+      if (i === 3) b.classList.add('ph2');
       b.onclick = () => select(`${side}Bans`, i);
       b.oncontextmenu = (e) => { e.preventDefault(); if (id) clearSlot(`${side}Bans`, i); };
       el.appendChild(b);
@@ -539,6 +550,19 @@ function renderBanPlan() {
   $('banFor').textContent = 'ciblés sur les champions joués par leurs joueurs (op.gg), selon la compo que tu veux jouer';
   const picks = state.slots.blue.filter(Boolean).length + state.slots.red.filter(Boolean).length;
   const list = banList(w.k);
+  // Frise de l'ordre de draft : tes étapes sont marquées, la prochaine est en surbrillance
+  const nextBan = target();
+  $('banOrder').innerHTML = DRAFT_ORDER.map((g) => {
+    const groups = [];
+    for (const st of g.steps) { const side = st[0].replace('Bans', ''); const last = groups[groups.length - 1]; if (!g.ban && last && last.side === side) last.steps.push(st); else groups.push({ side, steps: [st] }); }
+    return `<div class="do-g ${g.ban ? 'isban' : 'ispick'}"><span class="do-ph">${g.ph}</span><div class="do-row">${groups.map((gr) => `<span class="do-grp ${gr.side} ${gr.side === me ? 'me' : ''}">${gr.steps.map(([t, i]) => {
+      const id = state.slots[t][i], cur = nextBan && nextBan[0] === t && nextBan[1] === i;
+      const lab = g.ban ? `${gr.side === 'blue' ? 'B' : 'R'}·${BAN_NO[gr.side][i]}` : `${gr.side === 'blue' ? 'B' : 'R'}${i + 1}`;
+      return `<i class="do-s ${id ? 'done' : ''} ${cur ? 'cur' : ''}" title="${g.ban ? `${BAN_NO[gr.side][i]}e ban` : `Pick ${lab}`} — ${gr.side === 'blue' ? 'bleu' : 'rouge'}${gr.side === me ? ' (toi)' : ''}">${id ? `<img src="${img(id)}">` : lab}</i>`;
+    }).join('')}</span>`).join('<b class="do-sep">/</b>')}</div></div>`;
+  }).join('<span class="do-arrow">→</span>');
+  const enemyFirst = other === 'blue' ? 'B1 / B2 B3' : 'R1 R2 / R3', enemyLast = other === 'blue' ? 'B4 B5' : 'R4 / R5';
+  const myP1 = BAN_NO[me].slice(0, 3).map((n) => n + 'e').join(', '), myP2 = BAN_NO[me].slice(3).map((n) => n + 'e').join(', ');
   const myBans = state.slots[`${me}Bans`];
   const done = (from, to) => myBans.slice(from, to).filter(Boolean);
   const slots = (from, to) => `<div class="bp-slots">${myBans.slice(from, to).map((id) => (id ? `<img src="${img(id)}" title="${state.P[id].name}">` : '<span></span>')).join('')}</div>`;
@@ -547,10 +571,10 @@ function renderBanPlan() {
   // Les bans de base restent proposés tant que tes slots ne sont pas remplis, même si tu as pické avant de bannir.
   const left1 = 3 - done(0, 3).length, left2 = 2 - done(3, 5).length;
   const p1 = left1 > 0
-    ? col('Phase 1', picks === 0 ? 'maintenant · 3 bans' : `bans de base · ${left1} à faire`, 'now', rows(left1 + 2), 0, 3)
+    ? col('Phase 1', `${picks === 0 ? 'maintenant' : `${left1} à faire`} · tes bans : ${myP1} · visent leurs picks ${enemyFirst}`, 'now', rows(left1 + 2), 0, 3)
     : col('Phase 1', 'faite', 'past', '<p class="muted">Tes 3 bans de phase 1 sont posés.</p>', 0, 3);
   const p2state = left2 <= 0 || picks >= 10 ? 'past' : picks >= 6 ? 'now' : 'next';
-  const p2 = col('Phase 2', p2state === 'now' ? `maintenant · ${left2} ban${left2 > 1 ? 's' : ''}` : p2state === 'past' ? 'faite' : 'aperçu : se précise après les 3 premiers picks de chaque équipe', p2state,
+  const p2 = col('Phase 2', p2state === 'past' ? 'faite' : `${p2state === 'now' ? 'maintenant' : 'aperçu, se précise après R3'} · tes bans : ${myP2} · visent leurs picks ${enemyLast}`, p2state,
     p2state === 'past' ? '<p class="muted">Phase 2 terminée.</p>' : rows(left2 + 1), 3, 5);
   // Ta compo est déjà (en partie) pickée : bans qui la protègent le mieux
   const cb = compBans(w.k);
