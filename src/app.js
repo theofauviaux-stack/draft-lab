@@ -881,8 +881,12 @@ function openMenu() {
   $('startForm').hidden = true; $('startChoices').hidden = false;
   $('menuBlue').value = state.teamInput.blue ?? ''; $('menuRed').value = state.teamInput.red ?? '';
   $('menuSide').value = state.mySide; $('menuRegion').value = state.region;
+  renderMenuSaves();
+}
+// liste des drafts sauvegardées du menu (re-dessinée quand les données arrivent : sinon les portraits restent vides)
+function renderMenuSaves() {
   const saves = readSaves();
-  const mini = (ids) => (ids ?? []).map((id) => (id && id !== NO_BAN && state.P[id] ? `<img src="${img(id)}" alt="">` : '<span></span>')).join('');
+  const mini = (ids) => (ids ?? []).map((id) => (id && id !== NO_BAN && img(id) ? `<img src="${img(id)}" alt="" title="${state.P[id]?.name ?? id}">` : '<span></span>')).join('');
   $('menuSaves').innerHTML = saves.length ? `<details class="ms-list"><summary>📂 Reprendre une draft sauvegardée <span>(${saves.length})</span></summary>
     <div class="ms-rows">${saves.map((d) => `<button class="msave" data-id="${d.id}">
       <span class="ms-n"><b>${d.name.replace(/</g, '&lt;')}</b><small>${new Date(d.date).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}</small></span>
@@ -1440,6 +1444,7 @@ function ingest(data) {
   $('champList').innerHTML = state.list.map((c) => `<option value="${c.name}"></option>`).join('');
   if (prevPatch && prevPatch !== data.patch) toast(`Nouveau patch ${data.patch} détecté — données mises à jour`);
   render();
+  if (!$('startMenu').hidden) renderMenuSaves();
 }
 
 async function load(force = false) {

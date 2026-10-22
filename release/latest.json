@@ -1,7 +1,7 @@
 {
-  "version": "2.23.0",
-  "sha256": "2b56facf5b3936bd52d2878dbb7f17cf3a2c2ea3a03bcf4818ea1cd715a924cf",
-  "file": "draftlab-2.23.0.json.gz",
-  "notes": "Pentagone : légers avantages en pointillés + style conseillé quand ta compo hésite ; fenêtre : mode Fenêtré ajustable avec mise à l'échelle automatique",
-  "date": "2026-10-22T23:40:52.177Z"
+  "version": "2.23.1",
+  "sha256": "cc8801a67145db5b6ac70fb1f4095dc0420a7ad0365da31e52991628275c1154",
+  "file": "draftlab-2.23.1.json.gz",
+  "notes": "Drafts sauvegardées : portraits des champions de retour dans le menu",
+  "date": "2026-10-22T23:45:31.180Z"
 }
