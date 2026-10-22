@@ -866,7 +866,7 @@ function initControls() {
   $('startPlayers').onclick = () => { $('startMenu').classList.add('form'); $('startChoices').hidden = true; $('startForm').hidden = false; $('menuBlue').focus(); };
   $('menuBack').onclick = () => { $('startMenu').classList.remove('form'); $('startForm').hidden = true; $('startChoices').hidden = false; };
   $('menuGo').onclick = startFromPlayers;
-  $('menuClose').onclick = closeMenu; $('refresh').onclick = () => load(true);
+  $('refresh').onclick = () => load(true);
   $('search').oninput = (e) => { state.search = e.target.value; render(); };
   $('onlyRole').onchange = (e) => { state.onlyRole = e.target.checked; render(); };
   const rf = $('roleFilter');
@@ -886,7 +886,7 @@ function initControls() {
   }
   document.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
-    if (e.key === 'Escape') { if (!$('startMenu').hidden && state.data) closeMenu(); state.selected = null; render(); }
+    if (e.key === 'Escape' && $('startMenu').hidden) { state.selected = null; render(); }
     if (e.key === 'Enter' && document.activeElement === $('search')) {
       const first = $('grid').querySelector('.tile:not(.used)'); first?.click(); $('search').value = ''; state.search = '';
     }
