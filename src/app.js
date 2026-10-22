@@ -1,4 +1,5 @@
 import { teamSynergy, KINDS } from './synergy.js';
+import { detectSlots, matchBanner } from './shotauto.js';
 import {
   ROLES, ROLE_LABEL, ARCH, ORDER, rel,
   buildProfiles, evaluate, setDetailSource, applyProGames, proInfo, recommend, recommendBans, projectPicks, gamePlan, powerCurve,
@@ -894,7 +895,8 @@ function onLive(d) {
     state.slots[side] = slots; state.roles[side] = roles; state.lock[side] = lock.map((r, k) => (slots[k] && r ? r : null));
     if (members.some((m) => !m.role)) assignRoles(side);
     const bans = (d.bans?.[side] ?? []).map(champByKey).filter(Boolean).slice(0, 5);
-    state.slots[`${side}Bans`] = [...bans, ...Array(5 - bans.length).fill(null)];
+    // en jeu, l'API ne donne plus les bans : on garde ceux de la sélection des champions
+    if (bans.length || d.phase !== 'InProgress') state.slots[`${side}Bans`] = [...bans, ...Array(5 - bans.length).fill(null)];
     // joueurs : op.gg pour ceux dont le nom est visible, les autres (mode streamer) sont ignorés
     const visible = members.filter((m) => m.riotId);
     const key = visible.map((m) => m.riotId).join(',');
@@ -921,9 +923,9 @@ function onLive(d) {
 // ---------- Draft depuis une capture de fin de game ----------
 // L'utilisateur clique sur les 10 icônes de champions (équipe 1 de haut en bas, puis équipe 2) ;
 // chaque clic est comparé aux 170 portraits (centre de l'icône, plusieurs tailles et petits décalages).
-const SHOT = { img: null, icons: null, clicks: [], scale: 1 };
+const SHOT = { img: null, icons: null, imgs: [], clicks: [], bans: null, det: null, scale: 1, run: 0 };
 const ICON_N = 20, ZOOMS = [0.45, 0.52, 0.6, 0.68, 0.76]; // centre de l'icône : évite le badge de niveau et les bordures
-function iconVec(source, sx, sy, sw, sh) {
+function iconVec(source, sx, sy, sw, sh, gray = false) {
   const cv = iconVec.cv ??= Object.assign(document.createElement('canvas'), { width: ICON_N, height: ICON_N });
   const ctx = iconVec.ctx ??= cv.getContext('2d', { willReadFrequently: true });
   ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
@@ -932,7 +934,10 @@ function iconVec(source, sx, sy, sw, sh) {
   const d = ctx.getImageData(0, 0, ICON_N, ICON_N).data, v = new Float32Array(ICON_N * ICON_N * 3);
   // une seule moyenne pour les 3 couleurs : on garde la teinte (très discriminante), on retire la luminosité
   let m = 0;
-  for (let k = 0, j = 0; k < d.length; k += 4, j += 3) { v[j] = d[k]; v[j + 1] = d[k + 1]; v[j + 2] = d[k + 2]; m += d[k] + d[k + 1] + d[k + 2]; }
+  for (let k = 0, j = 0; k < d.length; k += 4, j += 3) {
+    if (gray) { const g = (d[k] + d[k + 1] + d[k + 2]) / 3; v[j] = v[j + 1] = v[j + 2] = g; m += 3 * g; continue; } // bans grisés
+    v[j] = d[k]; v[j + 1] = d[k + 1]; v[j + 2] = d[k + 2]; m += d[k] + d[k + 1] + d[k + 2];
+  }
   m /= v.length;
   let ss = 0;
   for (let j = 0; j < v.length; j++) { v[j] -= m; ss += v[j] ** 2; }
@@ -948,6 +953,7 @@ async function loadIcons() {
   await Promise.all(state.list.map((c) => new Promise((res) => {
     const im = new Image(); im.crossOrigin = 'anonymous';
     im.onload = () => {
+      SHOT.imgs.push({ id: c.id, im });
       try { for (const z of ZOOMS) { const w = im.width * z; out.push({ id: c.id, z, v: iconVec(im, (im.width - w) / 2, (im.height - w) / 2, w, w) }); } } catch {}
       res();
     };
@@ -959,13 +965,14 @@ async function loadIcons() {
 }
 // Recherche en 2 passes : on localise d'abord l'icône autour du clic (taille, décalage),
 // puis on affine autour de la meilleure position avec tous les cadrages.
-function matchAt(x, y, exclude = new Set()) {
+function matchAt(x, y, exclude = new Set(), size = 0) {
   const W = SHOT.img.width;
   const icons = SHOT.icons.filter((ic) => !exclude.has(ic.id));
   const corr = (v, u) => { let c = 0; for (let j = 0; j < v.length; j++) c += v[j] * u[j]; return c / v.length; };
   // passe 1 : pour CHAQUE champion, sa meilleure position/taille autour du clic (cadrage 0.6)
   const z1 = icons.filter((ic) => ic.z === 0.6), bestOf = new Map();
-  for (let s = W * 0.015; s <= W * 0.075; s *= 1.08) {
+  // taille connue (case repérée automatiquement) : on ne cherche qu'autour d'elle
+  for (let s = size ? size * 0.78 : W * 0.015; s <= (size ? size * 1.12 : W * 0.075); s *= size ? 1.04 : 1.08) {
     for (let dx = -0.2; dx <= 0.201; dx += 0.08) for (let dy = -0.2; dy <= 0.201; dy += 0.08) {
       const w = s * 0.6, v = iconVec(SHOT.img, x + dx * s - w / 2, y + dy * s - w / 2, w, w);
       if (v.sd < 6) continue;
@@ -992,18 +999,68 @@ function matchAt(x, y, exclude = new Set()) {
   const out = [...res.entries()].sort((p, q) => q[1] - p[1]);
   return out.slice(0, 4).map(([id]) => id);
 }
+// bans grisés (drafters) : comparaison en niveaux de gris avec le centre des portraits
+function matchGray(b, exclude) {
+  const corr = (v, u) => { let c = 0; for (let j = 0; j < v.length; j++) c += v[j] * u[j]; return c / v.length; };
+  SHOT.gray ??= SHOT.imgs.flatMap(({ id, im }) => [0.5, 0.62, 0.74].map((z) => { const w = im.width * z; return { id, z, v: iconVec(im, (im.width - w) / 2, (im.height - w) / 2, w, w, true) }; }));
+  const best = new Map();
+  for (const ks of [0.9, 1, 1.1]) for (const ox of [-0.04, 0, 0.04]) for (const oy of [-0.04, 0, 0.04]) for (const z of [0.5, 0.62, 0.74]) {
+    const s = b.w * ks, w = s * z, v = iconVec(SHOT.img, b.cx + ox * s - w / 2, b.cy + oy * s - w / 2, w, w, true);
+    if (v.sd < 4) continue;
+    for (const ic of SHOT.gray) if (ic.z === z && !exclude.has(ic.id)) { const c = corr(v, ic.v); if (c > (best.get(ic.id) ?? -1)) best.set(ic.id, c); }
+  }
+  return [...best.entries()].sort((p, q) => q[1] - p[1]).slice(0, 4).map(([id]) => id);
+}
+// Analyse sans clic : repérage des cases puis reconnaissance de chacune
+async function autoShot() {
+  const run = ++SHOT.run;
+  const st = (t) => { if (run === SHOT.run) $('shotState').textContent = t; };
+  st('Recherche des champions sur l’image…');
+  await new Promise((r) => setTimeout(r, 30));
+  let det = null;
+  try { det = detectSlots(SHOT.img); } catch (e) { console.warn(e); }
+  SHOT.det = det;
+  if (!det) { st(''); SHOT.auto = 'fail'; renderShotList(); return; }
+  await loadIcons();
+  const boxes = det.picks.flat(), taken = new Set();
+  SHOT.clicks = [];
+  for (let k = 0; k < boxes.length; k++) {
+    if (run !== SHOT.run) return;
+    const b = boxes[k];
+    st(`Reconnaissance ${k + 1}/10${b.kind === 'wide' ? ' (illustrations)' : ''}…`);
+    await new Promise((r) => setTimeout(r, 0));
+    const alts = b.kind === 'wide' ? await matchBanner(SHOT.img, b, taken) : matchAt(b.cx, b.cy, taken, b.w);
+    if (alts[0]) taken.add(alts[0]);
+    SHOT.clicks.push({ x: b.cx, y: b.cy, id: alts[0], alts, box: b });
+    drawShot(); renderShotList();
+  }
+  SHOT.bans = null;
+  if (det.bans) {
+    st('Bans…'); await new Promise((r) => setTimeout(r, 0));
+    const seen = new Set(taken);
+    SHOT.bans = det.bans.flat().map((b) => { const alts = matchGray(b, seen); if (alts[0]) seen.add(alts[0]); return { x: b.cx, y: b.cy, id: alts[0], alts, box: b }; });
+  }
+  SHOT.auto = 'ok'; st(''); drawShot(); renderShotList();
+}
 function drawShot() {
   const cv = $('shotCanvas'), ctx = cv.getContext('2d');
   ctx.drawImage(SHOT.img, 0, 0, cv.width, cv.height);
   SHOT.clicks.forEach((c, k) => {
     const x = c.x * SHOT.scale, y = c.y * SHOT.scale;
+    if (c.box) { ctx.strokeStyle = k < 5 ? '#2f6fe0' : '#d64552'; ctx.lineWidth = 2; ctx.strokeRect((c.box.cx - c.box.w / 2) * SHOT.scale, (c.box.cy - c.box.h / 2) * SHOT.scale, c.box.w * SHOT.scale, c.box.h * SHOT.scale); }
     ctx.fillStyle = k < 5 ? '#2f6fe0' : '#d64552'; ctx.beginPath(); ctx.arc(x, y, 11, 0, 7); ctx.fill();
     ctx.fillStyle = '#fff'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(String(k + 1), x, y + 4);
   });
 }
 function renderShotList() {
   const n = SHOT.clicks.length;
+  for (const [k, b] of (SHOT.bans ?? []).entries()) { /* bans dessinés en pointillés */
+    const ctx = $('shotCanvas').getContext('2d'); ctx.setLineDash([4, 3]); ctx.strokeStyle = k < 5 ? '#2f6fe0' : '#d64552'; ctx.lineWidth = 1.5;
+    ctx.strokeRect((b.box.cx - b.box.w / 2) * SHOT.scale, (b.box.cy - b.box.h / 2) * SHOT.scale, b.box.w * SHOT.scale, b.box.h * SHOT.scale); ctx.setLineDash([]);
+  }
   $('shotHelp').innerHTML = !SHOT.img ? 'Choisis, glisse ou colle (Ctrl/Cmd + V) une capture : tableau de fin de game ou écran d’un drafter.'
+    : SHOT.auto === 'ok' && n === 10 ? 'Analyse automatique terminée : les 10 champions ont été repérés et reconnus. Vérifie, corrige si besoin (clic sur un autre choix ou tape un nom), puis lance l’analyse.'
+    : SHOT.auto === 'fail' && !n ? 'Je n’ai pas trouvé automatiquement les 10 champions sur cette image : <b>clique sur chacun</b> (équipe bleue d’abord).'
     : n < 10 ? `Clique au centre du portrait d’un champion de l’<b>${n < 5 ? 'équipe 1 (bleue)' : 'équipe 2 (rouge)'}</b> — ${n < 5 ? n + 1 : n - 4}/5. L’ordre n’a pas d’importance : les rôles sont attribués automatiquement.`
       : 'Les 10 champions sont reconnus. Corrige si besoin (clic sur un autre choix ou tape un nom), puis lance l’analyse.';
   $('shotList').innerHTML = [0, 1].map((t) => `<div class="sl-team ${t ? 'r' : 'b'}"><h5>${t ? 'Équipe 2 · rouge' : 'Équipe 1 · bleu'}</h5>${ROLES.map((r, k) => {
@@ -1011,7 +1068,8 @@ function renderShotList() {
     return `<div class="sl-row ${c ? '' : 'empty'}"><span class="sl-r">${k + 1}</span>${c ? `<img src="${img(c.id)}" alt=""><b>${state.P[c.id]?.name ?? c.id}</b>
       <span class="sl-alt">${c.alts.filter((a) => a !== c.id).slice(0, 3).map((a) => `<img src="${img(a)}" title="${state.P[a]?.name}" data-k="${t * 5 + k}" data-id="${a}">`).join('')}</span>
       <input class="sl-in" data-k="${t * 5 + k}" list="champList" placeholder="autre…">` : '<span class="muted">—</span>'}</div>`;
-  }).join('')}</div>`).join('');
+  }).join('')}</div>`).join('') + (SHOT.bans ? `<div class="sl-bans"><h5>Bans repérés</h5>${[0, 1].map((t) => `<span class="${t ? 'r' : 'b'}">${SHOT.bans.slice(t * 5, t * 5 + 5).map((b) => (b.id ? `<img src="${img(b.id)}" title="${state.P[b.id]?.name}">` : '<i></i>')).join('')}</span>`).join('')}<button class="sl-noban" id="shotNoBans">ignorer</button></div>` : '');
+  $('shotNoBans') && ($('shotNoBans').onclick = () => { SHOT.bans = null; drawShot(); renderShotList(); });
   $('shotList').querySelectorAll('.sl-alt img').forEach((im) => (im.onclick = () => { const c = SHOT.clicks[+im.dataset.k]; c.alts = [im.dataset.id, ...c.alts.filter((a) => a !== im.dataset.id)]; c.id = im.dataset.id; renderShotList(); }));
   $('shotList').querySelectorAll('.sl-in').forEach((inp) => (inp.onchange = () => { const ch = findChamp(inp.value); if (ch) { SHOT.clicks[+inp.dataset.k].id = ch.id; renderShotList(); } }));
   $('shotGo').disabled = n < 10;
@@ -1023,16 +1081,17 @@ async function setShotImage(file) {
   const im = new Image();
   const ok = await new Promise((r) => { im.onload = () => r(true); im.onerror = () => r(false); im.src = url; });
   if (!ok) { toast('Image illisible : essaie en PNG ou JPG'); return; }
-  SHOT.img = im; SHOT.clicks = [];
+  SHOT.img = im; SHOT.clicks = []; SHOT.bans = null; SHOT.det = null; SHOT.auto = null;
   const cv = $('shotCanvas'), maxW = Math.min(900, innerWidth * 0.62);
   SHOT.scale = Math.min(1, maxW / im.width);
   cv.width = Math.round(im.width * SHOT.scale); cv.height = Math.round(im.height * SHOT.scale);
   cv.hidden = false; $('shotEmpty').hidden = true;
   drawShot(); renderShotList();
   await loadIcons();
+  await autoShot();
 }
 function openShot() {
-  $('shotBox').hidden = false; SHOT.clicks = []; SHOT.img = null;
+  $('shotBox').hidden = false; SHOT.clicks = []; SHOT.img = null; SHOT.bans = null; SHOT.auto = null; SHOT.run++;
   $('shotCanvas').hidden = true; $('shotEmpty').hidden = false; renderShotList();
   loadIcons();
 }
@@ -1042,7 +1101,7 @@ function applyShot() {
   SHOT.clicks.forEach((c, k) => { const side = k < 5 ? 'blue' : 'red'; state.slots[side][k % 5] = c.id; });
   // Rôles déduits uniquement des champions reconnus sur l'image (jamais des pseudos)
   assignRoles('blue'); assignRoles('red');
-  for (const side of ['blueBans', 'redBans']) state.slots[side] = Array(5).fill(NO_BAN);
+  for (const [t, side] of ['blueBans', 'redBans'].entries()) state.slots[side] = SHOT.bans ? SHOT.bans.slice(t * 5, t * 5 + 5).map((b) => b.id ?? NO_BAN) : Array(5).fill(NO_BAN);
   state.flow = state.flow === 'players' ? 'players' : 'zero';
   $('shotBox').hidden = true; closeMenu(); render();
   // seule question possible : qui est top et qui est mid, quand les deux champions jouent les deux lanes
@@ -1101,11 +1160,14 @@ function initShot() {
     const r = e.target.getBoundingClientRect();
     const x = (e.clientX - r.left) / SHOT.scale * (e.target.width / r.width), y = (e.clientY - r.top) / SHOT.scale * (e.target.height / r.height);
     await loadIcons();
-    const alts = matchAt(x, y, new Set(SHOT.clicks.map((c) => c.id)));
-    SHOT.clicks.push({ x, y, id: alts[0], alts });
+    const ex = new Set(SHOT.clicks.map((c) => c.id));
+    // clic dans un bandeau repéré : on compare avec les illustrations
+    const box = SHOT.det?.picks.flat().find((b) => Math.abs(b.cx - x) < b.w / 2 && Math.abs(b.cy - y) < b.h / 2);
+    const alts = box?.kind === 'wide' ? await matchBanner(SHOT.img, box, ex) : matchAt(x, y, ex, box?.w ?? 0);
+    SHOT.clicks.push({ x: box?.cx ?? x, y: box?.cy ?? y, id: alts[0], alts, box });
     drawShot(); renderShotList();
   };
-  $('shotUndo').onclick = () => { SHOT.clicks.pop(); drawShot(); renderShotList(); };
+  $('shotUndo').onclick = () => { SHOT.run++; SHOT.clicks.pop(); $('shotState').textContent = ''; drawShot(); renderShotList(); };
   $('shotGo').onclick = applyShot;
 }
 

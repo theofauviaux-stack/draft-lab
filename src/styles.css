@@ -923,3 +923,10 @@ html, body { overflow-x: hidden; }
 .st-card.zero:hover { border-color: #2f6fe0; } .st-card.players:hover { border-color: #b08a3e; }
 .st-card.live:hover { border-color: #d64552; } .st-card.shot:hover { border-color: #1f9d5b; }
 .st-card.zero .st-ic { color: #2f6fe0; } .st-card.players .st-ic { color: #b08a3e; }
+/* bans repérés sur une capture */
+.sl-bans { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding-top: 6px; border-top: 1px solid var(--line); }
+.sl-bans h5 { margin: 0; font-size: 12px; color: var(--muted); }
+.sl-bans span { display: flex; gap: 4px; padding-left: 8px; border-left: 3px solid var(--blue); }
+.sl-bans span.r { border-left-color: var(--red); }
+.sl-bans img, .sl-bans i { width: 26px; height: 26px; border-radius: 5px; filter: grayscale(.6); display: block; background: var(--line); }
+.sl-bans .sl-noban { margin-left: auto; font-size: 12px; padding: 3px 9px; }
