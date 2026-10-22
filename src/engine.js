@@ -739,7 +739,7 @@ export function compLabel(team) {
 
 // Analyse du pentagone (pour la vue visuelle)
 export function pentagonView(mine, theirs) {
-  const me = mine.map((x) => x.c), them = theirs.map((x) => x.c);
+  const me = mine.map((x) => ({ ...x.c, lane: x.role })), them = theirs.map((x) => ({ ...x.c, lane: x.role }));
   const sm = teamShares(me), st = teamShares(them);
   if (!sm || !st) return null;
   const d1 = dominant(sm), t1 = dominant(st), r = rel(d1, t1);
@@ -787,7 +787,7 @@ function botLane(mine, theirs) {
 }
 
 export function gamePlan(mine, theirs) {
-  const me = mine.map((x) => x.c), them = theirs.map((x) => x.c);
+  const me = mine.map((x) => ({ ...x.c, lane: x.role })), them = theirs.map((x) => ({ ...x.c, lane: x.role }));
   const sm = teamShares(me), st = teamShares(them);
   if (!sm) return [{ title: 'Plan de jeu', items: ['Choisis un premier champion pour voir le plan de jeu.'] }];
   const out = [];
@@ -869,7 +869,7 @@ export function gamePlan(mine, theirs) {
 // ---------- Analyse résumée d'une draft face à la compo adverse probable ----------
 // mine / theirs = [{ c, role }]. Renvoie des points clés courts + le plan complet.
 export function analyzeDraft(mine, theirs) {
-  const me = mine.map((x) => x.c), them = theirs.map((x) => x.c);
+  const me = mine.map((x) => ({ ...x.c, lane: x.role })), them = theirs.map((x) => ({ ...x.c, lane: x.role }));
   const sm = teamShares(me), st = teamShares(them);
   const out = [];
   if (!sm) return { points: [], plan: [] };
@@ -914,7 +914,7 @@ export function analyzeDraft(mine, theirs) {
 
 // ---------- Plan de match détaillé (côtés forts/faibles, objectifs, phases) ----------
 // Règles saison 16 : 1er drake 5:00 (vague canon 4:30), Larves x3 uniques à 8:00 (vague canon 7:30, despawn 14:45),
-// plaques T1 présentes toute la partie (saison 2026) + 3 plaques sur les T2 et T3, Héraut 15:00, Baron 20:00, âme au 4e drake puis Elder toutes les 6 min (exécution < 20 % PV).
+// patch 26.1 : 5 plaques sur chaque tour T1, T2 et T3 (tombent à 10/25/45/70/100 % de PV perdus), plaques T1 permanentes (120 or, -10 or/min dès 11 min, max -40), T2/T3 : 600 or répartis sur 5 plaques, Héraut 15:00, Baron 20:00, âme au 4e drake puis Elder toutes les 6 min (exécution < 20 % PV).
 // Patch 26.1 : moins d'or sur les larves, drakes plus résistants, Vengeance draconique renforcée.
 const COACH_EARLY = { Strong: 0.14, Average: 0, Depends: 0, Weak: -0.12 };
 function laneEarly(c, role) {
@@ -934,7 +934,7 @@ const HEALERS = new Set(['Soraka', 'Yuumi', 'Sona', 'Nami', 'Milio', 'Seraphine'
 const LANE_FR = { T: 'top', M: 'mid', B: 'bot' };
 
 export function matchPlan(mine, theirs) {
-  const me = mine.map((x) => x.c), them = theirs.map((x) => x.c);
+  const me = mine.map((x) => ({ ...x.c, lane: x.role })), them = theirs.map((x) => ({ ...x.c, lane: x.role }));
   if (!me.length) return null;
   // 1) Lanes : avantage en début de partie
   const laneVal = (roster, lane) => {
@@ -1065,7 +1065,7 @@ export function matchPlan(mine, theirs) {
   herald.items.push(tag(mid) === 'mine'
     ? 'Tu es plus fort en mid game : prends le Héraut à 15:00 et lâche-le en mid (ou sur la lane la plus avancée) pour ouvrir la carte et la rotation vers le drake suivant.'
     : tag(mid) === 'theirs' ? 'Ils sont plus forts en mid game : ne te bats pas pour le Héraut, prends le drake ou des tours ailleurs pendant qu’ils le font.'
-      : 'À jouer selon la vague mid : le Héraut sert surtout à faire tomber une tour et ses plaques (depuis 2026 les plaques T1 restent toute la partie et les T2/T3 en ont 3 chacune).');
+      : 'À jouer selon la vague mid : le Héraut sert surtout à faire tomber une tour et ses plaques (depuis le patch 26.1, chaque tour T1, T2 et T3 a 5 plaques ; celles des T1 restent toute la partie mais rapportent un peu moins après 11 min).');
   herald.simple = tag(mid) === 'mine' ? ['high', 'À prioriser', 'Tu es plus fort en mid game : utilise-le pour une tour et ses plaques.']
     : tag(mid) === 'theirs' ? ['low', 'À laisser', 'Ils sont plus forts en mid game : prends un drake ou des tours ailleurs.']
     : ['mid', 'Si la vague mid est poussée', 'À prendre seulement avec la prio mid.'];
@@ -1117,7 +1117,7 @@ export function matchPlan(mine, theirs) {
   // 8) Plan par phase
   const laneTip = (L) => {
     const s = lanes[L];
-    if (s.state === 'fort') return `${LANE_FR[L]} (côté fort) : pousse, trade, prends les plaques (elles restent toute la partie depuis 2026, donc une lane gagnante peut continuer à les farmer en mid game) et la prio pour ton jungler.`;
+    if (s.state === 'fort') return `${LANE_FR[L]} (côté fort) : pousse, trade, prends les plaques (5 par tour, et celles des T1 restent toute la partie depuis le patch 26.1 : une lane gagnante peut continuer à les farmer en mid game, même si elles valent un peu moins après 11 min) et la prio pour ton jungler.`;
     if (s.state === 'faible') return `${LANE_FR[L]} (côté faible) : freeze près de ta tour, ne meurs pas, garde le TP/flash ; ton but est de perdre le moins possible.`;
     if (s.state === 'égal') return `${LANE_FR[L]} : lane équilibrée, joue les timings de vague et suis le jungler.`;
     return null;

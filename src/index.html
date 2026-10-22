@@ -168,6 +168,12 @@
           <span class="st-desc">Colle les multi op.gg des deux équipes : pools des joueurs, picks adverses probables et bans ciblés.</span>
           <span class="st-go">Charger les équipes →</span>
         </button>
+        <button id="startShot" class="st-card shot">
+          <span class="st-ic">📷</span>
+          <b>Depuis une capture</b>
+          <span class="st-desc">Tableau de fin de game ou écran d’un drafter : clique sur les 10 champions, ils sont reconnus pour analyser la draft.</span>
+          <span class="st-go">Importer une capture →</span>
+        </button>
       </div>
       <div id="startForm" class="start-form st-form" hidden>
         <label class="blue">Équipe 1 — côté bleu<input id="menuBlue" placeholder="Lien multi op.gg ou Nom#TAG, Nom#TAG…" /></label>
@@ -185,6 +191,20 @@
   </div>
 
   <div id="laneAsk" class="laneask" hidden></div>
+  <div id="shotBox" class="shotbox" hidden>
+    <div class="sb-card">
+      <div class="sb-head"><b>📷 Draft depuis une capture (fin de game ou drafter)</b><button id="shotClose" class="tb-icon" title="Fermer">✕</button></div>
+      <p class="muted" id="shotHelp">Choisis, glisse ou colle (Ctrl/Cmd + V) une capture : tableau de fin de game ou écran d’un drafter.</p>
+      <div class="sb-main">
+        <div class="sb-img" id="shotDrop">
+          <label class="sb-pick"><input type="file" id="shotFile" accept="image/*" hidden />Choisir une image…</label>
+          <canvas id="shotCanvas" hidden></canvas>
+        </div>
+        <div class="sb-list" id="shotList"></div>
+      </div>
+      <div class="sb-foot"><button id="shotUndo">↶ Dernier clic</button><span class="muted" id="shotState"></span><button id="shotGo" class="primary" disabled>Analyser cette draft</button></div>
+    </div>
+  </div>
   <datalist id="champList"></datalist>
   <div id="toast" class="toast"></div>
   <script type="module" src="app.js"></script>

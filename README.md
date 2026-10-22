@@ -175,7 +175,7 @@ Front to Back »), verdict au centre, top 3 des styles de chaque équipe avec le
 - **Mini-carte** : chaque lane colorée (côté fort / égal / côté faible) avec les champions face à face, chemin conseillé du jungler.
 - **Jungle et côtés** : où commencer et finir le premier clear, comparaison des junglers, côté où leur jungler va jouer.
 - **Timeline des objectifs** (règles saison 16) : vague canon 4:30, drake 5:00, vague canon 7:30, Larves x3 à 8:00
-  (despawn 14:45), 2e drake ~10:00, plaques T1 présentes toute la partie (et 3 plaques sur les T2/T3, saison 2026), Héraut 15:00, Baron 20:00, Elder après l’âme (toutes les 6 min).
+  (despawn 14:45), 2e drake ~10:00, 5 plaques sur chaque tour T1, T2 et T3 (patch 26.1), celles des T1 restent toute la partie, Héraut 15:00, Baron 20:00, Elder après l’âme (toutes les 6 min).
 - **Early / Mid / Late** : barre d’avantage, consignes par lane et **alternatives** (cross-map, lane swap, full clear…).
 - **Drakes** : si l’adversaire outscale et que tu as la prio bot → stacker les drakes tôt pour l’âme (bonus permanent)
   (exécution sous 20 %) avant leur pic ; si tu outscale → ne pas forcer, juste refuser leur âme ; Vengeance draconique renforcée en 26.1.
@@ -276,3 +276,10 @@ Seul un changement de version d'Electron demande de retélécharger l'applicatio
 - Plus de choix de rôle par champion : les rôles de toute l'équipe sont répartis automatiquement à chaque pick (la répartition qui colle le mieux aux champions pickés). La grille montre les champions jouables aux rôles encore libres, et chaque % est calculé au meilleur rôle libre du champion.
 - 2.16 : quand un champion se joue sur 2 ou 3 lanes encore libres (Poppy, Sylas, Vel'Koz…), l'appli demande sa lane (avec la part de games à chaque lane). La lane choisie est verrouillée ; un clic sur le badge de rôle d'un champion permet de la changer.
 - 2.16.1 : un champion retiré d'un pool puis rajouté retrouve les vraies stats du joueur (games, winrate). Un champion jamais joué (ou sous 1 % des games, après rechargement op.gg) est ajouté seul, sans stats inventées.
+
+## Version 2.17
+
+- Synergies selon les vraies lanes : un « duo bot » ou « jungle-support » ne compte que si les champions jouent vraiment ces lanes dans la draft (ex. Viktor + Amumu en jungle/mid : pas de duo de lane). Les synergies de teamfight (ultis, contrôles, plongée, peel) restent valables quelle que soit la lane.
+- Draft depuis une capture (tableau de fin de game ou drafter) : on clique sur les 10 portraits, chaque champion est reconnu (recherche en 2 passes, teinte conservée), avec 3 alternatives et une saisie pour corriger. Rôles attribués automatiquement.
+- Menu : liste dépliable de toutes les drafts sauvegardées, avec leurs picks.
+- Plaques : 5 plaques sur chaque tour T1, T2 et T3 depuis le patch 26.1.

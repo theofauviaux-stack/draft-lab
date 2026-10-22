@@ -793,9 +793,12 @@ function openMenu() {
   $('startForm').hidden = true; $('startChoices').hidden = false;
   $('menuBlue').value = state.teamInput.blue ?? ''; $('menuRed').value = state.teamInput.red ?? '';
   $('menuSide').value = state.mySide; $('menuRegion').value = state.region;
-  const saves = readSaves().slice(0, 4);
-  $('menuSaves').innerHTML = saves.length ? `<div class="muted">Reprendre une draft sauvegardée :</div>` +
-    saves.map((d) => `<button class="msave" data-id="${d.id}">${d.name.replace(/</g, '&lt;')}</button>`).join('') : '';
+  const saves = readSaves();
+  const mini = (ids) => (ids ?? []).map((id) => (id && id !== NO_BAN && state.P[id] ? `<img src="${img(id)}" alt="">` : '<span></span>')).join('');
+  $('menuSaves').innerHTML = saves.length ? `<details class="ms-list"><summary>📂 Reprendre une draft sauvegardée <span>(${saves.length})</span></summary>
+    <div class="ms-rows">${saves.map((d) => `<button class="msave" data-id="${d.id}">
+      <span class="ms-n"><b>${d.name.replace(/</g, '&lt;')}</b><small>${new Date(d.date).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}</small></span>
+      <span class="ms-p b">${mini(d.slots?.blue)}</span><em>vs</em><span class="ms-p r">${mini(d.slots?.red)}</span></button>`).join('')}</div></details>` : '';
   $('menuSaves').querySelectorAll('.msave').forEach((b) => (b.onclick = () => { loadDraft(+b.dataset.id); closeMenu(); }));
 }
 const closeMenu = () => {
@@ -824,6 +827,153 @@ async function startFromPlayers() {
   go.disabled = false; go.textContent = 'Lancer la draft';
   $('playersBox').open = true;
   closeMenu();
+}
+
+// ---------- Draft depuis une capture de fin de game ----------
+// L'utilisateur clique sur les 10 icônes de champions (équipe 1 de haut en bas, puis équipe 2) ;
+// chaque clic est comparé aux 170 portraits (centre de l'icône, plusieurs tailles et petits décalages).
+const SHOT = { img: null, icons: null, clicks: [], scale: 1 };
+const ICON_N = 20, ZOOMS = [0.45, 0.52, 0.6, 0.68, 0.76]; // centre de l'icône : évite le badge de niveau et les bordures
+function iconVec(source, sx, sy, sw, sh) {
+  const cv = iconVec.cv ??= Object.assign(document.createElement('canvas'), { width: ICON_N, height: ICON_N });
+  const ctx = iconVec.ctx ??= cv.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(source, sx, sy, sw, sh, 0, 0, ICON_N, ICON_N);
+  const d = ctx.getImageData(0, 0, ICON_N, ICON_N).data, v = new Float32Array(ICON_N * ICON_N * 3);
+  // une seule moyenne pour les 3 couleurs : on garde la teinte (très discriminante), on retire la luminosité
+  let m = 0;
+  for (let k = 0, j = 0; k < d.length; k += 4, j += 3) { v[j] = d[k]; v[j + 1] = d[k + 1]; v[j + 2] = d[k + 2]; m += d[k] + d[k + 1] + d[k + 2]; }
+  m /= v.length;
+  let ss = 0;
+  for (let j = 0; j < v.length; j++) { v[j] -= m; ss += v[j] ** 2; }
+  const sd = Math.sqrt(ss / v.length) || 1;
+  for (let j = 0; j < v.length; j++) v[j] /= sd; // contraste normalisé : on compare le dessin, pas la luminosité
+  v.sd = sd;
+  return v;
+}
+async function loadIcons() {
+  if (SHOT.icons) return SHOT.icons;
+  $('shotState').textContent = 'Préparation des portraits…';
+  const out = [];
+  await Promise.all(state.list.map((c) => new Promise((res) => {
+    const im = new Image(); im.crossOrigin = 'anonymous';
+    im.onload = () => {
+      try { for (const z of ZOOMS) { const w = im.width * z; out.push({ id: c.id, z, v: iconVec(im, (im.width - w) / 2, (im.height - w) / 2, w, w) }); } } catch {}
+      res();
+    };
+    im.onerror = res; im.src = img(c.id);
+  })));
+  SHOT.icons = out; $('shotState').textContent = '';
+  return out;
+}
+// Recherche en 2 passes : on localise d'abord l'icône autour du clic (taille, décalage),
+// puis on affine autour de la meilleure position avec tous les cadrages.
+function matchAt(x, y, exclude = new Set()) {
+  const W = SHOT.img.width;
+  const icons = SHOT.icons.filter((ic) => !exclude.has(ic.id));
+  const score = (v, list) => { const out = new Map(); for (const ic of list) { let c = 0; for (let j = 0; j < v.length; j++) c += v[j] * ic.v[j]; c /= v.length; const cur = out.get(ic.id); if (cur == null || c > cur) out.set(ic.id, c); } return out; };
+  // passe 1 : grossière (cadrage 0.6), décalages jusqu'à ±18 % de la taille
+  let best = null; const cand = new Map();
+  const z1 = icons.filter((ic) => ic.z === 0.6);
+  for (let s = W * 0.015; s <= W * 0.075; s *= 1.1) {
+    for (let dx = -0.18; dx <= 0.181; dx += 0.09) for (let dy = -0.18; dy <= 0.181; dy += 0.09) {
+      const w = s * 0.6, v = iconVec(SHOT.img, x + dx * s - w / 2, y + dy * s - w / 2, w, w);
+      if (v.sd < 6) continue;
+      for (const [id, c] of score(v, z1)) {
+        if (!best || c > best.c) best = { c, s, dx, dy };
+        if (!cand.has(id) || c > cand.get(id)) cand.set(id, c);
+      }
+    }
+  }
+  if (!best) return [];
+  const top = new Set([...cand.entries()].sort((p, q) => q[1] - p[1]).slice(0, 14).map(([id]) => id));
+  const fine = icons.filter((ic) => top.has(ic.id));
+  // passe 2 : fine, autour de la meilleure position, tous les cadrages
+  const res = new Map();
+  for (let ks = 0.9; ks <= 1.101; ks += 0.05) for (let ox = -0.06; ox <= 0.061; ox += 0.03) for (let oy = -0.06; oy <= 0.061; oy += 0.03) {
+    const s = best.s * ks, cx = x + (best.dx + ox) * best.s, cy = y + (best.dy + oy) * best.s;
+    for (const z of ZOOMS) {
+      const w = s * z, v = iconVec(SHOT.img, cx - w / 2, cy - w / 2, w, w);
+      if (v.sd < 6) continue;
+      for (const [id, c] of score(v, fine.filter((ic) => ic.z === z))) if (!res.has(id) || c > res.get(id)) res.set(id, c);
+    }
+  }
+  return [...res.entries()].sort((p, q) => q[1] - p[1]).slice(0, 4).map(([id]) => id);
+}
+function drawShot() {
+  const cv = $('shotCanvas'), ctx = cv.getContext('2d');
+  ctx.drawImage(SHOT.img, 0, 0, cv.width, cv.height);
+  SHOT.clicks.forEach((c, k) => {
+    const x = c.x * SHOT.scale, y = c.y * SHOT.scale;
+    ctx.fillStyle = k < 5 ? '#2f6fe0' : '#d64552'; ctx.beginPath(); ctx.arc(x, y, 11, 0, 7); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(String(k + 1), x, y + 4);
+  });
+}
+function renderShotList() {
+  const n = SHOT.clicks.length;
+  $('shotHelp').innerHTML = !SHOT.img ? 'Choisis, glisse ou colle (Ctrl/Cmd + V) une capture : tableau de fin de game ou écran d’un drafter.'
+    : n < 10 ? `Clique au centre du portrait d’un champion de l’<b>${n < 5 ? 'équipe 1 (bleue)' : 'équipe 2 (rouge)'}</b> — ${n < 5 ? n + 1 : n - 4}/5. L’ordre n’a pas d’importance : les rôles sont attribués automatiquement.`
+      : 'Les 10 champions sont reconnus. Corrige si besoin (clic sur un autre choix ou tape un nom), puis lance l’analyse.';
+  $('shotList').innerHTML = [0, 1].map((t) => `<div class="sl-team ${t ? 'r' : 'b'}"><h5>${t ? 'Équipe 2 · rouge' : 'Équipe 1 · bleu'}</h5>${ROLES.map((r, k) => {
+    const c = SHOT.clicks[t * 5 + k];
+    return `<div class="sl-row ${c ? '' : 'empty'}"><span class="sl-r">${k + 1}</span>${c ? `<img src="${img(c.id)}" alt=""><b>${state.P[c.id]?.name ?? c.id}</b>
+      <span class="sl-alt">${c.alts.filter((a) => a !== c.id).slice(0, 3).map((a) => `<img src="${img(a)}" title="${state.P[a]?.name}" data-k="${t * 5 + k}" data-id="${a}">`).join('')}</span>
+      <input class="sl-in" data-k="${t * 5 + k}" list="champList" placeholder="autre…">` : '<span class="muted">—</span>'}</div>`;
+  }).join('')}</div>`).join('');
+  $('shotList').querySelectorAll('.sl-alt img').forEach((im) => (im.onclick = () => { const c = SHOT.clicks[+im.dataset.k]; c.alts = [im.dataset.id, ...c.alts.filter((a) => a !== im.dataset.id)]; c.id = im.dataset.id; renderShotList(); }));
+  $('shotList').querySelectorAll('.sl-in').forEach((inp) => (inp.onchange = () => { const ch = findChamp(inp.value); if (ch) { SHOT.clicks[+inp.dataset.k].id = ch.id; renderShotList(); } }));
+  $('shotGo').disabled = n < 10;
+  $('shotUndo').disabled = !n;
+}
+async function setShotImage(file) {
+  const url = URL.createObjectURL(file);
+  const im = new Image();
+  await new Promise((r) => { im.onload = r; im.src = url; });
+  SHOT.img = im; SHOT.clicks = [];
+  const cv = $('shotCanvas'), maxW = Math.min(900, innerWidth * 0.62);
+  SHOT.scale = Math.min(1, maxW / im.width);
+  cv.width = Math.round(im.width * SHOT.scale); cv.height = Math.round(im.height * SHOT.scale);
+  cv.hidden = false; document.querySelector('#shotDrop .sb-pick').hidden = true;
+  drawShot(); renderShotList();
+  await loadIcons();
+}
+function openShot() {
+  $('shotBox').hidden = false; SHOT.clicks = []; renderShotList();
+  loadIcons();
+}
+function applyShot() {
+  state.slots = emptySlots(); state.roles = { blue: [...ROLES], red: [...ROLES] };
+  state.lock = { blue: Array(5).fill(null), red: Array(5).fill(null) }; state.history = []; state.selected = null;
+  SHOT.clicks.forEach((c, k) => { const side = k < 5 ? 'blue' : 'red'; state.slots[side][k % 5] = c.id; });
+  assignRoles('blue'); assignRoles('red'); // rôles déduits des champions (clic sur un badge de rôle pour corriger)
+  for (const side of ['blueBans', 'redBans']) state.slots[side] = Array(5).fill(NO_BAN);
+  state.flow = state.flow === 'players' ? 'players' : 'zero';
+  $('shotBox').hidden = true; closeMenu(); render();
+  toast('Draft importée : rôles attribués automatiquement, clic sur un badge de rôle pour corriger');
+}
+
+function initShot() {
+  $('startShot').onclick = openShot;
+  $('shotClose').onclick = () => { $('shotBox').hidden = true; };
+  $('shotFile').onchange = (e) => { const f = e.target.files?.[0]; if (f) setShotImage(f); };
+  document.addEventListener('paste', (e) => {
+    if ($('shotBox').hidden) return;
+    const f = [...(e.clipboardData?.files ?? [])].find((x) => x.type.startsWith('image/'));
+    if (f) setShotImage(f);
+  });
+  const drop = $('shotDrop');
+  drop.ondragover = (e) => e.preventDefault();
+  drop.ondrop = (e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) setShotImage(f); };
+  $('shotCanvas').onclick = async (e) => {
+    if (!SHOT.img || SHOT.clicks.length >= 10) return;
+    const r = e.target.getBoundingClientRect();
+    const x = (e.clientX - r.left) / SHOT.scale * (e.target.width / r.width), y = (e.clientY - r.top) / SHOT.scale * (e.target.height / r.height);
+    await loadIcons();
+    const alts = matchAt(x, y, new Set(SHOT.clicks.map((c) => c.id)));
+    SHOT.clicks.push({ x, y, id: alts[0], alts });
+    drawShot(); renderShotList();
+  };
+  $('shotUndo').onclick = () => { SHOT.clicks.pop(); drawShot(); renderShotList(); };
+  $('shotGo').onclick = applyShot;
 }
 
 // ---------- Drafts sauvegardées ----------
@@ -926,7 +1076,8 @@ function renderAdvice() {
   const objCard = (icon, name, when, o) => `<div class="ob ${o.simple[0]}">
       <div class="ob-h"><span class="ob-i">${icon}</span><b>${name}</b><small>${when}</small><em>${o.simple[1]}</em></div>
       <p>${o.simple[2]}</p>${o.fake ? `<p class="ob-x">${o.fake}</p>` : ''}</div>`;
-  const synM = teamSynergy(mine.map((x) => x.c)).pairs.slice(0, 4), synT = teamSynergy(theirs.map((x) => x.c)).pairs.slice(0, 2);
+  const withLane = (r) => r.map((x) => ({ ...x.c, lane: x.role }));
+  const synM = teamSynergy(withLane(mine)).pairs.slice(0, 4), synT = teamSynergy(withLane(theirs)).pairs.slice(0, 2);
   const synCard = (x, enemy) => `<div class="sy ${enemy ? 'enemy' : ''}">
       <div class="sy-pics"><img src="${img(x.a.id)}"><span>+</span><img src="${img(x.b.id)}"></div>
       <div class="sy-txt"><div class="sy-h"><b>${x.a.name} + ${x.b.name}</b><em style="--k:${KINDS[x.kind]?.color ?? '#6b7280'}">${KINDS[x.kind]?.label ?? ''}</em></div>
@@ -1079,6 +1230,7 @@ function initUpdates() {
 
 applyTheme();
 initControls();
+initShot();
 initUpdates();
 openMenu();
 load();

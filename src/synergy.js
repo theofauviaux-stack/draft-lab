@@ -100,23 +100,28 @@ for (const [jg, d] of Object.entries(COACH.jungle)) {
   d.sup.forEach((s, i) => JUNGLE.set(`${jg}|${s}`, { v: 0.9 - Math.min(i, 8) * 0.05, early: d.early, rank: i + 1 }));
 }
 
-// Synergie d'une paire (a, b = profils de champions) : la plus forte trouvée, avec son mécanisme
+// Rôle réel dans la draft (c.lane) quand on le connaît, sinon rôle principal du champion
+const is = (c, r) => (c.lane ? c.lane === r : c.roles?.[0] === r);
+// Synergie d'une paire (a, b = profils de champions) : la plus forte trouvée, avec son mécanisme.
+// Les duos de lane (bot) et jungle-support ne comptent que si les champions jouent vraiment ces lanes.
 export function pair(a, b) {
   if (a.id === b.id) return null;
   const hits = [];
-  const t = TABLE.get(key(a.id, b.id));
+  let t = TABLE.get(key(a.id, b.id));
+  if (t && t.kind === 'lane' && !((is(a, 'A') && is(b, 'S')) || (is(a, 'S') && is(b, 'A')))) t = null;
+  if (t && t.kind === 'jgl' && !((is(a, 'J') && is(b, 'S')) || (is(a, 'S') && is(b, 'J')))) t = null;
   if (t) hits.push(t);
   for (const [x, y] of [[a, b], [b, a]]) {
-    const bt = BOT.get(`${x.id}|${y.id}`);
+    const bt = is(x, 'A') && is(y, 'S') ? BOT.get(`${x.id}|${y.id}`) : null;
     if (bt) hits.push({ v: bt.v, kind: 'lane', title: 'Duo bot conseillé', why: `${y.name} fait partie des meilleurs supports de ${x.name} (n°${bt.rank}, profil ${bt.type}) : la lane gagne ses trades et contrôle la vague pour le drake.`, src: 'duo conseillé' });
     const jg = JUNGLE.get(`${x.id}|${y.id}`);
-    if (jg && x.roles[0] === 'J' && y.roles.includes('S')) hits.push({ v: jg.v, kind: 'jgl', title: 'Duo jungle-support', why: `${y.name} est un des meilleurs supports pour ${x.name} (n°${jg.rank}) : roams, vision et ganks synchronisés autour des objectifs.`, src: 'duo conseillé' });
+    if (jg && is(x, 'J') && is(y, 'S')) hits.push({ v: jg.v, kind: 'jgl', title: 'Duo jungle-support', why: `${y.name} est un des meilleurs supports pour ${x.name} (n°${jg.rank}) : roams, vision et ganks synchronisés autour des objectifs.`, src: 'duo conseillé' });
     if (x.id === 'Orianna' && BALL_CARRIERS.has(y.id) && !t) hits.push({ v: 1.2, kind: 'ulti', title: 'Balle d’Orianna', why: `Orianna pose sa balle sur ${y.name} qui plonge : Onde de choc part du milieu de leur équipe.`, src: 'règle' });
     if (x.id === 'Galio' && GALIO_TARGET.has(y.id) && !t) hits.push({ v: 1.1, kind: 'ulti', title: 'Atterrissage de Galio', why: `Galio atterrit sur ${y.name} quand il engage (Héros en approche) puis provoque : la cible ne peut plus s’échapper.`, src: 'règle' });
     if ((x.id === 'Yasuo' || x.id === 'Yone') && KNOCKUP[y.id] && !t) hits.push({ v: 1.3, kind: 'ulti', title: 'Projection + ultime', why: `${y.name} projette en l’air avec ${KNOCKUP[y.id]} : ${x.name} déclenche son ultime sur tous les ennemis touchés.`, src: 'règle' });
-    if (x.id === 'Kalista' && KALISTA_SUPS.has(y.id) && !t) hits.push({ v: 1.2, kind: 'ulti', title: 'Pacte de Kalista', why: `Kalista lance ${y.name} dans leur équipe avec son ultime : engage depuis une distance imprévisible.`, src: 'règle' });
+    if (x.id === 'Kalista' && KALISTA_SUPS.has(y.id) && is(x, 'A') && is(y, 'S') && !t) hits.push({ v: 1.2, kind: 'ulti', title: 'Pacte de Kalista', why: `Kalista lance ${y.name} dans leur équipe avec son ultime : engage depuis une distance imprévisible.`, src: 'règle' });
     if (GLOBAL[x.id] && y.s >= 3) hits.push({ v: 0.8, kind: 'macro', title: 'Ulti global + split', why: `${y.name} split en side lane, ${x.name} le rejoint avec ${GLOBAL[x.id]} : 2v1 ou 4v4 ailleurs. Moins rentable dans la méta actuelle où le split paie moins.`, src: 'règle' });
-    if (y.roles[0] === 'A' && y.scale === 3 && x.roles[0] === 'S' && x.d >= 3 && x.f < 2 && !t) hits.push({ v: 0.9, kind: 'peel', title: 'Hyper-carry protégé', why: `${x.name} protège ${y.name} (boucliers, soins, désengage) jusqu’à son pic de puissance en late.`, src: 'règle' });
+    if (is(y, 'A') && y.scale === 3 && is(x, 'S') && x.d >= 3 && x.f < 2 && !t) hits.push({ v: 0.9, kind: 'peel', title: 'Hyper-carry protégé', why: `${x.name} protège ${y.name} (boucliers, soins, désengage) jusqu’à son pic de puissance en late.`, src: 'règle' });
     if (x.e >= 3 && x.f >= 2 && AOE.has(y.id) && !t) hits.push({ v: 0.7, kind: 'cc', title: 'Engage + zone', why: `${x.name} engage et regroupe, ${y.name} enchaîne ses dégâts de zone sur des cibles contrôlées.`, src: 'règle' });
   }
   if (!hits.length) return null;
