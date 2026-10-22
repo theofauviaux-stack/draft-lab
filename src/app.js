@@ -1,7 +1,7 @@
 import { teamSynergy, KINDS } from './synergy.js';
 import { detectSlots, matchBanner } from './shotauto.js';
 import {
-  ROLES, ROLE_LABEL, ARCH, ORDER, rel, laneEdge,
+  ROLES, ROLE_LABEL, ARCH, ORDER, rel, relText, laneEdge,
   buildProfiles, evaluate, setDetailSource, applyProGames, proInfo, recommend, recommendBans, projectPicks, gamePlan, powerCurve,
   comfortPts, proposeDrafts, playerLabel, analyzeDraft, matchPlan, pentagonView, styleBreakdown, compLabel, playersForecast, combineWr, pointsLabel, rankPoints, RANK_OPTIONS, playerRating, dominant, teamShares, predictPicks, enemyScenarios, predictedBans
 } from './engine.js';
@@ -231,7 +231,7 @@ function render() {
   $('flowChip').textContent = state.flow === 'players' ? '⚔ Draft depuis des joueurs' : '✦ Draft de zéro';
   document.querySelectorAll('.seg-b').forEach((b) => b.classList.toggle('on', b.dataset.side === state.mySide));
   renderPlayers(); renderSaves(); renderBanPlan();
-  renderPentagon(ev); renderScaling(); renderAdvice();
+  renderPentagon(ev); renderPentaAdvice(ev); renderScaling(); renderAdvice();
 }
 
 function renderBans() {
@@ -462,14 +462,20 @@ function renderPentagon(ev) {
   s += `<polygon points="${poly(1)}" fill="#f4f6f9" stroke="#d9dee6" stroke-width="1.5"/>`;
   for (const f of [0.25, 0.5, 0.75]) s += `<polygon points="${poly(f)}" fill="none" stroke="#e3e7ed" stroke-width="1"/>`;
   for (const k of ORDER) { const [x, y] = at(k); s += `<line x1="${C[0]}" y1="${C[1]}" x2="${x}" y2="${y}" stroke="#e3e7ed"/>`; }
-  // cycle des avantages : uniquement les gros avantages, en arcs à l'extérieur (plus de traits au milieu)
+  // légers avantages : fines diagonales en pointillés, sous les radars (discrètes mais présentes)
+  ORDER.forEach((a, i) => {
+    const b = ORDER[(i + 2) % 5];
+    const [x1, y1] = at(a, R - 6), [x2, y2] = at(b, R - 6), t0 = 0.12, t1 = 0.86;
+    s += `<line x1="${(x1 + (x2 - x1) * t0).toFixed(1)}" y1="${(y1 + (y2 - y1) * t0).toFixed(1)}" x2="${(x1 + (x2 - x1) * t1).toFixed(1)}" y2="${(y1 + (y2 - y1) * t1).toFixed(1)}" stroke="${ARCH[a].color}" stroke-width="1.3" stroke-dasharray="5 4" opacity=".45" marker-end="url(#ar-${a})"><title>${ARCH[a].label} a un léger avantage sur ${ARCH[b].label}</title></line>`;
+  });
+  // gros avantages : arcs pleins à l'extérieur
   ORDER.forEach((a, i) => {
     const b = ORDER[(i + 1) % 5];
     const [x1, y1] = at(a, R + 9), [x2, y2] = at(b, R + 9);
     const t0 = 0.2, t1 = 0.8, mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
     const ox = (mx - C[0]) * 0.12, oy = (my - C[1]) * 0.12; // légère courbure vers l'extérieur
     const p0 = [x1 + (x2 - x1) * t0, y1 + (y2 - y1) * t0], p1 = [x1 + (x2 - x1) * t1, y1 + (y2 - y1) * t1];
-    s += `<path d="M${p0[0].toFixed(1)},${p0[1].toFixed(1)} Q${(mx + ox).toFixed(1)},${(my + oy).toFixed(1)} ${p1[0].toFixed(1)},${p1[1].toFixed(1)}" fill="none" stroke="${ARCH[a].color}" stroke-width="2" opacity=".75" marker-end="url(#ar-${a})"><title>${ARCH[a].label} a l’avantage sur ${ARCH[b].label} (et léger avantage sur ${ARCH[ORDER[(i + 2) % 5]].label})</title></path>`;
+    s += `<path d="M${p0[0].toFixed(1)},${p0[1].toFixed(1)} Q${(mx + ox).toFixed(1)},${(my + oy).toFixed(1)} ${p1[0].toFixed(1)},${p1[1].toFixed(1)}" fill="none" stroke="${ARCH[a].color}" stroke-width="2.4" opacity=".85" marker-end="url(#ar-${a})"><title>${ARCH[a].label} a un gros avantage sur ${ARCH[b].label}</title></path>`;
   });
   // radar des deux équipes (échelle adoucie : les petites parts restent visibles)
   const rr = (v) => R * (0.08 + 0.92 * Math.sqrt(Math.min(1, v / 0.5)));
@@ -495,6 +501,25 @@ function renderPentagon(ev) {
     }).join('');
 }
 
+// Compo indécise (plusieurs styles à égalité) : quel style jouer face à la compo adverse ?
+function renderPentaAdvice(ev) {
+  const el = $('pentaAdvice');
+  const me = state.mySide, mine = me === 'blue' ? ev.sharesBlue : ev.sharesRed, theirs = me === 'blue' ? ev.sharesRed : ev.sharesBlue;
+  if (!mine || !theirs || team(me).length < 2) { el.innerHTML = ''; return; }
+  const top = Math.max(...ORDER.map((k) => mine[k]));
+  const tied = ORDER.filter((k) => mine[k] >= top - 0.04 && mine[k] > 0.12).sort((a, b) => mine[b] - mine[a]);
+  // valeur d'un style = ses avantages face à CHAQUE style adverse, pondérés par leur part dans la compo d'en face
+  const val = (a) => ORDER.reduce((t, e) => t + rel(a, e) * theirs[e], 0);
+  const best = [...tied].sort((a, b) => val(b) - val(a) || mine[b] - mine[a])[0];
+  const eTop = [...ORDER].sort((a, b) => theirs[b] - theirs[a]).filter((k, i) => i === 0 || theirs[k] >= theirs[ORDER.reduce((x, y) => (theirs[y] > theirs[x] ? y : x))] - 0.04);
+  const pct = (v) => Math.round(v * 100) + ' %';
+  const lbl = (k) => `<b style="color:${ARCH[k].color}">${ARCH[k].label}</b>`;
+  const vsTxt = eTop.map((e) => `${relText(best, e)} sur ${lbl(e)}`).join(', ');
+  const others = tied.filter((k) => k !== best).map((k) => `${lbl(k)} ${val(k) >= 0 ? '+' : ''}${val(k).toFixed(2)}`).join(' · ');
+  el.innerHTML = tied.length > 1
+    ? `<div class="pa"><span class="pa-k">Ta compo hésite</span> entre ${tied.map((k) => `${lbl(k)} (${pct(mine[k])})`).join(', ')}. Face à leur ${eTop.map(lbl).join(' / ')}, joue ${lbl(best)} : ${vsTxt}.<span class="pa-s">Score face à leur compo : ${lbl(best)} ${val(best) >= 0 ? '+' : ''}${val(best).toFixed(2)}${others ? ' · ' + others : ''}</span></div>`
+    : `<div class="pa"><span class="pa-k">Ton style</span> ${lbl(best)} (${pct(mine[best])}) face à leur ${eTop.map(lbl).join(' / ')} : ${vsTxt}.${val(best) < 0 ? ` <span class="pa-w">Plan B conseillé : ${lbl([...ORDER].sort((a, b) => val(b) - val(a))[0])}</span>` : ''}</div>`;
+}
 function renderScaling() {
   const svg = $('scaling');
   // le graphique prend toute la place de sa carte (pas de vide en dessous)

@@ -151,7 +151,7 @@ async function quickLoad(tier) {
   return snap;
 }
 
-// ---- Taille de la fenêtre : plein écran ou tailles fixes en 16:9 ----
+// ---- Taille de la fenêtre : plein écran, fenêtré (libre, en 16:9) ou tailles fixes ----
 // L'interface est toujours dessinée pour 1600 px de large puis mise à l'échelle :
 // elle reste identique (rien ne se décale), quelle que soit la taille choisie.
 const BASE_W = 1600;
@@ -164,23 +164,40 @@ function winSizes() {
     const w = Math.floor(Math.min(wa.width, ((wa.height - 30) * 16) / 9) / 16) * 16, h = (w * 9) / 16;
     list.push({ id: `${w}x${h}`, w, h, label: `${w} × ${h}` });
   }
-  return [{ id: 'full', label: 'Plein écran' }, ...list];
+  return [{ id: 'full', label: 'Plein écran' }, { id: 'free', label: 'Fenêtré (ajustable)' }, ...list];
 }
-function readWinPref() { try { return JSON.parse(fs.readFileSync(WIN_FILE(), 'utf8')).size; } catch { return null; } }
+function readWinPref() { try { return JSON.parse(fs.readFileSync(WIN_FILE(), 'utf8')); } catch { return {}; } }
+function saveWinPref(o) { try { fs.writeFileSync(WIN_FILE(), JSON.stringify({ ...readWinPref(), ...o })); } catch {} }
 function applyZoom() {
   if (!win || win.isDestroyed()) return;
   const [cw] = win.getContentSize();
   win.webContents.setZoomFactor(Math.max(0.3, cw / BASE_W));
 }
 let lastWindowed = null;
+// mode fenêtré : redimensionnable à la souris, toujours en 16:9 pour que l'interface reste identique
+function freeMode(on) {
+  win.setResizable(on);
+  win.setMaximizable(on);
+  win.setAspectRatio(on ? 16 / 9 : 0);
+  win.setMinimumSize(on ? 960 : 0, on ? 540 : 0);
+}
+function freeSize() {
+  const wa = screen.getPrimaryDisplay().workAreaSize, p = readWinPref();
+  let w = p.freeW || 1600; w = Math.min(w, wa.width, Math.floor(((wa.height - 30) * 16) / 9));
+  return { w: Math.max(960, Math.round(w)), h: Math.max(540, Math.round((w * 9) / 16)) };
+}
 function setWinSize(id, save = true) {
   const sizes = winSizes();
-  const opt = sizes.find((o) => o.id === id) ?? sizes[1] ?? sizes[0];
-  if (save) try { fs.writeFileSync(WIN_FILE(), JSON.stringify({ size: opt.id })); } catch {}
+  const opt = sizes.find((o) => o.id === id) ?? sizes[2] ?? sizes[0];
+  if (save) saveWinPref({ size: opt.id });
   if (opt.id === 'full') { win.setResizable(true); win.setFullScreen(true); } // macOS : le plein écran demande une fenêtre redimensionnable
   else {
     lastWindowed = opt.id;
-    const apply = () => { win.setResizable(true); win.setContentSize(opt.w, opt.h); win.setResizable(false); win.center(); applyZoom(); };
+    const apply = () => {
+      if (opt.id === 'free') { const f = freeSize(); freeMode(false); win.setResizable(true); win.setContentSize(f.w, f.h); freeMode(true); }
+      else { freeMode(false); win.setResizable(true); win.setContentSize(opt.w, opt.h); win.setResizable(false); }
+      win.center(); applyZoom();
+    };
     if (win.isFullScreen()) { win.once('leave-full-screen', () => setTimeout(apply, 50)); win.setFullScreen(false); } else apply();
   }
   setTimeout(applyZoom, 300);
@@ -190,9 +207,9 @@ const currentWinSize = () => (win.isFullScreen() ? 'full' : lastWindowed);
 
 function createWindow() {
   const sizes = winSizes();
-  const pref = readWinPref();
-  const first = sizes.find((o) => o.id === pref) ?? sizes[1] ?? sizes[0];
-  const start = first.id === 'full' ? (sizes[1] ?? { w: 1600, h: 900 }) : first;
+  const pref = readWinPref().size;
+  const first = sizes.find((o) => o.id === pref) ?? sizes[2] ?? sizes[0];
+  const start = first.id === 'full' ? (sizes[2] ?? { w: 1600, h: 900 }) : first.id === 'free' ? { id: 'free', ...freeSize() } : first;
   win = new BrowserWindow({
     width: start.w,
     height: start.h,
@@ -211,17 +228,22 @@ function createWindow() {
     }
   });
   lastWindowed = start.id ?? null;
+  if (lastWindowed === 'free') freeMode(true);
   win.loadFile(path.join(__dirname, 'src', 'index.html'));
   if (first.id === 'full') { win.setResizable(true); win.setFullScreen(true); }
   // mise à l'échelle : au chargement, à chaque changement de taille, et si l'utilisateur tente de zoomer
   win.webContents.on('did-finish-load', applyZoom);
   win.webContents.on('zoom-changed', () => setTimeout(applyZoom, 0));
   win.webContents.setVisualZoomLevelLimits(1, 1).catch(() => {});
-  for (const ev of ['resize', 'enter-full-screen', 'leave-full-screen']) win.on(ev, () => { setTimeout(applyZoom, 60); win.webContents.send('window:changed', currentWinSize()); });
-  // en quittant le plein écran (Échap, bouton vert…), on revient à la dernière taille fixe
+  win.on('resize', () => {
+    applyZoom();
+    if (lastWindowed === 'free' && !win.isFullScreen()) saveWinPref({ freeW: win.getContentSize()[0] });
+  });
+  for (const ev of ['enter-full-screen', 'leave-full-screen']) win.on(ev, () => { setTimeout(applyZoom, 60); win.webContents.send('window:changed', currentWinSize()); });
+  // en quittant le plein écran (Échap, bouton vert…), on revient à la dernière taille choisie
   win.on('leave-full-screen', () => {
-    try { fs.writeFileSync(WIN_FILE(), JSON.stringify({ size: lastWindowed ?? 'full' })); } catch {}
-    setTimeout(() => { const o = winSizes().find((x) => x.id === lastWindowed) ?? winSizes()[1]; if (o?.w) { win.setResizable(true); win.setContentSize(o.w, o.h); win.setResizable(false); win.center(); applyZoom(); } }, 80);
+    saveWinPref({ size: lastWindowed ?? 'full' });
+    setTimeout(() => setWinSize(lastWindowed ?? 'free', false), 80);
   });
   // fermer aussi la fenêtre cachée de dpm.lol quand on ferme l'app
   win.on('closed', () => { for (const w of BrowserWindow.getAllWindows()) { try { w.destroy(); } catch {} } });
