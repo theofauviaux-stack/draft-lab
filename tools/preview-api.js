@@ -55,7 +55,7 @@
     'Ancre#EUW': ['EMERALD', 1, 55, [['Nautilus', 110, 60], ['Leona', 42, 21], ['Alistar', 19, 9]]]
   };
   let liveCb = null, liveTimer = null;
-  const mk = (id, role, rid, locked = true) => ({ champ: id ? KEY[id] : null, locked, role, riotId: rid });
+  const mk = (id, role, rid, locked = true) => ({ champ: id ? KEY[id] : null, locked, role, riotId: rid, me: rid === 'Moi#EUW' });
   const STEPS = [
     { phase: 'NoClient' }, { phase: 'Lobby' }, { phase: 'Matchmaking' }, { phase: 'ReadyCheck' },
     // sélection des champions : bans puis picks dans l'ordre (B1 R1 R2 B2 B3 R3 / R4 B4 B5 R5)
@@ -66,11 +66,11 @@
         teams: { blue: blueRoles.map((r, i) => mk(picks.blue[i], r, blueNames[i])), red: picks.red.map((c) => mk(c, null, null)) },
         bans: { blue: bans.blue.map((c) => KEY[c]), red: bans.red.map((c) => KEY[c]) } });
       const seq = [['ban', 'blue', 'Yasuo'], ['ban', 'red', 'Zed'], ['ban', 'blue', 'Yone'], ['ban', 'red', 'Draven'], ['ban', 'blue', 'Ambessa'], ['ban', 'red', 'Smolder'],
-        ['pick', 'blue', 1, 'LeeSin'], ['pick', 'red', 0, 'Vi'], ['pick', 'red', 1, 'Kaisa'], ['pick', 'blue', 3, 'Jinx'], ['pick', 'blue', 4, 'Thresh'], ['pick', 'red', 2, 'Nautilus'],
+        ['pick', 'blue', 1, 'LeeSin'], ['pick', 'red', 0, 'Vi'], ['pick', 'red', 1, 'Kaisa'], ['pick', 'blue', 3, 'Jinx'], ['pick', 'blue', 4, 'Thresh'], ['pick', 'red', 2, 'Taliyah'],
         ['ban', 'red', 'Orianna'], ['ban', 'blue', 'Viktor'], ['ban', 'red', 'Syndra'], ['ban', 'blue', 'Rumble'],
-        ['pick', 'red', 3, 'Renekton'], ['pick', 'blue', 0, 'Gnar'], ['pick', 'blue', 2, 'Ahri'], ['pick', 'red', 4, 'Taliyah']];
+        ['pick', 'red', 3, 'Renekton'], ['pick', 'blue', 0, 'Gnar'], ['wait'], ['wait'], ['wait'], ['pick', 'blue', 2, 'Ahri'], ['pick', 'red', 4, 'Nautilus']];
       out.push(snap());
-      for (const a of seq) { if (a[0] === 'ban') bans[a[1]].push(a[2]); else picks[a[1]][a[2]] = a[3]; out.push(snap()); }
+      for (const a of seq) { if (a[0] === 'wait') {} else if (a[0] === 'ban') bans[a[1]].push(a[2]); else picks[a[1]][a[2]] = a[3]; out.push(snap()); }
       return out;
     })(),
     { phase: 'InProgress' }

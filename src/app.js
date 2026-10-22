@@ -1,7 +1,7 @@
 import { teamSynergy, KINDS } from './synergy.js';
 import { detectSlots, matchBanner } from './shotauto.js';
 import {
-  ROLES, ROLE_LABEL, ARCH, ORDER, rel,
+  ROLES, ROLE_LABEL, ARCH, ORDER, rel, laneEdge,
   buildProfiles, evaluate, setDetailSource, applyProGames, proInfo, recommend, recommendBans, projectPicks, gamePlan, powerCurve,
   comfortPts, proposeDrafts, playerLabel, analyzeDraft, matchPlan, pentagonView, styleBreakdown, compLabel, playersForecast, combineWr, pointsLabel, rankPoints, RANK_OPTIONS, playerRating, dominant, teamShares, predictPicks, enemyScenarios, predictedBans
 } from './engine.js';
@@ -67,7 +67,7 @@ const $ = (id) => document.getElementById(id);
 // ---------- Thème clair / sombre ----------
 // Les dessins SVG sont écrits avec les couleurs du thème clair ; en sombre on les remplace.
 const DARK_MAP = { '#6b7280': '#8a93a8', '#1f2937': '#e6e9f2', '#d9dee6': '#263049', '#c3cad5': '#3a4560', '#ffffff': '#151c2c',
-  '#f4f6f9': '#151c2c', '#eef1f5': '#0e1422', '#d3e2f4': '#1d2a44', '#c9d9ec': '#13304a' };
+  '#f4f6f9': '#151c2c', '#eef1f5': '#0e1422', '#d3e2f4': '#1d2a44', '#c9d9ec': '#13304a', '#e3e7ed': '#222b40', '#f6f8fb': '#121a29', '#cfd5de': '#2e3852', '#9aa3b2': '#5d6780' };
 const themed = (svg) => (state.theme === 'dark' ? svg.replace(/#[0-9a-f]{6}\b/gi, (h) => DARK_MAP[h.toLowerCase()] ?? h) : svg);
 function applyTheme() {
   document.documentElement.dataset.theme = state.theme;
@@ -451,35 +451,40 @@ function renderGrid(info) {
 
 function renderPentagon(ev) {
   const svg = $('pentagon');
-  const C = [180, 160], R = 104;
-  // Disposition de l'image : Engage en haut, Catch à droite, Protect en bas à droite, Poke en bas à gauche, Split à gauche
+  svg.setAttribute('viewBox', '0 0 400 330');
+  const C = [200, 172], R = 112;
+  // Engage en haut, Catch à droite, Peeling en bas à droite, Poke en bas à gauche, Split à gauche
   const ANG = { e: -90, c: -18, d: 54, p: 126, s: 198 };
   const at = (k, r = R) => [C[0] + r * Math.cos((ANG[k] * Math.PI) / 180), C[1] + r * Math.sin((ANG[k] * Math.PI) / 180)];
-  let s = '<defs>' + ORDER.map((k) => `<marker id="ar-${k}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0L10,5L0,10z" fill="${ARCH[k].color}"/></marker>`).join('') + '</defs>';
-  s += `<polygon points="${ORDER.map((k) => at(k).join(',')).join(' ')}" fill="#f4f6f9" stroke="#d9dee6" stroke-width="1.5"/>`;
-  for (const f of [0.5]) s += `<polygon points="${ORDER.map((k) => at(k, R * f).join(',')).join(' ')}" fill="none" stroke="#d9dee6" stroke-dasharray="3 4"/>`;
-  // Flèches : contour = gros avantage, étoile = léger avantage
+  const poly = (f) => ORDER.map((k) => at(k, R * f).map((v) => v.toFixed(1)).join(',')).join(' ');
+  let s = '<defs>' + ORDER.map((k) => `<marker id="ar-${k}" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0L10,5L0,10z" fill="${ARCH[k].color}"/></marker>`).join('') + '</defs>';
+  // fond : pentagone + 3 anneaux discrets + rayons
+  s += `<polygon points="${poly(1)}" fill="#f4f6f9" stroke="#d9dee6" stroke-width="1.5"/>`;
+  for (const f of [0.25, 0.5, 0.75]) s += `<polygon points="${poly(f)}" fill="none" stroke="#e3e7ed" stroke-width="1"/>`;
+  for (const k of ORDER) { const [x, y] = at(k); s += `<line x1="${C[0]}" y1="${C[1]}" x2="${x}" y2="${y}" stroke="#e3e7ed"/>`; }
+  // cycle des avantages : uniquement les gros avantages, en arcs à l'extérieur (plus de traits au milieu)
   ORDER.forEach((a, i) => {
-    for (const [step, big] of [[1, true], [2, false]]) {
-      const b = ORDER[(i + step) % 5];
-      const [x1, y1] = at(a, R - 4), [x2, y2] = at(b, R - 4);
-      const t0 = 0.17, t1 = 0.83;
-      s += `<line x1="${x1 + (x2 - x1) * t0}" y1="${y1 + (y2 - y1) * t0}" x2="${x1 + (x2 - x1) * t1}" y2="${y1 + (y2 - y1) * t1}" stroke="${ARCH[a].color}" stroke-width="${big ? 2.6 : 1.3}" ${big ? '' : 'stroke-dasharray="5 4"'} opacity="${big ? 0.9 : 0.55}" marker-end="url(#ar-${a})"><title>${ARCH[a].label} a un ${big ? 'gros' : 'léger'} avantage sur ${ARCH[b].label}</title></line>`;
-    }
+    const b = ORDER[(i + 1) % 5];
+    const [x1, y1] = at(a, R + 9), [x2, y2] = at(b, R + 9);
+    const t0 = 0.2, t1 = 0.8, mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+    const ox = (mx - C[0]) * 0.12, oy = (my - C[1]) * 0.12; // légère courbure vers l'extérieur
+    const p0 = [x1 + (x2 - x1) * t0, y1 + (y2 - y1) * t0], p1 = [x1 + (x2 - x1) * t1, y1 + (y2 - y1) * t1];
+    s += `<path d="M${p0[0].toFixed(1)},${p0[1].toFixed(1)} Q${(mx + ox).toFixed(1)},${(my + oy).toFixed(1)} ${p1[0].toFixed(1)},${p1[1].toFixed(1)}" fill="none" stroke="${ARCH[a].color}" stroke-width="2" opacity=".75" marker-end="url(#ar-${a})"><title>${ARCH[a].label} a l’avantage sur ${ARCH[b].label} (et léger avantage sur ${ARCH[ORDER[(i + 2) % 5]].label})</title></path>`;
   });
-  // Radar des deux équipes
+  // radar des deux équipes (échelle adoucie : les petites parts restent visibles)
+  const rr = (v) => R * (0.08 + 0.92 * Math.sqrt(Math.min(1, v / 0.5)));
   for (const [sh, col] of [[ev.sharesRed, '214,69,82'], [ev.sharesBlue, '47,111,224']]) {
     if (!sh) continue;
-    const pts = ORDER.map((k) => at(k, R * Math.min(1, sh[k] * 2)).join(',')).join(' ');
-    s += `<polygon points="${pts}" fill="rgba(${col},.22)" stroke="rgb(${col})" stroke-width="2"/>`;
+    const pts = ORDER.map((k) => at(k, rr(sh[k])).map((v) => v.toFixed(1)).join(',')).join(' ');
+    s += `<polygon points="${pts}" fill="rgba(${col},.16)" stroke="rgb(${col})" stroke-width="2.2" stroke-linejoin="round"/>`;
+    for (const k of ORDER) { const [x, y] = at(k, rr(sh[k])); s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="rgb(${col})"/>`; }
   }
   for (const k of ORDER) {
-    const [vx, vy] = at(k), [lx, ly] = at(k, R + 26);
-    s += `<circle cx="${vx}" cy="${vy}" r="6" fill="${ARCH[k].color}"/>`;
-    s += `<text x="${lx}" y="${ly + 4}" fill="${ARCH[k].color}" font-size="13" font-weight="800" text-anchor="middle">${ARCH[k].label}</text>`;
+    const [vx, vy] = at(k), [lx, ly] = at(k, R + 32);
+    s += `<circle cx="${vx}" cy="${vy}" r="5" fill="${ARCH[k].color}"/>`;
+    s += `<text x="${lx}" y="${ly + 5}" fill="${ARCH[k].color}" font-size="15" font-weight="800" text-anchor="middle">${ARCH[k].label}</text>`;
   }
   svg.innerHTML = themed(s);
-  const fmt = (sh) => (sh ? ORDER.map((k) => `<span style="color:${ARCH[k].color}">${ARCH[k].short} ${Math.round(sh[k] * 100)}%</span>`).join(' · ') : '—');
   const tB = team('blue'), tR = team('red');
   const lb = tB.length ? compLabel(tB) : null, lr = tR.length ? compLabel(tR) : null;
   $('identity').innerHTML = `<div class="idt"><span class="b">${lb ? lb.label : 'Bleu'}</span><span class="r">${lr ? lr.label : 'Rouge'}</span></div>` +
@@ -492,39 +497,71 @@ function renderPentagon(ev) {
 
 function renderScaling() {
   const svg = $('scaling');
-  const W = 420, H = 190, L = 34, Rr = 10, T = 14, B = 24;
+  // le graphique prend toute la place de sa carte (pas de vide en dessous)
+  const box = svg.parentElement.getBoundingClientRect();
+  const W = Math.max(360, Math.round(box.width) || 640), H = Math.max(220, Math.round(box.height) || 300);
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  const L = 46, Rr = 26, T = 30, B = 28;
   const x = (m) => L + ((m - 3) * (W - L - Rr)) / 37;
   const me = state.mySide, them = me === 'blue' ? 'red' : 'blue';
   const sides = state.scalShow === 'mine' ? [me] : state.scalShow === 'theirs' ? [them] : ['red', 'blue'];
-  const curves = sides.map((sd) => team(sd)).filter((t) => t.length).map(powerCurve);
-  const vals = curves.flat().map(([, v]) => v);
-  const lo = Math.min(0.9, ...vals) - 0.04, hi = Math.max(1.1, ...vals) + 0.04;
+  const cur = Object.fromEntries(['blue', 'red'].map((sd) => [sd, team(sd).length ? powerCurve(team(sd)) : null]));
+  const vals = sides.flatMap((sd) => cur[sd] ?? []).map(([, v]) => v);
+  const lo = Math.min(0.88, ...vals) - 0.03, hi = Math.max(1.12, ...vals) + 0.03;
   const y = (v) => T + ((hi - v) * (H - T - B)) / (hi - lo);
   let s = '';
-  for (const [m, lab] of [[14, 'Mid'], [20, 'Baron'], [25, 'Late']]) {
-    s += `<line x1="${x(m)}" x2="${x(m)}" y1="${T}" y2="${H - B}" stroke="#d9dee6" stroke-dasharray="3 3"/>`;
-    s += `<text x="${x(m) + 3}" y="${T + 9}" fill="#6b7280" font-size="9.5">${lab}</text>`;
+  // phases de jeu en fond
+  for (const [a, b, lab, fill] of [[3, 14, 'Early', '#f6f8fb'], [14, 25, 'Mid', '#ffffff'], [25, 40, 'Late', '#f6f8fb']]) {
+    s += `<rect x="${x(a)}" y="${T}" width="${x(b) - x(a)}" height="${H - T - B}" fill="${fill}"/>`;
+    s += `<text x="${(x(a) + x(b)) / 2}" y="${T - 10}" fill="#6b7280" font-size="12" font-weight="700" text-anchor="middle">${lab}</text>`;
   }
-  s += `<line x1="${L}" x2="${W - Rr}" y1="${y(1)}" y2="${y(1)}" stroke="#6b7280" stroke-width=".6"/>`;
-  for (const m of [5, 10, 15, 20, 25, 30, 35, 40]) s += `<text x="${x(m)}" y="${H - 8}" fill="#6b7280" font-size="9.5" text-anchor="middle">${m}'</text>`;
-  s += `<text x="${L - 6}" y="${T + 10}" fill="#6b7280" font-size="9.5" text-anchor="end">fort</text>`;
-  s += `<text x="${L - 6}" y="${H - B}" fill="#6b7280" font-size="9.5" text-anchor="end">faible</text>`;
+  for (const [m, lab] of [[14, 'Herald / grubs'], [20, 'Baron']]) {
+    s += `<line x1="${x(m)}" x2="${x(m)}" y1="${T}" y2="${H - B}" stroke="#cfd5de" stroke-dasharray="4 4"/>`;
+    s += `<text x="${x(m) + 4}" y="${T + 14}" fill="#8a93a8" font-size="11">${lab}</text>`;
+  }
+  for (let m = 5; m <= 40; m += 5) {
+    s += `<line x1="${x(m)}" x2="${x(m)}" y1="${H - B}" y2="${H - B + 4}" stroke="#9aa3b2"/>`;
+    s += `<text x="${x(m)}" y="${H - 8}" fill="#6b7280" font-size="11.5" text-anchor="middle">${m} min</text>`;
+  }
+  s += `<line x1="${L}" x2="${W - Rr}" y1="${y(1)}" y2="${y(1)}" stroke="#9aa3b2" stroke-width="1"/>`;
+  s += `<text x="${L - 8}" y="${y(1) + 4}" fill="#6b7280" font-size="11" text-anchor="end">moy.</text>`;
+  s += `<text x="${L - 8}" y="${T + 12}" fill="#6b7280" font-size="11" text-anchor="end">fort</text>`;
+  s += `<text x="${L - 8}" y="${H - B - 2}" fill="#6b7280" font-size="11" text-anchor="end">faible</text>`;
+  const path = (pts) => pts.map(([m, v], i) => `${i ? 'L' : 'M'}${x(m).toFixed(1)},${y(v).toFixed(1)}`).join('');
+  // zone entre les deux courbes, colorée selon l'équipe devant
+  if (sides.length === 2 && cur.blue && cur.red) {
+    for (let i = 0; i < cur.blue.length - 1; i++) {
+      const [m0, b0] = cur.blue[i], [m1, b1] = cur.blue[i + 1], r0 = cur.red[i][1], r1 = cur.red[i + 1][1];
+      const col = b0 + b1 >= r0 + r1 ? '47,111,224' : '214,69,82';
+      s += `<path d="M${x(m0)},${y(b0)}L${x(m1)},${y(b1)}L${x(m1)},${y(r1)}L${x(m0)},${y(r0)}Z" fill="rgba(${col},.12)"/>`;
+    }
+  }
   let any = false;
   for (const [side, col] of [['red', '#d64552'], ['blue', '#2f6fe0']]) {
-    if (!sides.includes(side)) continue;
-    const tm = team(side);
-    if (!tm.length) continue;
+    if (!sides.includes(side) || !cur[side]) continue;
     any = true;
-    const pts = powerCurve(tm);
-    s += `<polyline fill="none" stroke="${col}" stroke-width="2.6" stroke-linejoin="round" points="${pts.map(([m, v]) => `${x(m)},${y(v)}`).join(' ')}"/>`;
+    s += `<path d="${path(cur[side])}" fill="none" stroke="${col}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>`;
+    // pic de puissance
+    const pk = cur[side].reduce((a, p) => (p[1] > a[1] ? p : a));
+    s += `<circle cx="${x(pk[0])}" cy="${y(pk[1])}" r="4.5" fill="${col}" stroke="#ffffff" stroke-width="2"><title>Pic ${side === 'blue' ? 'bleu' : 'rouge'} vers ${Math.round(pk[0])} min</title></circle>`;
   }
-  if (any && sides.includes('blue')) s += `<circle cx="${W - 92}" cy="${T + 6}" r="4" fill="#2f6fe0"/><text x="${W - 84}" y="${T + 10}" fill="#1f2937" font-size="10">Bleu</text>`;
-  if (any && sides.includes('red')) s += `<circle cx="${W - 46}" cy="${T + 6}" r="4" fill="#d64552"/><text x="${W - 38}" y="${T + 10}" fill="#1f2937" font-size="10">Rouge</text>`;
+  let lx = W - Rr - 130;
+  for (const [side, col, lab] of [['blue', '#2f6fe0', 'Bleu'], ['red', '#d64552', 'Rouge']]) {
+    if (!any || !sides.includes(side) || !cur[side]) continue;
+    s += `<line x1="${lx}" x2="${lx + 16}" y1="${T + 30}" y2="${T + 30}" stroke="${col}" stroke-width="3" stroke-linecap="round"/><text x="${lx + 22}" y="${T + 34}" fill="#1f2937" font-size="12" font-weight="600">${lab}</text>`;
+    lx += 66;
+  }
   $('scalPick').innerHTML = [['both', 'Les deux'], ['mine', 'Ta compo'], ['theirs', 'Leur compo']]
     .map(([k, l]) => `<button class="chip ${state.scalShow === k ? 'on' : ''}" data-k="${k}">${l}</button>`).join('');
   $('scalPick').querySelectorAll('.chip').forEach((b) => (b.onclick = () => { state.scalShow = b.dataset.k; renderScaling(); }));
-  if (!any) s += `<text x="${W / 2}" y="${H / 2}" fill="#6b7280" font-size="12" text-anchor="middle">Les courbes apparaissent avec les picks</text>`;
+  if (!any) s += `<text x="${W / 2}" y="${H / 2}" fill="#6b7280" font-size="13" text-anchor="middle">Les courbes apparaissent avec les picks</text>`;
   svg.innerHTML = themed(s);
+  // résumé par phase : qui est devant, et de combien
+  const at = (sd, a, b) => { const p = cur[sd]?.filter(([m]) => m >= a && m <= b); return p?.length ? p.reduce((t, [, v]) => t + v, 0) / p.length : null; };
+  $('scalSum').innerHTML = cur.blue && cur.red ? [['Early', 3, 14], ['Mid', 14, 25], ['Late', 25, 40]].map(([lab, a, b]) => {
+    const d = at('blue', a, b) - at('red', a, b), who = Math.abs(d) < 0.03 ? 'eq' : d > 0 ? 'b' : 'r';
+    return `<div class="ss ${who}"><b>${lab}</b><span>${who === 'eq' ? 'Équilibré' : who === 'b' ? 'Avantage bleu' : 'Avantage rouge'}</span><i>${who === 'eq' ? '' : `${d > 0 ? '+' : ''}${Math.round(d * 100)} %`}</i></div>`;
+  }).join('') : '';
 }
 
 const roster = (side) => state.slots[side].map((id, i) => (id ? { c: state.P[id], role: state.roles[side][i] } : null)).filter(Boolean);
@@ -868,13 +905,13 @@ function startLiveMode() {
   $('liveBar').hidden = false; $('liveTitle').textContent = 'Connexion au client…'; $('liveText').textContent = '';
   api.liveStart();
 }
-function stopLiveMode() { LIVE.on = false; api.liveStop?.(); $('liveBar').hidden = true; }
+function stopLiveMode() { LIVE.on = false; api.liveStop?.(); $('liveBar').hidden = true; $('liveReco').hidden = true; }
 function onLive(d) {
   if (!LIVE.on) return;
   const [t, sub] = LIVE_TXT[d.phase] ?? ['Client connecté', d.phase];
   $('liveTitle').textContent = t; $('liveText').textContent = d.error ? `${sub} (${d.error})` : sub;
   $('liveBar').dataset.phase = d.phase;
-  if (!d.teams) return;
+  if (!d.teams) { $('liveReco').hidden = true; return; }
   const sig = JSON.stringify([d.teams, d.bans, d.mySide]);
   if (sig === LIVE.sig) return;
   LIVE.sig = sig;
@@ -918,6 +955,39 @@ function onLive(d) {
     }
   }
   render();
+  liveReco(d);
+}
+// Pendant la sélection des champions : les meilleures réponses pour TON pick (lane, matchup, compo, ton pool)
+function liveReco(d) {
+  const box = $('liveReco');
+  const side = d.mySide, other = side === 'blue' ? 'red' : 'blue';
+  const meM = d.teams?.[side]?.find((m) => m.me);
+  if (d.phase !== 'ChampSelect' || !meM || (meM.champ && meM.locked !== false)) { box.hidden = true; return; }
+  const mine = team(side), theirs = team(other);
+  const free = ROLES.filter((r) => !mine.some((c) => c.lane === r));
+  const role = meM.role && free.includes(meM.role) ? meM.role : free[0];
+  if (!role) { box.hidden = true; return; }
+  const opp = theirs.find((c) => c.lane === role);
+  const u = used(), idx = Math.max(0, state.roles[side].indexOf(role));
+  const cand = state.list.filter((c) => !u.has(c.id) && (c.roles.includes(role) || flexRoles(c).includes(role)))
+    .map((c) => ({ ...withComfort(c, side, role), lane: role, po: pickPos(side, idx) }));
+  const [b, r] = side === 'blue' ? [mine, theirs] : [theirs, mine];
+  const rows = projectPicks(b, r, side, null, cand).map((x) => {
+    const le = opp ? laneEdge(x.c, role, opp, role) : null;
+    // le matchup direct compte en plus (réponse au champion d'en face), puis la maîtrise du joueur
+    return { ...x, le, score: x.wr + (le ? 0.6 * le.edge : 0) + (x.c.comfort > 0 ? 1.2 * x.c.comfort : 0) };
+  }).sort((p, q) => q.score - p.score).slice(0, 7);
+  if (!rows.length) { box.hidden = true; return; }
+  box.innerHTML = `<div class="lr-h"><b>À toi de choisir · ${ROLE_LABEL[role]}</b><span class="muted">${opp ? `meilleures réponses face à <b>${opp.name}</b>, avec ta compo et ton pool` : 'leur ' + ROLE_LABEL[role] + ' n’est pas encore choisi : meilleurs picks pour ta compo'}</span></div>
+    <div class="lr-list">${rows.map((x) => `<button class="lr-c" data-id="${x.c.id}" title="${x.c.name} · winrate projeté ${x.wr.toFixed(1)} %${x.le ? ` · face à ${opp.name} : ${x.le.raw > 0 ? '+' : ''}${x.le.raw} pts (${x.le.n} games Master+)` : ''}${x.c.comfort > 0 ? ' · dans ton pool' : ''}">
+      <img src="${img(x.c.id)}" alt=""><span class="lr-n">${x.c.name}${x.c.comfort > 0 ? ' <i>★</i>' : ''}</span>
+      <span class="lr-w">${x.wr.toFixed(1)} %</span>${x.le ? `<span class="lr-m ${x.le.raw >= 0 ? 'up' : 'down'}">vs ${opp.name} ${x.le.raw > 0 ? '+' : ''}${x.le.raw.toFixed(1)}</span>` : ''}</button>`).join('')}</div>`;
+  box.hidden = false;
+  // clic : essai du pick dans la draft (le client reprend la main au prochain changement)
+  box.querySelectorAll('.lr-c').forEach((btn) => (btn.onclick = () => {
+    const k = state.roles[side].indexOf(role);
+    if (k >= 0 && !state.slots[side][k]) { state.slots[side][k] = btn.dataset.id; state.lock[side][k] = role; render(); toast(`Essai : ${state.P[btn.dataset.id].name} en ${ROLE_LABEL[role]}`); }
+  }));
 }
 
 // ---------- Draft depuis une capture de fin de game ----------
@@ -1149,6 +1219,8 @@ async function initWinSize() {
   sel.onchange = () => api.setWindowSize(sel.value);
   api.onWindowChanged?.(() => fill());
 }
+// la courbe de scaling suit la taille de sa carte
+new ResizeObserver(() => { if (state.list?.length) renderScaling(); }).observe(document.querySelector('.scal-plot'));
 function initLive() {
   initWinSize();
   $('startLive').onclick = startLiveMode;

@@ -36,6 +36,7 @@
   </header>
 
   <div id="liveBar" class="livebar" hidden><span class="lv-dot"></span><b id="liveTitle">Partie en direct</b><span id="liveText" class="muted"></span><button id="liveStop" class="tb-btn">Arrêter le direct</button></div>
+  <div id="liveReco" class="live-reco" hidden></div>
   <section class="tools">
     <details class="box" id="playersBox" hidden>
       <summary>Joueurs (multi op.gg)</summary>
@@ -107,16 +108,15 @@
       <div id="advice" class="advice"></div>
     </div>
     <div class="card half">
-      <div class="card-h"><h3>Pentagone des compos</h3><span class="muted">trait plein = gros avantage, pointillé = léger</span></div>
+      <div class="card-h"><h3>Pentagone des compos</h3><span class="muted">flèche = a l’avantage sur la compo suivante</span></div>
       <svg id="pentagon" viewBox="0 0 360 300"></svg>
       <div id="identity" class="identity"></div>
     </div>
-    <div class="card half">
-      <details id="scalingBox" class="scal">
-        <summary><h3>Courbe de scaling</h3><span class="muted">clique pour l’afficher</span></summary>
-        <div class="chips" id="scalPick"></div>
-        <svg id="scaling" viewBox="0 0 420 190"></svg>
-      </details>
+    <div class="card half scal-card">
+      <div class="card-h"><h3>Courbe de scaling</h3><span class="muted">puissance estimée des deux compos, minute par minute</span></div>
+      <div class="chips" id="scalPick"></div>
+      <div class="scal-plot"><svg id="scaling"></svg></div>
+      <div class="scal-sum" id="scalSum"></div>
     </div>
   </section>
 

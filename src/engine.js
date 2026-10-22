@@ -619,19 +619,30 @@ export function proposeDrafts(fixed, theirs, side, openRoles, candidatesByRole, 
 // ---------- Scaling ----------
 // Puissance relative d'un champion selon la minute (points d'ancrage 8, 20 et 32 min).
 const CURVE = { 1: [1.3, 1.05, 0.75], 2: [0.95, 1.15, 1.0], 3: [0.72, 0.97, 1.35] };
-const ANCHOR = [8, 20, 32];
+// Courbes détaillées (minute → puissance relative) par profil : early, mid, late game
+const KNOTS = [3, 8, 14, 20, 26, 32, 40];
+const PROFILE = {
+  1: [1.24, 1.3, 1.16, 1.03, 0.91, 0.81, 0.75],
+  2: [0.94, 0.98, 1.1, 1.16, 1.1, 1.02, 0.98],
+  3: [0.76, 0.72, 0.84, 0.98, 1.15, 1.31, 1.4]
+};
+// interpolation cubique monotone (pas de bosses artificielles entre deux points)
+function smooth(xs, ys, x) {
+  if (x <= xs[0]) return ys[0];
+  if (x >= xs[xs.length - 1]) return ys[ys.length - 1];
+  let i = 0; while (x > xs[i + 1]) i++;
+  const d = (k) => (ys[k + 1] - ys[k]) / (xs[k + 1] - xs[k]);
+  const m = (k) => (k === 0 ? d(0) : k === xs.length - 1 ? d(k - 1) : d(k - 1) * d(k) <= 0 ? 0 : (d(k - 1) + d(k)) / 2);
+  const h = xs[i + 1] - xs[i], t = (x - xs[i]) / h, t2 = t * t, t3 = t2 * t;
+  return (2 * t3 - 3 * t2 + 1) * ys[i] + (t3 - 2 * t2 + t) * h * m(i) + (-2 * t3 + 3 * t2) * ys[i + 1] + (t3 - t2) * h * m(i + 1);
+}
 function champPower(c, min) {
-  const v = CURVE[c.scale ?? 2];
-  if (min <= ANCHOR[0]) return v[0];
-  if (min >= ANCHOR[2]) return v[2];
-  const i = min < ANCHOR[1] ? 0 : 1;
-  const t = (min - ANCHOR[i]) / (ANCHOR[i + 1] - ANCHOR[i]);
-  return v[i] + (v[i + 1] - v[i]) * t;
+  return smooth(KNOTS, PROFILE[c.scale ?? 2] ?? PROFILE[2], min);
 }
 export const teamPower = (team, min) => (team.length ? team.reduce((a, c) => a + champPower(c, min), 0) / team.length : null);
 export function powerCurve(team) {
   const pts = [];
-  for (let m = 3; m <= 40; m++) pts.push([m, teamPower(team, m)]);
+  for (let m = 3; m <= 40; m += 0.5) pts.push([m, teamPower(team, m)]);
   return pts;
 }
 
