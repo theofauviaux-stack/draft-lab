@@ -1,7 +1,7 @@
 {
-  "version": "2.17.1",
-  "sha256": "b93896b49b42662480d48a1f4196cef1e08c948507c144c26ee714c6b625badf",
-  "file": "draftlab-2.17.1.json.gz",
-  "notes": "Import de capture : lanes déduites des champions, question seulement pour top/mid",
-  "date": "2026-10-22T18:13:27.992Z"
+  "version": "2.17.2",
+  "sha256": "034387f07dc858696f6df54b8f600925f3c6aafc235135968b0b8ea69ccc9acb",
+  "file": "draftlab-2.17.2.json.gz",
+  "notes": "Import de capture : bouton Choisir un fichier réparé, zone de dépôt redessinée",
+  "date": "2026-10-22T18:19:45.457Z"
 }

@@ -932,12 +932,13 @@ async function setShotImage(file) {
   const cv = $('shotCanvas'), maxW = Math.min(900, innerWidth * 0.62);
   SHOT.scale = Math.min(1, maxW / im.width);
   cv.width = Math.round(im.width * SHOT.scale); cv.height = Math.round(im.height * SHOT.scale);
-  cv.hidden = false; document.querySelector('#shotDrop .sb-pick').hidden = true;
+  cv.hidden = false; $('shotEmpty').hidden = true;
   drawShot(); renderShotList();
   await loadIcons();
 }
 function openShot() {
-  $('shotBox').hidden = false; SHOT.clicks = []; renderShotList();
+  $('shotBox').hidden = false; SHOT.clicks = []; SHOT.img = null;
+  $('shotCanvas').hidden = true; $('shotEmpty').hidden = false; renderShotList();
   loadIcons();
 }
 function applyShot() {
@@ -984,15 +985,17 @@ function askTopMid(side, done) {
 function initShot() {
   $('startShot').onclick = openShot;
   $('shotClose').onclick = () => { $('shotBox').hidden = true; };
-  $('shotFile').onchange = (e) => { const f = e.target.files?.[0]; if (f) setShotImage(f); };
+  $('shotChoose').onclick = () => $('shotFile').click();
+  $('shotFile').onchange = (e) => { const f = e.target.files?.[0]; if (f) setShotImage(f); e.target.value = ''; };
   document.addEventListener('paste', (e) => {
     if ($('shotBox').hidden) return;
     const f = [...(e.clipboardData?.files ?? [])].find((x) => x.type.startsWith('image/'));
     if (f) setShotImage(f);
   });
   const drop = $('shotDrop');
-  drop.ondragover = (e) => e.preventDefault();
-  drop.ondrop = (e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) setShotImage(f); };
+  drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('over'); };
+  drop.ondragleave = () => drop.classList.remove('over');
+  drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove('over'); const f = [...(e.dataTransfer.files ?? [])].find((x) => x.type.startsWith('image/')); if (f) setShotImage(f); else toast('Dépose une image (PNG ou JPG)'); };
   $('shotCanvas').onclick = async (e) => {
     if (!SHOT.img || SHOT.clicks.length >= 10) return;
     const r = e.target.getBoundingClientRect();

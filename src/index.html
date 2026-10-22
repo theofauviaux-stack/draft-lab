@@ -192,17 +192,24 @@
 
   <div id="laneAsk" class="laneask" hidden></div>
   <div id="shotBox" class="shotbox" hidden>
-    <div class="sb-card">
-      <div class="sb-head"><b>📷 Draft depuis une capture (fin de game ou drafter)</b><button id="shotClose" class="tb-icon" title="Fermer">✕</button></div>
+    <div class="shot-card">
+      <div class="shot-head"><b>📷 Draft depuis une capture (fin de game ou drafter)</b><button id="shotClose" class="tb-icon" title="Fermer">✕</button></div>
       <p class="muted" id="shotHelp">Choisis, glisse ou colle (Ctrl/Cmd + V) une capture : tableau de fin de game ou écran d’un drafter.</p>
-      <div class="sb-main">
-        <div class="sb-img" id="shotDrop">
-          <label class="sb-pick"><input type="file" id="shotFile" accept="image/*" hidden />Choisir une image…</label>
+      <div class="shot-main">
+        <div class="shot-img" id="shotDrop">
+          <div class="shot-empty" id="shotEmpty">
+            <div class="shot-ic">🖼️</div>
+            <b>Glisse ta capture ici</b>
+            <span>ou colle-la avec Ctrl/Cmd + V</span>
+            <button type="button" id="shotChoose" class="shot-btn">Choisir un fichier…</button>
+            <small>PNG ou JPG · tableau de fin de game ou écran d’un drafter</small>
+            <input type="file" id="shotFile" accept="image/png,image/jpeg,image/webp,image/*" hidden />
+          </div>
           <canvas id="shotCanvas" hidden></canvas>
         </div>
-        <div class="sb-list" id="shotList"></div>
+        <div class="shot-list" id="shotList"></div>
       </div>
-      <div class="sb-foot"><button id="shotUndo">↶ Dernier clic</button><span class="muted" id="shotState"></span><button id="shotGo" class="primary" disabled>Analyser cette draft</button></div>
+      <div class="shot-foot"><button id="shotUndo">↶ Dernier clic</button><span class="muted" id="shotState"></span><button id="shotGo" class="primary" disabled>Analyser cette draft</button></div>
     </div>
   </div>
   <datalist id="champList"></datalist>
