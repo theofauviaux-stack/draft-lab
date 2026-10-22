@@ -811,3 +811,8 @@ details.box > summary, .scal summary { cursor: pointer; }
 .la-opts button.main { border-color: var(--gold); background: color-mix(in srgb, var(--gold) 14%, var(--panel)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 25%, transparent); }
 .la-opts button.main small { color: var(--gold); font-weight: 700; }
 .la-opts button em { font-style: normal; font-size: 9.5px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; color: var(--gold); margin-bottom: 2px; }
+
+.la-opts { flex-wrap: wrap; }
+.la-opts button small.pro { color: var(--blue); font-weight: 600; }
+.la-opts button.taken { opacity: .75; border-style: dashed; }
+.la-opts button small.tk { font-size: 9.5px; color: var(--red); }

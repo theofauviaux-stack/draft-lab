@@ -141,22 +141,29 @@ function place(id) {
   render();
   if (t === 'blue' || t === 'red') askLane(t, i, false);
 }
-// Champion joué sur 2 ou 3 lanes encore libres : on demande la lane
+// Champion joué sur plusieurs lanes : on demande la lane (toutes les lanes sont proposées)
+const laneShare = (c, r) => Math.round(c.rolePct?.[r] ?? c.roleShare?.[r] ?? 0);
+const proShare = (c, r) => (c.proPicks ? Math.round(((c.proRoleStats?.[r]?.picks ?? 0) / c.proPicks) * 100) : 0);
+// lane « réelle » : au moins 8 % de ses games en soloQ, ou 8 % de ses picks en pro
+const flexRoles = (c) => ROLES.filter((r) => laneShare(c, r) >= 8 || (c.proPicks >= 10 && proShare(c, r) >= 8));
 function askLane(side, i, force) {
   const id = state.slots[side][i]; if (!id) return;
   const c = state.P[id];
   const open = openRoles(side, i);
-  const opts = force ? ROLES.filter((r) => open.includes(r)) : open.filter((r) => c.roles.includes(r));
-  if (!force && opts.length < 2) return;
-  const share = (r) => Math.round(c.roleShare?.[r] ?? 0);
+  if (!force && flexRoles(c).filter((r) => open.includes(r)).length < 2) return;
+  const main = ROLES.reduce((a, r) => (laneShare(c, r) > laneShare(c, a) ? r : a), ROLES[0]);
+  const holder = (r) => { const j = state.roles[side].findIndex((x, k) => x === r && k !== i && state.slots[side][k]); return j >= 0 ? j : null; };
+  const sorted = [...ROLES].sort((a, b) => laneShare(c, b) - laneShare(c, a));
   const box = $('laneAsk');
   box.innerHTML = `<div class="la-card"><img src="${img(id)}" alt=""><div class="la-body">
-      <b>Sur quelle lane joue ${c.name} ?</b><span class="muted">${side === 'blue' ? 'Équipe 1' : 'Équipe 2'} · ${force ? 'changer la lane' : 'champion joué sur plusieurs lanes'}</span>
-      <div class="la-opts">${(() => { const sorted = [...opts].sort((a, b) => share(b) - share(a)); const main = ROLES.reduce((a, r) => (share(r) > share(a) ? r : a), ROLES[0]);
-        return sorted.map((r) => `<button data-r="${r}" class="${r === main ? 'main' : ''}">${r === main ? '<em>Lane principale</em>' : ''}${ROLE_LABEL[r]}<small>${share(r)} % des games</small></button>`).join(''); })()}</div></div></div>`;
+      <b>Sur quelle lane joue ${c.name} ?</b><span class="muted">${side === 'blue' ? 'Équipe 1' : 'Équipe 2'} · part de ses games en soloQ${c.proPicks >= 10 ? ' et de ses picks en pro' : ''}</span>
+      <div class="la-opts">${sorted.map((r) => { const h = holder(r); const ps = proShare(c, r);
+        return `<button data-r="${r}" class="${r === main ? 'main' : ''} ${h != null ? 'taken' : ''}">${r === main ? '<em>Lane principale</em>' : ''}${ROLE_LABEL[r]}<small>${laneShare(c, r)} % des games</small>${c.proPicks >= 10 ? `<small class="pro">pro ${ps} %</small>` : ''}${h != null ? `<small class="tk">échange avec ${state.P[state.slots[side][h]].name}</small>` : ''}</button>`; }).join('')}</div></div></div>`;
   box.hidden = false;
   box.querySelectorAll('button').forEach((b) => (b.onclick = () => {
-    state.lock[side][i] = b.dataset.r; assignRoles(side); box.hidden = true; render();
+    const r = b.dataset.r, h = holder(r);
+    if (h != null) state.lock[side][h] = null; // le coéquipier qui avait cette lane est replacé automatiquement
+    state.lock[side][i] = r; assignRoles(side); box.hidden = true; render();
   }));
   box.onclick = (e) => { if (e.target === box) box.hidden = true; };
 }
@@ -391,7 +398,7 @@ function renderGrid(info) {
   let list = state.list.filter((c) =>
     (!q || c.name.toLowerCase().includes(q) || c.id.toLowerCase().includes(q)) &&
     (!roleNeeded || c.roles.includes(roleNeeded)) &&
-    (!openR || c.roles.some((r) => openR.includes(r))) &&
+    (!openR || c.roles.some((r) => openR.includes(r)) || flexRoles(c).some((r) => openR.includes(r))) &&
     (!state.archFilter || c[state.archFilter] >= 2));
   if (info?.proj) list = [...list].sort((a, b) => (info.proj.get(b.id)?.prio ?? 0) - (info.proj.get(a.id)?.prio ?? 0));
   el.innerHTML = '';

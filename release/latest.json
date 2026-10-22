@@ -1,7 +1,7 @@
 {
-  "version": "2.16.2",
-  "sha256": "b108e134f63b9b9dfaaaa640c92491bd4b04e0f2dbd1c5cbed4a2b1def331db2",
-  "file": "draftlab-2.16.2.json.gz",
-  "notes": "Choix de lane : 0 % affiché et lane principale en surbrillance",
-  "date": "2026-10-22T17:41:34.387Z"
+  "version": "2.16.3",
+  "sha256": "b9b84b3e4b67ef26fd3d9a1353430efcfce7c4f5783cd39cb407888fa2f22d5b",
+  "file": "draftlab-2.16.3.json.gz",
+  "notes": "Choix de lane : toutes les lanes proposées, flex détectés dès 8 % des games, échange avec un coéquipier",
+  "date": "2026-10-22T17:50:41.729Z"
 }
