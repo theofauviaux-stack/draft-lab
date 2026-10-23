@@ -1,7 +1,7 @@
 {
-  "version": "2.27.3",
-  "sha256": "552508ad77a0cf3e7849b15a3f8868d7478f5c87001772534cbf9ba9352038e1",
-  "file": "draftlab-2.27.3.json.gz",
-  "notes": "Capture : textes mis à jour (reconnaissance automatique)",
-  "date": "2026-10-23T01:43:32.930Z"
+  "version": "2.27.4",
+  "sha256": "c9ad98cd1976e23378c0f529d820cb456eb13ced5059c0073ef68ae45a418cfd",
+  "file": "draftlab-2.27.4.json.gz",
+  "notes": "Menu : Partie en direct pour tous les modes",
+  "date": "2026-10-23T13:08:49.836Z"
 }
