@@ -1,7 +1,7 @@
 {
-  "version": "2.27.8",
-  "sha256": "dda06842d7c8bdf92ee8de5b140e6a052395b91030b8e197561f19704b9b4769",
-  "file": "draftlab-2.27.8.json.gz",
-  "notes": "Draft : ordre de pick (B1…R5) sur les lignes vides ; encadrés d'équipe remis par lane",
-  "date": "2026-10-23T22:45:17.352Z"
+  "version": "2.28.0",
+  "sha256": "140967f83b3059bd81d429da5cf1f00a0c3e2abfac3f94b0e1e15db12b719b0c",
+  "file": "draftlab-2.28.0.json.gz",
+  "notes": "Fiche matchup au clic sur un champion (forces, faiblesses, comment le jouer) ; recherche : nom exact prioritaire et recherche hors filtre de rôles ; conseil du pentagone plus juste",
+  "date": "2026-10-23T22:56:42.834Z"
 }

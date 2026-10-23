@@ -126,7 +126,7 @@ const engagePenalty = (s) => (s.n >= 4 && s.e + s.c < 3 ? -W.engageTool : 0);
 // DETAIL(key, lane) renvoie { vs: { lane: { cid: [vsWr, n] } }, team: { lane: { cid: [wr, d2, n] } } } ou null.
 let DETAIL = () => null;
 export const setDetailSource = (fn) => { DETAIL = fn; };
-const LANE_OPP = { T: ['T'], J: ['J'], M: ['M'], A: ['A', 'S'], S: ['S', 'A'] };
+export const LANE_OPP = { T: ['T'], J: ['J'], M: ['M'], A: ['A', 'S'], S: ['S', 'A'] };
 const shrink = (n, k) => n / (n + k);
 // Avantage (en points de winrate) de a (à sa lane) contre b (à la sienne), vu des deux côtés quand c'est possible.
 export function laneEdge(a, la, b, lb) {
@@ -201,7 +201,7 @@ export function applyProGames(P, games) {
   return PRO;
 }
 export const proInfo = () => PRO;
-function proEdge(a, b) {
+export function proEdge(a, b) {
   // Si l'ordre de pick est connu, on regarde d'abord les réponses dans le même ordre (a pris avant b, ou l'inverse)
   if (a.po != null && b.po != null) {
     const [first, second] = a.po < b.po ? [a, b] : [b, a];

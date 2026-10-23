@@ -1039,3 +1039,25 @@ body.q-flex .sb-p .sbr-flex { font-size: 12.5px; } body.q-flex .sb-p .sbr-flex u
 .lane-ph.po { font-size: 17px; font-weight: 800; letter-spacing: .5px; }
 .team.blue .lane-ph.po { color: color-mix(in srgb, var(--blue) 75%, var(--muted)); }
 .team.red .lane-ph.po { color: color-mix(in srgb, var(--red) 75%, var(--muted)); }
+/* fiche matchup d'un champion */
+.mup { position: fixed; inset: 0; z-index: 60; background: rgba(10, 14, 22, .18); }
+.mup[hidden] { display: none; }
+.mu-card { position: fixed; width: 460px; max-height: calc(100vh - 24px); overflow-y: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 18px 50px rgba(0,0,0,.25); padding: 14px 16px; animation: muIn .18s ease-out; }
+.mu-card.blue { border-top: 4px solid var(--blue); } .mu-card.red { border-top: 4px solid var(--red); }
+@keyframes muIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.mu-h { display: grid; grid-template-columns: 46px 1fr auto; gap: 10px; align-items: center; margin-bottom: 8px; }
+.mu-h img { width: 46px; height: 46px; border-radius: 10px; }
+.mu-h b { display: block; font-size: 17px; } .mu-h span { font-size: 12px; color: var(--muted); }
+.mu-x { border: 0; background: none; font-size: 20px; cursor: pointer; color: var(--muted); }
+.mu-card h6 { margin: 10px 0 6px; font-size: 11.5px; text-transform: uppercase; letter-spacing: .6px; color: var(--gold); }
+.mu-card h6.g { color: #1f9d55; } .mu-card h6.r { color: var(--red); }
+.mu-row { display: grid; grid-template-columns: 26px auto 1fr auto auto; gap: 8px; align-items: center; padding: 5px 8px; border-radius: 8px; background: var(--panel-2); margin-bottom: 4px; font-size: 13px; }
+.mu-row img { width: 26px; height: 26px; border-radius: 6px; } .mu-row small { color: var(--muted); }
+.mu-v { font-weight: 800; font-size: 12.5px; white-space: nowrap; } .mu-v i { font-style: normal; font-weight: 600; color: var(--muted); font-size: 11px; }
+.mu-v.up { color: #1f9d55; } .mu-v.down { color: var(--red); } .mu-v.na { color: var(--muted); font-weight: 600; }
+.mu-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.mu-card ul { margin: 0; padding-left: 16px; font-size: 12.5px; line-height: 1.45; } .mu-card li { margin-bottom: 4px; }
+.mu-tips { padding: 8px 10px 8px 26px !important; background: color-mix(in srgb, var(--gold) 10%, var(--panel)); border-radius: 8px; }
+.mu-empty { font-size: 12.5px; padding: 4px 2px; }
+.mu-foot { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+.mu-foot button { font-size: 12.5px; padding: 6px 12px; }

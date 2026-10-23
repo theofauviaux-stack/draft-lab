@@ -1,7 +1,7 @@
 import { teamSynergy, KINDS } from './synergy.js';
 import { detectSlots, matchBanner } from './shotauto.js';
 import {
-  ROLES, ROLE_LABEL, ARCH, ORDER, rel, relText, laneEdge,
+  ROLES, ROLE_LABEL, ARCH, ORDER, rel, relText, laneEdge, proEdge, LANE_OPP,
   buildProfiles, evaluate, setDetailSource, applyProGames, proInfo, recommend, recommendBans, projectPicks, gamePlan, powerCurve,
   comfortPts, proposeDrafts, playerLabel, analyzeDraft, matchPlan, pentagonView, styleBreakdown, compLabel, playersForecast, combineWr, pointsLabel, rankPoints, RANK_OPTIONS, playerRating, dominant, teamShares, predictPicks, enemyScenarios, predictedBans
 } from './engine.js';
@@ -290,11 +290,82 @@ function renderTeams() {
         if (e.target.classList.contains('clear')) { clearSlot(side, i); return; }
         if (e.target.classList.contains('rolebadge')) { askLane(side, i, true); return; }
         state.wantRole = c ? null : { side, i, r }; // clic sur une lane vide : le prochain champion ira à cette lane
+        if (c) { showMatchups(side, i, s); return; } // champion choisi : forces et faiblesses face aux matchups
         select(side, i);
       };
       el.appendChild(s);
     });
   }
+}
+
+// ---------- Fiche matchup d'un champion choisi : forces, faiblesses, comment le jouer ----------
+function showMatchups(side, i, anchor) {
+  const box = $('mupBox');
+  const id = state.slots[side][i]; if (!id) return;
+  const other = side === 'blue' ? 'red' : 'blue';
+  const me = team(side).find((x) => x.id === id), them = team(other), mates = team(side).filter((x) => x.id !== id);
+  const lane = me.lane, c = me;
+  const pct = (v) => `${v > 0 ? '+' : ''}${v.toFixed(1)}`;
+  const opps = them.filter((o) => LANE_OPP[lane]?.includes(o.lane));
+  // face-à-face : Master+ (lolalytics) et games pro du patch (gol.gg)
+  const rows = opps.map((o) => ({ o, le: laneEdge(c, lane, o, o.lane), pe: proEdge(c, o) }));
+  const champArch = ORDER.reduce((a, b) => (c[b] > c[a] ? b : a));
+  const enemyDom = them.length ? dominant(teamShares(them)) : null;
+  const sPairs = teamSynergy(team(side)).pairs.filter((x) => x.a.id === id || x.b.id === id);
+  const PH = ['', 'early', 'milieu de partie', 'late'];
+  const plus = [], minus = [], tips = [];
+  for (const { o, le, pe } of rows) {
+    const v = le?.raw ?? (pe ? pe.edge : null);
+    if (v == null) continue;
+    const src = le ? `${le.n} games Master+` : `${pe.n} games pro`;
+    if (v >= 1) plus.push(`Gagne son face-à-face contre <b>${o.name}</b> (${pct(v)} pts de winrate, ${src}).`);
+    else if (v <= -1) minus.push(`Perd son face-à-face contre <b>${o.name}</b> (${pct(v)} pts, ${src}).`);
+    else tips.push(`Face-à-face équilibré contre ${o.name} (${pct(v)} pts, ${src}) : c'est la jungle et les timings qui feront la différence.`);
+    if (pe?.resp && pe.second?.id === id && pe.edge > 0) plus.push(`En pro, c'est une réponse qui marche après <b>${o.name}</b> (${pe.w}/${pe.n} victoires).`);
+  }
+  const opp = opps.find((o) => o.lane === lane) ?? opps[0];
+  if (opp && c.scale != null && opp.scale != null && c.scale !== opp.scale) {
+    if (c.scale < opp.scale) { plus.push(`Plus fort que <b>${opp.name}</b> en ${PH[c.scale]}.`); minus.push(`<b>${opp.name}</b> scale mieux : il te dépasse en ${PH[opp.scale]}.`); tips.push(`Joue la pression tôt contre ${opp.name} : trades, prio et objectifs avant 14 min.`); }
+    else { plus.push(`Scale mieux que <b>${opp.name}</b> : plus fort en ${PH[c.scale]}.`); minus.push(`<b>${opp.name}</b> est plus fort que toi en ${PH[opp.scale]}.`); tips.push(`Joue safe contre ${opp.name} en early (farm, ward, appel au jungle), ta fenêtre arrive en ${PH[c.scale]}.`); }
+  } else if (c.scale === 1) minus.push('Perd en puissance en late : il faut convertir l’avance tôt.');
+  else if (c.scale === 3) minus.push('Faible en early : évite les trades longs avant ses objets clés.');
+  for (const k of ORDER) if (c[k] >= 2) plus.push(`Profil <b style="color:${ARCH[k].color}">${ARCH[k].label}</b> (${c[k]}/3) : ${ARCH[k].desc}.`);
+  if (enemyDom) {
+    const r = rel(champArch, enemyDom);
+    if (r > 0) plus.push(`Son style ${ARCH[champArch].label} a un ${relText(champArch, enemyDom)} sur leur compo ${ARCH[enemyDom].label}.`);
+    if (r < 0) minus.push(`Leur compo ${ARCH[enemyDom].label} a l'avantage sur son style ${ARCH[champArch].label} (${relText(champArch, enemyDom)}).`);
+  }
+  const engagers = them.filter((o) => o.e >= 2 || o.c >= 2);
+  if (c.f >= 2) plus.push('Solide en première ligne : encaisse l’engage pour son équipe.');
+  else if (c.f === 0 && engagers.length) minus.push(`Fragile face à leurs menaces d'engage / catch : ${engagers.slice(0, 3).map((o) => `<b>${o.name}</b>`).join(', ')}.`);
+  for (const x of sPairs.slice(0, 3)) { const o = x.a.id === id ? x.b : x.a; plus.push(`Synergie avec <b>${o.name}</b> : ${x.title}.`); }
+  if (!mates.length && !them.length) tips.push('Ajoute d’autres champions pour voir ses matchups.');
+  if (rows.some((x) => (x.le?.raw ?? 0) <= -2)) tips.push(`Matchup difficile : demande un ganker tôt et cherche à jouer autour d'une autre lane.`);
+  const bad = them.filter((o) => !LANE_OPP[lane]?.includes(o.lane) && rel(ORDER.reduce((a, b) => (o[b] > o[a] ? b : a)), champArch) > 0);
+  if (bad.length) minus.push(`Hors lane, ${bad.slice(0, 2).map((o) => `<b>${o.name}</b>`).join(' et ')} ${bad.length > 1 ? 'ont' : 'a'} un profil qui contre le sien.`);
+  const rowHtml = rows.length ? rows.map(({ o, le, pe }) => `<div class="mu-row"><img src="${img(o.id)}" alt=""><b>${o.name}</b><small>${ROLE_LABEL[o.lane]}</small>
+      <span class="mu-v ${le ? (le.raw >= 0 ? 'up' : 'down') : 'na'}" title="Master+ (lolalytics)">${le ? `${pct(le.raw)} <i>${le.n} g</i>` : 'Master+ —'}</span>
+      <span class="mu-v ${pe ? (pe.edge >= 0 ? 'up' : 'down') : 'na'}" title="Games pro du patch (gol.gg)">${pe ? `pro ${pe.w}/${pe.n}` : 'pro —'}</span></div>`).join('')
+    : `<div class="muted mu-empty">Son adversaire de lane n'est pas encore choisi.</div>`;
+  box.innerHTML = `<div class="mu-card ${side}">
+    <div class="mu-h"><img src="${img(id)}" alt=""><div><b>${c.name}</b><span>${ROLE_LABEL[lane]} · ${side === 'blue' ? 'Équipe 1' : 'Équipe 2'}${c.wr != null ? ` · ${c.wr.toFixed(1)} % WR` : ''}</span></div><button class="mu-x" title="Fermer">×</button></div>
+    <h6>Face-à-face</h6>${rowHtml}
+    <div class="mu-cols"><div><h6 class="g">Forces</h6>${plus.length ? `<ul>${plus.map((t) => `<li>${t}</li>`).join('')}</ul>` : '<p class="muted">Rien de marquant pour l’instant.</p>'}</div>
+      <div><h6 class="r">Faiblesses</h6>${minus.length ? `<ul>${minus.map((t) => `<li>${t}</li>`).join('')}</ul>` : '<p class="muted">Pas de faiblesse nette dans cette draft.</p>'}</div></div>
+    ${tips.length ? `<h6>Comment le jouer</h6><ul class="mu-tips">${tips.map((t) => `<li>${t}</li>`).join('')}</ul>` : ''}
+    <div class="mu-foot"><button class="mu-rep">Remplacer ce pick</button><button class="mu-lane">Changer de lane</button></div></div>`;
+  box.hidden = false;
+  const r = anchor.getBoundingClientRect(), card = box.firstElementChild, W = card.offsetWidth, H = card.offsetHeight;
+  const left = side === 'blue' ? Math.min(innerWidth - W - 12, r.right + 10) : Math.max(12, r.left - W - 10);
+  card.style.left = left + 'px'; card.style.top = Math.max(12, Math.min(innerHeight - H - 12, r.top - 20)) + 'px';
+  const close = () => { box.hidden = true; document.removeEventListener('keydown', esc); };
+  const esc = (e) => { if (e.key === 'Escape') close(); };
+  document.addEventListener('keydown', esc);
+  box.onclick = (e) => { if (e.target === box) close(); };
+  card.querySelector('.mu-x').onclick = close;
+  card.querySelector('.mu-rep').onclick = () => { close(); select(side, i); };
+  card.querySelector('.mu-lane').onclick = () => { close(); askLane(side, i, true); };
+  ensureDetails();
 }
 
 function renderStep() {
@@ -427,7 +498,7 @@ function renderGrid(info) {
   let list = state.list.filter((c) =>
     (!q || c.name.toLowerCase().includes(q) || c.id.toLowerCase().includes(q)) &&
     (!roleNeeded || c.roles.includes(roleNeeded)) &&
-    (!openR || c.roles.some((r) => openR.includes(r)) || flexRoles(c).some((r) => openR.includes(r))) &&
+    (!openR || q || c.roles.some((r) => openR.includes(r)) || flexRoles(c).some((r) => openR.includes(r))) &&
     (!state.archFilter || c[state.archFilter] >= 2));
   if (info?.proj) list = [...list].sort((a, b) => (info.proj.get(b.id)?.prio ?? 0) - (info.proj.get(a.id)?.prio ?? 0));
   el.innerHTML = '';
@@ -520,8 +591,9 @@ function renderPentaAdvice(ev) {
   const lbl = (k) => `<b style="color:${ARCH[k].color}">${ARCH[k].label}</b>`;
   const vsTxt = eTop.map((e) => `${relText(best, e)} sur ${lbl(e)}`).join(', ');
   const others = tied.filter((k) => k !== best).map((k) => `${lbl(k)} ${val(k) >= 0 ? '+' : ''}${val(k).toFixed(2)}`).join(' · ');
+  const verdict = val(best) > 0.05 ? `joue ${lbl(best)} : ${vsTxt}` : `aucun de ces styles n'a l'avantage ; ${lbl(best)} est le moins risqué (${vsTxt})`;
   el.innerHTML = tied.length > 1
-    ? `<div class="pa"><span class="pa-k">Ta compo hésite</span> entre ${tied.map((k) => `${lbl(k)} (${pct(mine[k])})`).join(', ')}. Face à leur ${eTop.map(lbl).join(' / ')}, joue ${lbl(best)} : ${vsTxt}.<span class="pa-s">Score face à leur compo : ${lbl(best)} ${val(best) >= 0 ? '+' : ''}${val(best).toFixed(2)}${others ? ' · ' + others : ''}</span></div>`
+    ? `<div class="pa"><span class="pa-k">Ta compo hésite</span> entre ${tied.map((k) => `${lbl(k)} (${pct(mine[k])})`).join(', ')}. Face à leur ${eTop.map(lbl).join(' / ')}, ${verdict}.<span class="pa-s">Score face à leur compo : ${lbl(best)} ${val(best) >= 0 ? '+' : ''}${val(best).toFixed(2)}${others ? ' · ' + others : ''}</span></div>`
     : `<div class="pa"><span class="pa-k">Ton style</span> ${lbl(best)} (${pct(mine[best])}) face à leur ${eTop.map(lbl).join(' / ')} : ${vsTxt}.${val(best) < 0 ? ` <span class="pa-w">Plan B conseillé : ${lbl([...ORDER].sort((a, b) => val(b) - val(a))[0])}</span>` : ''}</div>`;
 }
 function renderScaling() {
@@ -1530,7 +1602,13 @@ function initControls() {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
     if (e.key === 'Escape' && $('startMenu').hidden) { state.selected = null; render(); }
     if (e.key === 'Enter' && document.activeElement === $('search')) {
-      const first = $('grid').querySelector('.tile:not(.used)'); first?.click(); $('search').value = ''; state.search = ''; render();
+      // Entrée : le nom exact d'abord, puis celui qui commence par la saisie, puis le premier de la grille
+      const q = state.search.trim().toLowerCase(), u = used(), norm = (x) => x.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const free = state.list.filter((c) => !u.has(c.id));
+      const best = free.find((c) => norm(c.name) === norm(q) || norm(c.id) === norm(q)) ?? free.find((c) => norm(c.name).startsWith(norm(q)));
+      const taken = !best && state.list.find((c) => u.has(c.id) && (norm(c.name) === norm(q) || norm(c.name).startsWith(norm(q))));
+      if (best) place(best.id); else if (taken) toast(`${taken.name} est déjà pris ou banni`); else $('grid').querySelector('.tile:not(.used)')?.click();
+      $('search').value = ''; state.search = ''; render();
     }
   });
   api.onUpdated((d) => ingest(d));
