@@ -1036,3 +1036,6 @@ body.q-flex .sb-p .sbr-flex { font-size: 12.5px; } body.q-flex .sb-p .sbr-flex u
 .sb-pick.empty { place-items: center; }
 .sb-pick.empty span { position: static; background: none; font-size: 12.5px; color: var(--muted); padding: 0; }
 .sb-team.blue .sb-pick.empty { border-color: rgba(47,111,224,.45); } .sb-team.red .sb-pick.empty { border-color: rgba(214,69,82,.45); }
+.sb-pick.empty span { font-size: 17px; letter-spacing: .5px; }
+.sb-team.blue .sb-pick.empty span { color: color-mix(in srgb, var(--blue) 70%, var(--muted)); }
+.sb-team.red .sb-pick.empty span { color: color-mix(in srgb, var(--red) 70%, var(--muted)); }

@@ -1,7 +1,7 @@
 {
-  "version": "2.27.5",
-  "sha256": "327d5f670b08d1eff70ad903eae5b1e498069c83383c0d9b395500cb75d9bb58",
-  "file": "draftlab-2.27.5.json.gz",
-  "notes": "Recherche : la grille se réaffiche après un choix avec Entrée",
-  "date": "2026-10-23T14:03:25.933Z"
+  "version": "2.27.6",
+  "sha256": "c07814fc8d55b37d2530f89edef5768385399984679fd2dad173485a689ab85d",
+  "file": "draftlab-2.27.6.json.gz",
+  "notes": "Encadrés d'équipe : ordre de pick (B1…R5) sur les cases vides, lane une fois le champion choisi",
+  "date": "2026-10-23T22:27:28.882Z"
 }
