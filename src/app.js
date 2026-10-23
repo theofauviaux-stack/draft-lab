@@ -333,7 +333,8 @@ function renderWr(ev) {
       <div class="sb-players">${ROLES.map((r) => {
         const p = list.find((x) => x.role === r);
         const pts = p ? rankPoints(p.rank) : null;
-        return `<div class="sb-p" title="${p ? playerLabel(p) + (pts != null ? ' — ' + pointsLabel(pts) : '') : ROLE_LABEL[r]}"><i style="background:${tierColor(pts)}"></i><span>${ROLE_LABEL[r]}</span><b>${p && p.riotId ? playerLabel(p) : '—'}</b></div>`;
+        const fx = p?.rank?.flex ? rankPoints(p.rank.flex) : null;
+        return `<div class="sb-p" title="${p ? playerLabel(p) + (pts != null ? ' — Solo/Duo ' + pointsLabel(pts) : ' — Solo/Duo non classé') + (fx != null ? ' · Flex ' + pointsLabel(fx) : '') : ROLE_LABEL[r]}"><i style="background:${tierColor(pts)}"></i><span>${ROLE_LABEL[r]}</span><b>${p && p.riotId ? playerLabel(p) : '—'}</b>${p && p.riotId ? sbRank(pts, p.rank?.tier ? p.rank.lp : null, fx, p.rank?.flex?.lp) : ''}</div>`;
       }).join('')}</div>`;
   }
 }
@@ -674,8 +675,8 @@ function renderPlayers() {
           <input class="pinput" data-i="${i}" value="${(p.riotId || '').replace(/"/g, '&quot;')}" placeholder="Nom#TAG" />
           <div class="pinfo">
             ${p.error ? `<span class="perr">⚠ ${p.error}</span>`
-              : pts != null ? `<span class="tier" style="--c:${tierColor(pts)}">${pointsLabel(pts)}${p.rank?.tier && p.rank.lp != null ? ` · ${p.rank.lp} LP` : ''}${!p.rank?.tier ? ' (saison passée)' : ''}</span>${g ? `<span class="pwr ${p.rank.wins / g >= 0.5 ? 'up' : 'down'}">${Math.round((p.rank.wins / g) * 100)} %</span><span class="muted">${g} games</span>` : ''}${p.rank?.hot ? '<span title="série de victoires">🔥</span>' : ''}`
-              : p.riotId ? '<span class="muted">non classé</span>' : '<span class="muted">joueur non renseigné</span>'}
+              : pts != null ? `<div class="prk"><span class="qtag" title="Solo/Duo : seul classement utilisé pour le pronostic">Solo</span><span class="tier" style="--c:${tierColor(pts)}">${pointsLabel(pts)}${p.rank?.tier && p.rank.lp != null ? ` · ${p.rank.lp} LP` : ''}${!p.rank?.tier ? ' (saison passée)' : ''}</span>${g ? `<span class="pwr ${p.rank.wins / g >= 0.5 ? 'up' : 'down'}">${Math.round((p.rank.wins / g) * 100)} %</span><span class="muted">${g} g</span>` : ''}${p.rank?.hot ? '<span title="série de victoires">🔥</span>' : ''}</div>${flexTag(p)}`
+              : p.riotId ? `<div class="prk"><span class="qtag">Solo</span><span class="muted">non classé</span></div>${flexTag(p)}` : '<span class="muted">joueur non renseigné</span>'}
             ${p.dpm ? `<span class="pdpm" title="${p.dpm}">${/lues/.test(p.dpm) ? 'dpm ✓' : 'dpm —'}</span>` : ''}
           </div>
         </div>
@@ -934,12 +935,16 @@ function startLiveMode() {
   $('liveBar').hidden = false; $('liveTitle').textContent = 'Connexion au client…'; $('liveText').textContent = '';
   api.liveStart();
 }
-function stopLiveMode() { LIVE.on = false; api.liveStop?.(); $('liveBar').hidden = true; $('liveReco').hidden = true; }
+function stopLiveMode() { LIVE.on = false; api.liveStop?.(); $('liveBar').hidden = true; $('liveReco').hidden = true; $('liveMode').hidden = true; document.body.classList.remove('q-flex'); }
 function onLive(d) {
   if (!LIVE.on) return;
   const [t, sub] = LIVE_TXT[d.phase] ?? ['Client connecté', d.phase];
   $('liveTitle').textContent = t; $('liveText').textContent = d.error ? `${sub} (${d.error})` : sub;
   $('liveBar').dataset.phase = d.phase;
+  // mode de la partie (Solo/Duo, Flex, Normale, Personnalisée…) : la Flex est mise en avant en Flex, la Solo ailleurs
+  const qm = $('liveMode');
+  if (d.queue?.label) { qm.textContent = d.queue.label; qm.hidden = false; } else if (d.phase === 'NoClient' || d.phase === 'None') qm.hidden = true;
+  document.body.classList.toggle('q-flex', d.queue?.id === 440);
   if (!d.teams) { $('liveReco').hidden = true; return; }
   const sig = JSON.stringify([d.teams, d.bans, d.mySide]);
   if (sig === LIVE.sig) return;
@@ -1313,6 +1318,24 @@ function loadDraft(id) {
   savePrefs();
   ingest(state.data);
   toast(`« ${d.name} » chargée`);
+}
+// Elo bien visible dans les encadrés d'équipe : Solo/Duo en grand (compté), Flex en petit (affiché)
+const SHORT_T = { Fer: 'Fer', Bronze: 'Bronze', Argent: 'Argent', Or: 'Or', Platine: 'Plat', 'Émeraude': 'Émer', Diamant: 'Diam', Master: 'Master', 'Grand Master': 'GM', Challenger: 'Chall' };
+function rankParts(pts) {
+  const l = pointsLabel(pts), m = l.match(/^(.*?)\s+(I{1,3}|IV)$/);
+  return m ? [m[1], m[2]] : [l, ''];
+}
+function sbRank(pts, lp, fx, flp) {
+  const [t, d] = pts != null ? rankParts(pts) : ['Non classé', ''];
+  const [ft, fd] = fx != null ? rankParts(fx) : [null, ''];
+  return `<div class="sbr-solo ${pts == null ? 'none' : ''}" style="--c:${tierColor(pts)}" title="Solo/Duo (compté dans le pronostic) : ${pts != null ? pointsLabel(pts) : 'non classé'}${lp != null ? ' · ' + lp + ' LP' : ''}"><div class="sr1"><u>Solo</u>${lp != null ? `<small>${lp} LP</small>` : ''}</div><b>${pts != null ? `${(t + d).length > 8 ? SHORT_T[t] ?? t : t} ${d}` : 'Non classé'}</b></div>
+    <div class="sbr-flex" title="Flex 5c5 (affiché, non compté)${fx != null ? ' : ' + pointsLabel(fx) + (flp != null ? ' · ' + flp + ' LP' : '') : ''}"><u>Flex</u>${ft ? `<span style="color:${tierColor(fx)}">${SHORT_T[ft] ?? ft} ${fd}</span>` : '<span class="muted">—</span>'}</div>`;
+}
+// Classement Flex : affiché à côté (jamais compté dans le pronostic)
+function flexTag(p) {
+  const f = p?.rank?.flex; if (!f) return '';
+  const pts = rankPoints(f), g = (f.wins ?? 0) + (f.losses ?? 0);
+  return `<div class="prk"><span class="qtag flex" title="Flex 5c5 : affiché pour info, pas compté dans le pronostic">Flex</span><span class="tier flexr" style="--c:${tierColor(pts)}">${pointsLabel(pts)}${f.lp != null ? ` · ${f.lp} LP` : ''}</span>${g ? `<span class="muted">${Math.round((f.wins / g) * 100)} % · ${g} g</span>` : ''}</div>`;
 }
 function renderSaves() {
   const el = $('savesList'), list = readSaves();

@@ -984,3 +984,35 @@ html, body { overflow-x: hidden; }
 .lr-n em { display: block; font-style: normal; font-size: 10px; font-weight: 800; color: var(--gold); text-transform: uppercase; letter-spacing: .4px; }
 .lr-w small { font-weight: 600; color: var(--muted); }
 .lr-note { font-size: 12px; margin-top: 4px; }
+/* classements : Solo/Duo (compté) et Flex (affiché) */
+.qtag { font-size: 9.5px; font-weight: 800; letter-spacing: .4px; text-transform: uppercase; padding: 1px 5px; border-radius: 4px; background: var(--blue-soft); color: var(--blue); }
+.qtag.flex { background: var(--panel-2); color: var(--muted); margin-left: 6px; }
+.tier.flexr { opacity: .75; }
+body.q-flex .qtag.flex { background: rgba(214, 160, 40, .16); color: var(--gold); } body.q-flex .tier.flexr { opacity: 1; }
+.lv-mode { font-size: 11.5px; font-weight: 800; padding: 3px 9px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line); color: var(--text); }
+.lv-mode[hidden] { display: none; }
+.pinfo { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.pinfo .pbreak { flex-basis: 100%; height: 0; }
+.qtag.flex { margin-left: 0; }
+.qtag { min-width: 34px; text-align: center; }
+.pinfo:has(.prk) { flex-direction: column; align-items: flex-start; flex-wrap: nowrap; gap: 3px; }
+.prk { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+/* classements Solo / Flex dans les encadrés d'équipe */
+.sb-p .sbr { font-style: normal; font-size: 10.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+.sb-p .sbr u { text-decoration: none; font-size: 8.5px; font-weight: 800; letter-spacing: .3px; text-transform: uppercase; color: var(--blue); margin-right: 4px; }
+.sb-p .sbr.f { color: var(--muted); } .sb-p .sbr.f u { color: var(--muted); }
+body.q-flex .sb-p .sbr.f { color: var(--text); } body.q-flex .sb-p .sbr.f u { color: var(--gold); }
+body.q-flex .sb-p .sbr:not(.f) { color: var(--muted); }
+.sb-p .sbr-solo { margin-top: 4px; padding: 5px 6px 4px; border-radius: 7px; background: color-mix(in srgb, var(--c) 16%, transparent); border: 1px solid color-mix(in srgb, var(--c) 45%, transparent); display: grid; grid-template-columns: auto 1fr; column-gap: 5px; align-items: baseline; }
+.sb-p .sbr-solo u, .sb-p .sbr-flex u { text-decoration: none; font-size: 8.5px; font-weight: 800; letter-spacing: .3px; text-transform: uppercase; color: var(--muted); }
+.sb-p .sbr-solo b { font-size: 14px; font-weight: 800; color: var(--c); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb-p .sbr-solo small { grid-column: 2; font-size: 11px; font-weight: 700; color: var(--text); white-space: nowrap; }
+.sb-p .sbr-solo.none { background: var(--panel); border-color: var(--line); } .sb-p .sbr-solo.none b { color: var(--muted); font-size: 12px; }
+.sb-p .sbr-flex { font-size: 11px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 2px; }
+.sb-p .sbr-flex u { margin-right: 4px; }
+.sb-p .sbr-flex small { color: var(--muted); font-weight: 600; }
+body.q-flex .sb-p .sbr-flex { font-size: 12.5px; } body.q-flex .sb-p .sbr-flex u { color: var(--gold); }
+.sb-p .sbr-solo { display: block; padding: 4px 6px 5px; }
+.sb-p .sbr-solo .sr1 { display: flex; justify-content: space-between; align-items: baseline; }
+.sb-p .sbr-solo .sr1 small { font-size: 10px; font-weight: 700; color: var(--text); }
+.sb-p .sbr-solo b { display: block; font-size: 13.5px; letter-spacing: -.2px; line-height: 1.25; }

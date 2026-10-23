@@ -66,15 +66,17 @@ async function fetchPlayer(region, riotId, byKey) {
   ]);
   const d = sum?.data?.summoner ?? {};
   const season = most?.data?.champion_stats ? most.data : d.most_champions;
-  const solo = (d.league_stats ?? []).find((l) => l.game_type === 'SOLORANKED' && l.tier_info?.tier)
-    ?? (d.league_stats ?? []).find((l) => l.game_type === 'FLEXRANKED' && l.tier_info?.tier);
+  // le calcul n'utilise que la Solo/Duo ; la Flex est seulement affichée
+  const solo = (d.league_stats ?? []).find((l) => l.game_type === 'SOLORANKED' && l.tier_info?.tier);
+  const flexL = (d.league_stats ?? []).find((l) => l.game_type === 'FLEXRANKED' && l.tier_info?.tier);
   const prev = (d.previous_seasons ?? []).find((x) => x.tier_info?.tier);
   // Données de rang structurées pour le pronostic hors draft
   const rank = {
     tier: solo?.tier_info?.tier ?? null, division: solo?.tier_info?.division ?? null, lp: solo?.tier_info?.lp ?? null,
     queue: solo?.game_type ?? null, wins: solo?.win ?? 0, losses: solo?.lose ?? 0,
     hot: !!solo?.is_hot_streak, veteran: !!solo?.is_veteran, fresh: !!solo?.is_fresh_blood, inactive: !!solo?.is_inactive,
-    prevTier: prev?.tier_info?.tier ?? null, prevDivision: prev?.tier_info?.division ?? null
+    prevTier: prev?.tier_info?.tier ?? null, prevDivision: prev?.tier_info?.division ?? null,
+    flex: flexL ? { tier: flexL.tier_info.tier, division: flexL.tier_info.division ?? null, lp: flexL.tier_info.lp ?? null, wins: flexL.win ?? 0, losses: flexL.lose ?? 0 } : null
   };
   const tier = solo?.tier_info?.tier ? `${solo.tier_info.tier[0]}${solo.tier_info.tier.slice(1).toLowerCase()}${solo.tier_info.division ? ' ' + solo.tier_info.division : ''}${solo.tier_info.lp != null ? ` ${solo.tier_info.lp} LP` : ''}` : 'Non classé';
   // On garde les champions qui représentent au moins 1 % des games ranked de la saison

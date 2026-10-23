@@ -16,7 +16,9 @@
       golgg: { ok: true, at: T }
     }
   });
-  const R = (tier, division, lp, wins, losses, hot) => ({ tier, division, lp, wins, losses, hot, queue: 'SOLORANKED' });
+  const FLEX = ['PLATINUM', 'EMERALD', 'DIAMOND', 'EMERALD', 'MASTER'];
+  let fk = 0;
+  const R = (tier, division, lp, wins, losses, hot) => ({ tier, division, lp, wins, losses, hot, queue: 'SOLORANKED', flex: fk++ % 3 === 2 ? null : { tier: FLEX[fk % 5], division: FLEX[fk % 5] === 'MASTER' ? null : (fk % 4) + 1, lp: (fk * 17) % 100, wins: 20 + fk, losses: 18 + (fk % 5) } });
   const P = (riotId, rank, pool) => {
     const total = pool.reduce((a, x) => a + x[1], 0) + 40;
     return {
@@ -57,12 +59,12 @@
   let liveCb = null, liveTimer = null;
   const mk = (id, role, rid, locked = true) => ({ champ: id ? KEY[id] : null, locked, role, riotId: rid, me: rid === 'Moi#EUW' });
   const STEPS = [
-    { phase: 'NoClient' }, { phase: 'Lobby' }, { phase: 'Matchmaking' }, { phase: 'ReadyCheck' },
+    { phase: 'NoClient' }, { phase: 'Lobby', queue: { id: 420, label: 'Solo/Duo' } }, { phase: 'Matchmaking', queue: { id: 420, label: 'Solo/Duo' } }, { phase: 'ReadyCheck', queue: { id: 420, label: 'Solo/Duo' } },
     // sélection des champions : bans puis picks dans l'ordre (B1 R1 R2 B2 B3 R3 / R4 B4 B5 R5)
     ...(() => {
       const out = [], picks = { blue: [null, null, null, null, null], red: [null, null, null, null, null] }, bans = { blue: [], red: [] };
       const blueRoles = ['T', 'J', 'M', 'A', 'S'], blueNames = [null, 'Fauve#EUW', 'Moi#EUW', null, 'Rempart#EUW'];
-      const snap = () => ({ phase: 'ChampSelect', source: 'client', mySide: 'blue', region: 'EUW',
+      const snap = () => ({ phase: 'ChampSelect', source: 'client', queue: { id: 420, label: 'Solo/Duo' }, mySide: 'blue', region: 'EUW',
         teams: { blue: blueRoles.map((r, i) => mk(picks.blue[i], r, blueNames[i])), red: picks.red.map((c) => mk(c, null, null)) },
         bans: { blue: bans.blue.map((c) => KEY[c]), red: bans.red.map((c) => KEY[c]) } });
       const seq = [['ban', 'blue', 'Yasuo'], ['ban', 'red', 'Zed'], ['ban', 'blue', 'Yone'], ['ban', 'red', 'Draven'], ['ban', 'blue', 'Ambessa'], ['ban', 'red', 'Smolder'],
@@ -75,7 +77,7 @@
     })(),
     { phase: 'InProgress' }
   ];
-  const gameSnap = (t) => ({ phase: 'InProgress', source: 'jeu', mySide: 'blue', time: t, bans: { blue: [], red: [] }, teams: {
+  const gameSnap = (t) => ({ phase: 'InProgress', source: 'jeu', queue: { id: 420, label: 'Solo/Duo' }, mySide: 'blue', time: t, bans: { blue: [], red: [] }, teams: {
     blue: [['Gnar', 'T', 'Rocket#EUW'], ['LeeSin', 'J', 'Fauve#EUW'], ['Ahri', 'M', 'Moi#EUW'], ['Jinx', 'A', 'Kiwi#EUW'], ['Thresh', 'S', 'Rempart#EUW']].map(([c, r, n]) => ({ champKey: c, champName: c, role: r, riotId: n, locked: true })),
     red: [['Renekton', null, 'Bastion#EUW'], ['Vi', 'J', 'Brume#EUW'], ['Taliyah', null, null], ['Kaisa', null, 'Comète#EUW'], ['Nautilus', null, 'Ancre#EUW']].map(([c, r, n]) => ({ champKey: c, champName: c, role: r, riotId: n, locked: true })) } });
   function liveStart() {

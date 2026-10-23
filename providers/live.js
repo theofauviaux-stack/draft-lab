@@ -54,11 +54,24 @@ async function findLcu() {
 
 const hidden = (gameName) => !gameName || /^summoner \d+$/i.test(gameName) || /^invocateur \d+$/i.test(gameName);
 
+// Mode de la partie (file) d'après l'identifiant de queue du client
+const QUEUES = { 420: 'Solo/Duo', 440: 'Flex 5c5', 400: 'Normale (draft)', 430: 'Normale (aveugle)', 490: 'Normale (partie rapide)', 480: 'Partie rapide',
+  700: 'Clash', 720: 'Clash ARAM', 450: 'ARAM', 0: 'Personnalisée 5c5', 3100: 'Personnalisée 5c5', 1700: 'Arena', 1900: 'URF', 900: 'URF' };
+let lastQueue = null;
+async function readQueue(get) {
+  const g = await get('/lol-gameflow/v1/session').catch(() => null);
+  const q = g?.gameData?.queue;
+  if (!q) return lastQueue;
+  const custom = g?.gameData?.isCustomGame;
+  lastQueue = { id: q.id ?? null, label: custom ? 'Personnalisée 5c5' : QUEUES[q.id] ?? (q.description || q.gameMode || 'Autre mode'), ranked: q.id === 420 || q.id === 440 };
+  return lastQueue;
+}
 async function champSelect(lcu) {
   const get = (p) => localGet(lcu.port, p, lcu.token);
   const phase = await get('/lol-gameflow/v1/gameflow-phase').catch(() => null);
+  const queue = ['Lobby', 'Matchmaking', 'ReadyCheck', 'ChampSelect', 'InProgress'].includes(phase) ? await readQueue(get) : null;
   const s = phase === 'ChampSelect' ? await get('/lol-champ-select/v1/session').catch(() => null) : null;
-  if (!s) return { phase: phase || 'None' };
+  if (!s) return { phase: phase || 'None', queue };
   const mySide = (s.myTeam?.[0]?.team ?? 1) === 1 ? 'blue' : 'red';
   const region = await get('/riotclient/region-locale').then((r) => r?.region ?? r?.webRegion).catch(() => null);
   const member = async (m) => {
@@ -79,7 +92,7 @@ async function champSelect(lcu) {
     const list = isMine ? bans.mine : bans.theirs;
     if (!list.includes(a.championId)) list.push(a.championId);
   }
-  return { phase: 'ChampSelect', source: 'client', mySide, region, teams: { [mySide]: mine, [mySide === 'blue' ? 'red' : 'blue']: theirs }, bans: { [mySide]: bans.mine, [mySide === 'blue' ? 'red' : 'blue']: bans.theirs } };
+  return { phase: 'ChampSelect', source: 'client', queue, mySide, region, teams: { [mySide]: mine, [mySide === 'blue' ? 'red' : 'blue']: theirs }, bans: { [mySide]: bans.mine, [mySide === 'blue' ? 'red' : 'blue']: bans.theirs } };
 }
 
 async function inGame() {
@@ -98,7 +111,7 @@ async function inGame() {
     return { champKey, champName: p.championName, role: POS_GAME[p.position] ?? (smite ? 'J' : null), riotId: masked ? null : `${name}#${tag}`, me: (p.riotId || p.summonerName) === me, locked: true };
   };
   const teams = { blue: d.allPlayers.filter((p) => p.team === 'ORDER').map(player), red: d.allPlayers.filter((p) => p.team === 'CHAOS').map(player) };
-  return { phase: 'InProgress', source: 'jeu', mySide, teams, bans: { blue: [], red: [] }, time: d.gameData?.gameTime ?? 0 };
+  return { phase: 'InProgress', source: 'jeu', queue: lastQueue ?? (d.gameData?.gameMode === 'CLASSIC' ? null : { label: d.gameData?.gameMode }), mySide, teams, bans: { blue: [], red: [] }, time: d.gameData?.gameTime ?? 0 };
 }
 
 // Boucle : le jeu d'abord (si une partie tourne), sinon la sélection des champions
