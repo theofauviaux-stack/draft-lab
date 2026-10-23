@@ -1001,16 +1001,23 @@ function liveReco(d) {
   const cand = state.list.filter((c) => !u.has(c.id) && (c.roles.includes(role) || flexRoles(c).includes(role)))
     .map((c) => ({ ...withComfort(c, side, role), lane: role, po: pickPos(side, idx) }));
   const [b, r] = side === 'blue' ? [mine, theirs] : [theirs, mine];
-  const rows = projectPicks(b, r, side, null, cand).map((x) => {
+  const all = projectPicks(b, r, side, null, cand).map((x) => {
     const le = opp ? laneEdge(x.c, role, opp, role) : null;
     // le matchup direct compte en plus (réponse au champion d'en face), puis la maîtrise du joueur
     return { ...x, le, score: x.wr + (le ? 0.6 * le.edge : 0) + (x.c.comfort > 0 ? 1.2 * x.c.comfort : 0) };
-  }).sort((p, q) => q.score - p.score).slice(0, 7);
-  if (!rows.length) { box.hidden = true; return; }
+  }).sort((p, q) => q.score - p.score);
+  if (!all.length) { box.hidden = true; return; }
+  // ton pool (op.gg) : tes champions jouables à cette lane, le meilleur en tête
+  const pl = playerFor(side, role) ?? state.players[side].find((p) => p.riotId && d.teams[side].find((m) => m.me)?.riotId === p.riotId);
+  const pe = (id) => pl?.pool?.find((e) => e.id === id);
+  const mineRows = all.filter((x) => pe(x.c.id)?.games).slice(0, 4);
+  const others = all.filter((x) => !mineRows.includes(x)).slice(0, mineRows.length ? 5 : 7);
+  const card = (x, best) => { const e = pe(x.c.id); return `<button class="lr-c ${best ? 'best' : ''}" data-id="${x.c.id}" title="${x.c.name} · winrate projeté ${x.wr.toFixed(1)} %${x.le ? ` · face à ${opp.name} : ${x.le.raw > 0 ? '+' : ''}${x.le.raw} pts (${x.le.n} games Master+)` : ''}${e ? ` · toi : ${e.games} games, ${Math.round((e.wins / e.games) * 100)} % de victoires` : ''}">
+      <img src="${img(x.c.id)}" alt=""><span class="lr-n">${best ? '<em>Meilleur choix</em>' : ''}${x.c.name}${e ? ' <i>★</i>' : ''}</span>
+      <span class="lr-w">${x.wr.toFixed(1)} %${e ? ` <small>· ${e.games} g ${Math.round((e.wins / e.games) * 100)} %</small>` : ''}</span>${x.le ? `<span class="lr-m ${x.le.raw >= 0 ? 'up' : 'down'}">vs ${opp.name} ${x.le.raw > 0 ? '+' : ''}${x.le.raw.toFixed(1)}</span>` : ''}</button>`; };
   box.innerHTML = `<div class="lr-h"><b>À toi de choisir · ${ROLE_LABEL[role]}</b><span class="muted">${opp ? `meilleures réponses face à <b>${opp.name}</b>, avec ta compo et ton pool` : 'leur ' + ROLE_LABEL[role] + ' n’est pas encore choisi : meilleurs picks pour ta compo'}</span></div>
-    <div class="lr-list">${rows.map((x) => `<button class="lr-c" data-id="${x.c.id}" title="${x.c.name} · winrate projeté ${x.wr.toFixed(1)} %${x.le ? ` · face à ${opp.name} : ${x.le.raw > 0 ? '+' : ''}${x.le.raw} pts (${x.le.n} games Master+)` : ''}${x.c.comfort > 0 ? ' · dans ton pool' : ''}">
-      <img src="${img(x.c.id)}" alt=""><span class="lr-n">${x.c.name}${x.c.comfort > 0 ? ' <i>★</i>' : ''}</span>
-      <span class="lr-w">${x.wr.toFixed(1)} %</span>${x.le ? `<span class="lr-m ${x.le.raw >= 0 ? 'up' : 'down'}">vs ${opp.name} ${x.le.raw > 0 ? '+' : ''}${x.le.raw.toFixed(1)}</span>` : ''}</button>`).join('')}</div>`;
+    ${mineRows.length ? `<div class="lr-g"><span class="lr-t">Dans ton pool</span><div class="lr-list">${mineRows.map((x, i) => card(x, i === 0)).join('')}</div></div>` : (pl?.riotId ? '' : '<div class="lr-note muted">Ton pool op.gg n’est pas encore chargé : propositions générales.</div>')}
+    <div class="lr-g"><span class="lr-t">${mineRows.length ? 'Autres réponses' : 'Meilleures réponses'}</span><div class="lr-list">${others.map((x) => card(x, false)).join('')}</div></div>`;
   box.hidden = false;
   // clic : essai du pick dans la draft (le client reprend la main au prochain changement)
   box.querySelectorAll('.lr-c').forEach((btn) => (btn.onclick = () => {

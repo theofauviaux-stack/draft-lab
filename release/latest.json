@@ -1,7 +1,7 @@
 {
-  "version": "2.24.0",
-  "sha256": "adacc6b8ea86c17221443326a1b422438d776d8050ef0c40c0cdf9ddcdadc1ca",
-  "file": "draftlab-2.24.0.json.gz",
-  "notes": "Mises à jour : redémarrage automatique, draft en cours gardée et reprise ; numéro de version déplacé dans le menu",
-  "date": "2026-10-23T00:15:14.265Z"
+  "version": "2.25.0",
+  "sha256": "8fc19ef85101ad3ffd275883f708cdebb6a7e391a85fac543a2bfb561b285f13",
+  "file": "draftlab-2.25.0.json.gz",
+  "notes": "Direct (solo/duo) : meilleur choix dans ton pool op.gg, puis les autres réponses",
+  "date": "2026-10-23T00:25:10.959Z"
 }
