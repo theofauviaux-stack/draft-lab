@@ -1,7 +1,7 @@
 {
-  "version": "2.27.2",
-  "sha256": "21d2d667710f373b9b091a44a55d1803ac610f4967a5c9e02f4f73a3fd64588d",
-  "file": "draftlab-2.27.2.json.gz",
-  "notes": "Encadrés d'équipe : rôles plus visibles sur les cases des champions",
-  "date": "2026-10-23T01:20:27.753Z"
+  "version": "2.27.3",
+  "sha256": "552508ad77a0cf3e7849b15a3f8868d7478f5c87001772534cbf9ba9352038e1",
+  "file": "draftlab-2.27.3.json.gz",
+  "notes": "Capture : textes mis à jour (reconnaissance automatique)",
+  "date": "2026-10-23T01:43:32.930Z"
 }

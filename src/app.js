@@ -1040,7 +1040,7 @@ function liveReco(d) {
 }
 
 // ---------- Draft depuis une capture de fin de game ----------
-// L'utilisateur clique sur les 10 icônes de champions (équipe 1 de haut en bas, puis équipe 2) ;
+// Les 10 champions sont repérés automatiquement (shotauto.js) ; à défaut l'utilisateur clique sur chaque portrait ;
 // chaque clic est comparé aux 170 portraits (centre de l'icône, plusieurs tailles et petits décalages).
 const SHOT = { img: null, icons: null, imgs: [], clicks: [], bans: null, det: null, scale: 1, run: 0 };
 const ICON_N = 20, ZOOMS = [0.45, 0.52, 0.6, 0.68, 0.76]; // centre de l'icône : évite le badge de niveau et les bordures
@@ -1168,11 +1168,11 @@ function drawShot() {
 }
 function renderShotList() {
   const n = SHOT.clicks.length;
-  $('shotHelp').innerHTML = !SHOT.img ? 'Choisis, glisse ou colle (Ctrl/Cmd + V) une capture : tableau de fin de game ou écran d’un drafter.'
-    : SHOT.auto === 'ok' && n === 10 ? 'Analyse automatique terminée : les 10 champions ont été repérés et reconnus. Vérifie, corrige si besoin (clic sur un autre choix ou tape un nom), puis lance l’analyse.'
-    : SHOT.auto === 'fail' && !n ? 'Je n’ai pas trouvé automatiquement les 10 champions sur cette image : <b>clique sur chacun</b> (équipe bleue d’abord).'
-    : n < 10 ? `Clique au centre du portrait d’un champion de l’<b>${n < 5 ? 'équipe 1 (bleue)' : 'équipe 2 (rouge)'}</b> — ${n < 5 ? n + 1 : n - 4}/5. L’ordre n’a pas d’importance : les rôles sont attribués automatiquement.`
-      : 'Les 10 champions sont reconnus. Corrige si besoin (clic sur un autre choix ou tape un nom), puis lance l’analyse.';
+  $('shotHelp').innerHTML = !SHOT.img ? 'Choisis, glisse ou colle (Ctrl/Cmd + V) une capture : les champions sont repérés et reconnus automatiquement.'
+    : !SHOT.auto ? 'Analyse de l’image en cours : les champions sont repérés et reconnus automatiquement…'
+    : n === 10 ? 'Les 10 champions ont été reconnus automatiquement. Vérifie la liste à droite : si un champion est faux, clique sur un autre choix proposé ou tape son nom, puis lance l’analyse.'
+    : SHOT.auto === 'fail' && !n ? 'Les champions n’ont pas pu être repérés automatiquement sur cette image : <b>clique sur chaque portrait</b>, équipe bleue d’abord (l’ordre des lanes n’a pas d’importance).'
+    : `Il manque ${10 - n} champion${10 - n > 1 ? 's' : ''} : clique sur le portrait d’un champion de l’<b>${n < 5 ? 'équipe 1 (bleue)' : 'équipe 2 (rouge)'}</b> pour le reconnaître.`;
   $('shotList').innerHTML = [0, 1].map((t) => `<div class="sl-team ${t ? 'r' : 'b'}"><h5>${t ? 'Équipe 2 · rouge' : 'Équipe 1 · bleu'}</h5>${ROLES.map((r, k) => {
     const c = SHOT.clicks[t * 5 + k];
     return `<div class="sl-row ${c ? '' : 'empty'}"><span class="sl-r">${k + 1}</span>${c ? `<img src="${img(c.id)}" alt=""><b>${state.P[c.id]?.name ?? c.id}</b>
