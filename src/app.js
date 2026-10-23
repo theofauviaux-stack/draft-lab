@@ -1445,6 +1445,7 @@ function ingest(data) {
   if (prevPatch && prevPatch !== data.patch) toast(`Nouveau patch ${data.patch} détecté — données mises à jour`);
   render();
   if (!$('startMenu').hidden) renderMenuSaves();
+  resumeAfterUpdate();
 }
 
 async function load(force = false) {
@@ -1502,32 +1503,66 @@ function initControls() {
 }
 
 // ---------- Mises à jour de l'application ----------
+// Une nouvelle version téléchargée redémarre l'app toute seule. Si une draft est en cours,
+// elle est mise de côté (mémoire tampon) puis reprise telle quelle après le redémarrage.
+const RESUME_KEY = 'draftlab-resume', AUTO_KEY = 'draftlab-autorestart';
+function workInProgress() {
+  const any = (a) => (a ?? []).some((x) => x && x !== NO_BAN);
+  return any(state.slots.blue) || any(state.slots.red) || any(state.slots.blueBans) || any(state.slots.redBans) ||
+    [...state.players.blue, ...state.players.red].some((p) => p.riotId || p.pool?.length) || LIVE.on;
+}
+function bufferDraft() {
+  try {
+    if (!workInProgress()) { localStorage.removeItem(RESUME_KEY); return; }
+    localStorage.setItem(RESUME_KEY, JSON.stringify({ at: Date.now(), menuOpen: !$('startMenu').hidden, live: LIVE.on,
+      mySide: state.mySide, slots: state.slots, roles: state.roles, lock: state.lock, history: state.history,
+      players: state.players, teamInput: state.teamInput, flow: state.flow, region: state.region }));
+  } catch {}
+}
+let resumed = false;
+function resumeAfterUpdate() {
+  if (resumed) return; resumed = true;
+  let d = null;
+  try { d = JSON.parse(localStorage.getItem(RESUME_KEY) || 'null'); localStorage.removeItem(RESUME_KEY); } catch {}
+  if (!d || Date.now() - d.at > 30 * 60 * 1000) return;
+  Object.assign(state, { mySide: d.mySide, slots: d.slots, roles: d.roles, lock: d.lock, history: d.history ?? [], players: d.players, teamInput: d.teamInput, flow: d.flow, region: d.region ?? state.region, selected: null });
+  $('mySide').value = state.mySide;
+  $('opggBlue').value = state.teamInput?.blue ?? ''; $('opggRed').value = state.teamInput?.red ?? '';
+  if (!d.menuOpen) closeMenu();
+  if (d.live && api.liveStart) { LIVE.on = true; LIVE.sig = ''; $('liveBar').hidden = false; $('liveTitle').textContent = 'Reconnexion au client…'; $('liveText').textContent = ''; api.liveStart(); }
+  render();
+  api.version?.().then((v) => toast(`Draft Lab mis à jour (v${v}) : ta draft a été reprise`));
+}
 function initUpdates() {
-  if (!api.version) { $('verPill').hidden = true; document.querySelector('.tb-dot').hidden = true; return; }
-  api.version().then((v) => { $('verPill').textContent = 'v' + v; });
+  // le numéro de version n'est plus affiché en haut (il reste dans le menu)
+  $('verPill').hidden = true; document.querySelector('.tb-dot').hidden = true;
+  if (!api.version) return;
+  api.version().then((v) => { $('menuVer').textContent = `Draft Lab v${v} · rechercher une mise à jour`; $('menuVer').hidden = false; });
+  let timer = null;
   const show = (st) => {
-    if (!st) return;
-    const pill = $('verPill');
-    pill.classList.toggle('busy', st.status === 'downloading');
-    pill.classList.toggle('new', st.status === 'ready');
-    pill.title = st.status === 'uptodate' ? `Version ${st.current} : à jour` : st.status === 'downloading' ? `Téléchargement de la version ${st.version}…`
-      : st.status === 'ready' ? `Version ${st.version} installée : redémarre pour l’utiliser` : st.status === 'off' ? st.message : `Mise à jour : ${st.message ?? ''}`;
-    if (st.status === 'ready') {
-      const b = $('updRestart');
-      b.textContent = `⟳ Redémarrer (v${st.version})`;
-      b.title = `Version ${st.version} installée${st.notes ? ' : ' + st.notes : ''}. Redémarre pour l’utiliser.`;
-      b.hidden = false;
-      toast(`Nouvelle version ${st.version} prête : clique sur « Redémarrer » en haut`);
-    }
+    if (!st || st.status !== 'ready' || timer) return;
+    let tried = null; try { tried = localStorage.getItem(AUTO_KEY); } catch {}
+    const b = $('updRestart');
+    b.textContent = `⟳ Redémarrer (v${st.version})`; b.title = `Version ${st.version} installée${st.notes ? ' : ' + st.notes : ''}.`;
+    // garde-fou : un seul redémarrage automatique par version (sinon bouton manuel)
+    if (tried === st.version) { b.hidden = false; return; }
+    toast(`Mise à jour v${st.version} : redémarrage dans 5 s${workInProgress() ? ' — ta draft est gardée' : ''}`);
+    const go = () => {
+      // pas pendant une sélection des champions en direct : on attend qu'elle soit finie
+      if (LIVE.on && $('liveBar').dataset.phase === 'ChampSelect') { timer = setTimeout(go, 10000); return; }
+      try { localStorage.setItem(AUTO_KEY, st.version); } catch {}
+      bufferDraft(); api.restart();
+    };
+    timer = setTimeout(go, 5000);
   };
   api.lastUpdate?.().then(show);
   api.onUpdate?.(show);
-  $('verPill').onclick = () => { toast('Recherche de mise à jour…'); api.checkUpdate().then(() => api.lastUpdate().then((st) => {
+  $('menuVer').onclick = () => { toast('Recherche de mise à jour…'); api.checkUpdate().then(() => api.lastUpdate().then((st) => {
     if (st?.status === 'uptodate') toast(`Draft Lab est à jour (v${st.current})`);
     else if (st?.status === 'off') toast(st.message);
     else if (st?.status === 'error') toast('Mise à jour impossible : ' + st.message);
   })); };
-  $('updRestart').onclick = () => api.restart();
+  $('updRestart').onclick = () => { bufferDraft(); api.restart(); };
 }
 
 applyTheme();
