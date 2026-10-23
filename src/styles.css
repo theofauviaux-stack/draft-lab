@@ -1029,3 +1029,10 @@ body.q-flex .sb-p .sbr-flex { font-size: 12.5px; } body.q-flex .sb-p .sbr-flex u
 .livebar[data-conn="on"] .lv-dot, .livebar[data-conn="select"] .lv-dot, .livebar[data-conn="game"] .lv-dot { background: #1f9d55; animation: none; }
 .livebar[data-conn="select"] .lv-dot, .livebar[data-conn="game"] .lv-dot { animation: pulse 1.2s infinite; }
 .livebar[data-conn="select"] { border-left-color: var(--gold); }
+/* rôles bien visibles sur les cases de champions des encadrés d'équipe */
+.sb-pick span { position: absolute; left: 0; right: 0; bottom: 0; text-align: center; font-size: 11px; font-weight: 800; letter-spacing: .4px; text-transform: uppercase; color: #fff; padding: 3px 0 2px; border-radius: 0; background: linear-gradient(transparent, rgba(0,0,0,.85) 35%); }
+.sb-team.blue .sb-pick:not(.empty) span { background: linear-gradient(rgba(47,111,224,0), rgba(32,84,184,.95) 40%); }
+.sb-team.red .sb-pick:not(.empty) span { background: linear-gradient(rgba(214,69,82,0), rgba(176,44,58,.95) 40%); }
+.sb-pick.empty { place-items: center; }
+.sb-pick.empty span { position: static; background: none; font-size: 12.5px; color: var(--muted); padding: 0; }
+.sb-team.blue .sb-pick.empty { border-color: rgba(47,111,224,.45); } .sb-team.red .sb-pick.empty { border-color: rgba(214,69,82,.45); }

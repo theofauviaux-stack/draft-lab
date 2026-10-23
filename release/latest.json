@@ -1,7 +1,7 @@
 {
-  "version": "2.27.1",
-  "sha256": "f9ea5a37d1ad65d7d0152eb345c56bd3422dacb06f3efc33ff134eefc05f1103",
-  "file": "draftlab-2.27.1.json.gz",
-  "notes": "Direct : bouton Actualiser retiré (vérification automatique)",
-  "date": "2026-10-23T01:14:07.806Z"
+  "version": "2.27.2",
+  "sha256": "21d2d667710f373b9b091a44a55d1803ac610f4967a5c9e02f4f73a3fd64588d",
+  "file": "draftlab-2.27.2.json.gz",
+  "notes": "Encadrés d'équipe : rôles plus visibles sur les cases des champions",
+  "date": "2026-10-23T01:20:27.753Z"
 }
