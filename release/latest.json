@@ -1,7 +1,7 @@
 {
-  "version": "2.28.0",
-  "sha256": "140967f83b3059bd81d429da5cf1f00a0c3e2abfac3f94b0e1e15db12b719b0c",
-  "file": "draftlab-2.28.0.json.gz",
-  "notes": "Fiche matchup au clic sur un champion (forces, faiblesses, comment le jouer) ; recherche : nom exact prioritaire et recherche hors filtre de rôles ; conseil du pentagone plus juste",
-  "date": "2026-10-23T22:56:42.834Z"
+  "version": "2.29.0",
+  "sha256": "c1d4fde07c4d10445fb9da81202a30c27dc5d98f297add5be4568872873afcd4",
+  "file": "draftlab-2.29.0.json.gz",
+  "notes": "Mode Fearless (série Bo3/Bo5) pour la draft de zéro et la draft depuis des joueurs",
+  "date": "2026-10-23T23:02:47.369Z"
 }

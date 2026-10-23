@@ -1061,3 +1061,20 @@ body.q-flex .sb-p .sbr-flex { font-size: 12.5px; } body.q-flex .sb-p .sbr-flex u
 .mu-empty { font-size: 12.5px; padding: 4px 2px; }
 .mu-foot { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
 .mu-foot button { font-size: 12.5px; padding: 6px 12px; }
+/* Fearless */
+.st-fl { display: flex; align-items: center; gap: 8px; width: min(760px, 100%); margin: 14px auto 0; padding: 10px 14px; border-radius: 12px; cursor: pointer; font-size: 13px; background: color-mix(in srgb, var(--panel) 88%, transparent); border: 1px solid var(--line); backdrop-filter: blur(6px); }
+.st-fl input { width: 17px; height: 17px; accent-color: #b0452f; }
+.st-fl b { color: #b0452f; white-space: nowrap; } .st-fl span { color: var(--muted); }
+.st-fl:has(input:checked) { border-color: #b0452f; background: color-mix(in srgb, #b0452f 9%, var(--panel)); }
+.flbar { display: flex; align-items: center; gap: 14px; margin: 10px 16px 0; padding: 9px 14px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); border-left: 4px solid #b0452f; }
+.flbar[hidden] { display: none; }
+.fl-t { color: #b0452f; white-space: nowrap; font-size: 13.5px; }
+.fl-games { flex: 1; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 12.5px; min-width: 0; }
+.fl-g { display: inline-flex; align-items: center; gap: 2px; padding: 2px 6px; border-radius: 8px; background: var(--panel-2); }
+.fl-g em { font-style: normal; font-weight: 800; font-size: 11px; color: var(--muted); margin-right: 4px; }
+.fl-g img { width: 24px; height: 24px; border-radius: 5px; filter: grayscale(.5); }
+.fl-acts { display: flex; gap: 6px; } .fl-acts .primary { background: #b0452f; border-color: #b0452f; color: #fff; }
+.tile.fl { opacity: 1 !important; position: relative; }
+.tile.fl img { filter: grayscale(1) brightness(.55); }
+.tile.fl::after { content: '🔒'; position: absolute; top: 34%; left: 50%; transform: translate(-50%, -50%); font-size: 22px; }
+.tile.fl .nm { color: var(--muted); text-decoration: line-through; }

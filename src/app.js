@@ -88,7 +88,12 @@ function skipBan() {
   if (!tg || !tg[0].endsWith('Bans')) return;
   state.slots[tg[0]][tg[1]] = NO_BAN; state.history.push(tg); state.selected = null; render();
 }
-const used = () => new Set(Object.values(state.slots).flat().filter(Boolean));
+// Fearless : les champions joués dans les games précédentes de la série sont verrouillés pour les deux équipes
+const FL_KEY = 'draftlab-fearless';
+state.fearless = (() => { try { return JSON.parse(localStorage.getItem(FL_KEY)) ?? { on: false, games: [] }; } catch { return { on: false, games: [] }; } })();
+const saveFearless = () => { try { localStorage.setItem(FL_KEY, JSON.stringify(state.fearless)); } catch {} };
+const flLocked = () => { const m = new Map(); if (state.fearless?.on) state.fearless.games.forEach((g, k) => [...g.blue, ...g.red].forEach((id) => id && !m.has(id) && m.set(id, k + 1))); return m; };
+const used = () => new Set([...Object.values(state.slots).flat().filter(Boolean), ...flLocked().keys()]);
 // ---------- Joueurs (multi op.gg) ----------
 // Un champion du pool ne compte que s'il est joué à la lane du joueur
 // (ex. joueur placé Support => seulement ses supports). Les ajouts manuels sont toujours gardés.
@@ -222,7 +227,7 @@ function select(t, i) {
 function render() {
   if (!state.data) return;
   ensureDetails();
-  renderBans(); renderTeams(); renderStep();
+  renderBans(); renderTeams(); renderStep(); renderFearless();
   const ev = evaluate(team('blue'), team('red'));
   renderWr(ev);
   renderGrid(gridInfo());
@@ -505,7 +510,8 @@ function renderGrid(info) {
   const frag = document.createDocumentFragment();
   for (const c of list) {
     const t = document.createElement('div');
-    t.className = 'tile' + (u.has(c.id) ? ' used' : '') + (c.offmeta ? ' offmeta' : '');
+    const flg = flLocked().get(c.id);
+    t.className = 'tile' + (u.has(c.id) ? ' used' : '') + (flg && !Object.values(state.slots).flat().includes(c.id) ? ' fl' : '') + (c.offmeta ? ' offmeta' : '');
     const pj = info?.proj?.get(c.id);
     t.innerHTML = `<img loading="lazy" src="${img(c.id)}" alt="">
       ${pj?.wr != null ? `<span class="proj ${pj.delta >= 0 ? 'up' : 'down'}" title="Winrate projeté de ton côté avec ce pick">${pj.wr.toFixed(1)}%</span>` : ''}
@@ -518,6 +524,7 @@ function renderGrid(info) {
       (c.proRoleStats ? `\nRôles en pro : ${Object.entries(c.proRoleStats).sort((a, b) => b[1].picks - a[1].picks).map(([r, v]) => `${ROLE_LABEL[r]} ${v.picks}`).join(', ')}` : '') +
       (c.offmeta ? '\n⚠ Pas un pick pro à ce rôle' : '') +
       `\n${ORDER.map((k) => `${ARCH[k].label} ${c[k]}/3`).join(' · ')} · Scaling ${['', 'early', 'mid', 'late'][c.scale]}${c.guessed ? ' (profil estimé)' : ''}`;
+    if (flg && t.className.includes(' fl')) t.title = `🔒 Fearless : ${c.name} a été joué en game ${flg}, il ne peut plus être repris dans la série`;
     t.onclick = () => place(c.id);
     frag.appendChild(t);
   }
@@ -951,6 +958,7 @@ function startBackground() {
 }
 function openMenu() {
   if (LIVE.on) stopLiveMode();
+  $('menuFearless').checked = !!state.fearless?.on;
   $('startMenu').hidden = false;
   $('startMenu').classList.remove('leaving', 'form');
   startBackground();
@@ -975,7 +983,31 @@ const closeMenu = () => {
   m.classList.add('leaving');
   setTimeout(() => { m.hidden = true; m.classList.remove('leaving'); }, 420);
 };
+function renderFearless() {
+  const f = state.fearless, el = $('flBar');
+  el.hidden = !f?.on || LIVE.on;
+  document.body.classList.toggle('fearless', !!f?.on && !LIVE.on);
+  if (el.hidden) return;
+  const n = f.games.length + 1;
+  el.innerHTML = `<b class="fl-t">⚔ Fearless · Game ${n}</b>
+    <div class="fl-games">${f.games.length ? f.games.map((g, k) => `<span class="fl-g" title="Game ${k + 1} : verrouillés pour toute la série"><em>G${k + 1}</em>${[...g.blue, ...g.red].filter(Boolean).map((id) => `<img src="${img(id)}" title="${state.P[id]?.name ?? id} (game ${k + 1})" alt="">`).join('')}</span>`).join('') : '<span class="muted">Game 1 : aucun champion verrouillé pour l’instant. À la fin de la game, clique sur « Game suivante ».</span>'}</div>
+    <div class="fl-acts">${f.games.length ? '<button id="flUndo" class="tb-btn" title="Revenir à la game précédente">↶ Game précédente</button>' : ''}<button id="flNext" class="tb-btn primary" title="Verrouille les 10 champions joués et lance la game suivante">Game suivante →</button><button id="flEnd" class="tb-btn" title="Termine la série et désactive le Fearless">Terminer la série</button></div>`;
+  $('flNext').onclick = () => {
+    const picks = { blue: [...state.slots.blue], red: [...state.slots.red] };
+    if (![...picks.blue, ...picks.red].some(Boolean)) { toast('Aucun champion joué dans cette game'); return; }
+    f.games.push(picks); saveFearless(); reset();
+    toast(`Game ${f.games.length + 1} : ${flLocked().size} champions verrouillés pour les deux équipes`);
+  };
+  if ($('flUndo')) $('flUndo').onclick = () => {
+    const g = f.games.pop(); saveFearless();
+    state.slots = emptySlots(); state.slots.blue = [...g.blue]; state.slots.red = [...g.red]; assignRoles('blue'); assignRoles('red'); render();
+    toast(`Retour à la game ${f.games.length + 1}`);
+  };
+  $('flEnd').onclick = () => { state.fearless = { on: false, games: [] }; saveFearless(); render(); toast('Série terminée : Fearless désactivé'); };
+}
+function startSeries() { const on = !!$('menuFearless').checked; state.fearless = on && state.fearless?.on ? state.fearless : { on, games: [] }; saveFearless(); }
 function startFromZero() {
+  startSeries();
   state.players = { blue: [], red: [] }; state.teamInput = { blue: '', red: '' }; state.flow = 'zero';
   $('opggBlue').value = ''; $('opggRed').value = '';
   reset(); closeMenu();
@@ -989,6 +1021,7 @@ async function startFromPlayers() {
   savePrefs();
   $('opggBlue').value = blue; $('opggRed').value = red;
   state.flow = 'players';
+  startSeries();
   reset();
   const go = $('menuGo'); go.disabled = true; go.textContent = 'Chargement des joueurs…';
   await Promise.all([loadTeam('blue'), loadTeam('red')]);
@@ -1607,7 +1640,7 @@ function initControls() {
       const free = state.list.filter((c) => !u.has(c.id));
       const best = free.find((c) => norm(c.name) === norm(q) || norm(c.id) === norm(q)) ?? free.find((c) => norm(c.name).startsWith(norm(q)));
       const taken = !best && state.list.find((c) => u.has(c.id) && (norm(c.name) === norm(q) || norm(c.name).startsWith(norm(q))));
-      if (best) place(best.id); else if (taken) toast(`${taken.name} est déjà pris ou banni`); else $('grid').querySelector('.tile:not(.used)')?.click();
+      if (best) place(best.id); else if (taken) toast(flLocked().has(taken.id) && !Object.values(state.slots).flat().includes(taken.id) ? `${taken.name} est verrouillé (Fearless : joué en game ${flLocked().get(taken.id)})` : `${taken.name} est déjà pris ou banni`); else $('grid').querySelector('.tile:not(.used)')?.click();
       $('search').value = ''; state.search = ''; render();
     }
   });

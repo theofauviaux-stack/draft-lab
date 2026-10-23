@@ -37,6 +37,7 @@
 
   <div id="liveBar" class="livebar" hidden><span class="lv-conn" id="liveConn"><span class="lv-dot"></span><span id="liveConnTxt">Recherche du client…</span></span><b id="liveTitle">Partie en direct</b><span id="liveMode" class="lv-mode" hidden></span><span id="liveText" class="muted"></span><button id="liveStop" class="tb-btn">Arrêter le direct</button></div>
   <div id="liveReco" class="live-reco" hidden></div>
+  <div id="flBar" class="flbar" hidden></div>
   <section class="tools">
     <details class="box" id="playersBox" hidden>
       <summary>Joueurs (multi op.gg)</summary>
@@ -185,6 +186,7 @@
           <span class="st-go">Importer une capture →</span>
         </button>
       </div>
+      <label class="st-fl" id="menuFlRow" title="Série en Bo3 / Bo5 : un champion joué dans une game ne peut plus être repris par aucune des deux équipes"><input type="checkbox" id="menuFearless" /> <b>⚔ Mode Fearless</b> <span>pour « Draft de zéro » et « Draft depuis des joueurs » : un champion joué ne peut plus être repris dans la série</span></label>
       <div id="startForm" class="start-form st-form" hidden>
         <label class="blue">Équipe 1 — côté bleu<input id="menuBlue" placeholder="Lien multi op.gg ou Nom#TAG, Nom#TAG…" /></label>
         <label class="red">Équipe 2 — côté rouge<input id="menuRed" placeholder="Lien multi op.gg ou Nom#TAG, Nom#TAG…" /></label>
