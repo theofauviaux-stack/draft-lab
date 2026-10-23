@@ -59,12 +59,12 @@
   let liveCb = null, liveTimer = null;
   const mk = (id, role, rid, locked = true) => ({ champ: id ? KEY[id] : null, locked, role, riotId: rid, me: rid === 'Moi#EUW' });
   const STEPS = [
-    { phase: 'NoClient' }, { phase: 'Lobby', queue: { id: 420, label: 'Solo/Duo' } }, { phase: 'Matchmaking', queue: { id: 420, label: 'Solo/Duo' } }, { phase: 'ReadyCheck', queue: { id: 420, label: 'Solo/Duo' } },
+    { phase: 'NoClient' }, { phase: 'Lobby', summoner: 'Moi#EUW', queue: { id: 420, label: 'Solo/Duo' } }, { phase: 'Matchmaking', summoner: 'Moi#EUW', queue: { id: 420, label: 'Solo/Duo' } }, { phase: 'ReadyCheck', summoner: 'Moi#EUW', queue: { id: 420, label: 'Solo/Duo' } },
     // sélection des champions : bans puis picks dans l'ordre (B1 R1 R2 B2 B3 R3 / R4 B4 B5 R5)
     ...(() => {
       const out = [], picks = { blue: [null, null, null, null, null], red: [null, null, null, null, null] }, bans = { blue: [], red: [] };
       const blueRoles = ['T', 'J', 'M', 'A', 'S'], blueNames = [null, 'Fauve#EUW', 'Moi#EUW', null, 'Rempart#EUW'];
-      const snap = () => ({ phase: 'ChampSelect', source: 'client', queue: { id: 420, label: 'Solo/Duo' }, mySide: 'blue', region: 'EUW',
+      const snap = () => ({ phase: 'ChampSelect', source: 'client', queue: { id: 420, label: 'Solo/Duo' }, summoner: 'Moi#EUW', mySide: 'blue', region: 'EUW',
         teams: { blue: blueRoles.map((r, i) => mk(picks.blue[i], r, blueNames[i])), red: picks.red.map((c) => mk(c, null, null)) },
         bans: { blue: bans.blue.map((c) => KEY[c]), red: bans.red.map((c) => KEY[c]) } });
       const seq = [['ban', 'blue', 'Yasuo'], ['ban', 'red', 'Zed'], ['ban', 'blue', 'Yone'], ['ban', 'red', 'Draven'], ['ban', 'blue', 'Ambessa'], ['ban', 'red', 'Smolder'],
@@ -77,7 +77,7 @@
     })(),
     { phase: 'InProgress' }
   ];
-  const gameSnap = (t) => ({ phase: 'InProgress', source: 'jeu', queue: { id: 420, label: 'Solo/Duo' }, mySide: 'blue', time: t, bans: { blue: [], red: [] }, teams: {
+  const gameSnap = (t) => ({ phase: 'InProgress', source: 'jeu', queue: { id: 420, label: 'Solo/Duo' }, summoner: 'Moi#EUW', mySide: 'blue', time: t, bans: { blue: [], red: [] }, teams: {
     blue: [['Gnar', 'T', 'Rocket#EUW'], ['LeeSin', 'J', 'Fauve#EUW'], ['Ahri', 'M', 'Moi#EUW'], ['Jinx', 'A', 'Kiwi#EUW'], ['Thresh', 'S', 'Rempart#EUW']].map(([c, r, n]) => ({ champKey: c, champName: c, role: r, riotId: n, locked: true })),
     red: [['Renekton', null, 'Bastion#EUW'], ['Vi', 'J', 'Brume#EUW'], ['Taliyah', null, null], ['Kaisa', null, 'Comète#EUW'], ['Nautilus', null, 'Ancre#EUW']].map(([c, r, n]) => ({ champKey: c, champName: c, role: r, riotId: n, locked: true })) } });
   function liveStart() {

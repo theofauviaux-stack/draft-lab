@@ -1016,3 +1016,16 @@ body.q-flex .sb-p .sbr-flex { font-size: 12.5px; } body.q-flex .sb-p .sbr-flex u
 .sb-p .sbr-solo .sr1 { display: flex; justify-content: space-between; align-items: baseline; }
 .sb-p .sbr-solo .sr1 small { font-size: 10px; font-weight: 700; color: var(--text); }
 .sb-p .sbr-solo b { display: block; font-size: 13.5px; letter-spacing: -.2px; line-height: 1.25; }
+/* état de la connexion au client League */
+.lv-conn { display: inline-flex; align-items: center; gap: 7px; padding: 4px 11px 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 800; white-space: nowrap; background: var(--panel-2); color: var(--muted); border: 1px solid var(--line); }
+.livebar { border-left-color: var(--muted); transition: border-color .3s; }
+.livebar[data-conn="off"] { border-left-color: var(--red); }
+.livebar[data-conn="off"] .lv-conn { background: rgba(214, 69, 82, .12); color: var(--red); border-color: rgba(214, 69, 82, .4); }
+.livebar[data-conn="off"] .lv-dot { background: var(--red); animation: pulse 1.6s infinite; }
+.livebar[data-conn="err"] .lv-conn { background: rgba(214, 160, 40, .14); color: #b7791f; border-color: rgba(214, 160, 40, .45); }
+.livebar[data-conn="err"] .lv-dot { background: #d69e2e; }
+.livebar[data-conn="on"], .livebar[data-conn="select"], .livebar[data-conn="game"] { border-left-color: #1f9d55; }
+.livebar[data-conn="on"] .lv-conn, .livebar[data-conn="select"] .lv-conn, .livebar[data-conn="game"] .lv-conn { background: rgba(31, 157, 85, .12); color: #1f9d55; border-color: rgba(31, 157, 85, .4); }
+.livebar[data-conn="on"] .lv-dot, .livebar[data-conn="select"] .lv-dot, .livebar[data-conn="game"] .lv-dot { background: #1f9d55; animation: none; }
+.livebar[data-conn="select"] .lv-dot, .livebar[data-conn="game"] .lv-dot { animation: pulse 1.2s infinite; }
+.livebar[data-conn="select"] { border-left-color: var(--gold); }

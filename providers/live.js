@@ -33,13 +33,18 @@ function run(cmd, args) {
   return new Promise((r) => execFile(cmd, args, { timeout: 4000, windowsHide: true }, (e, out) => r(e ? '' : String(out))));
 }
 async function findLcu() {
-  let txt = '';
+  // 1. le processus du client doit tourner (sinon un vieux lockfile ferait croire qu'il est connecté)
+  let txt = '', running = false;
   if (process.platform === 'win32') {
     txt = await run('powershell', ['-NoProfile', '-Command', "Get-CimInstance Win32_Process -Filter \"name='LeagueClientUx.exe'\" | Select-Object -ExpandProperty CommandLine"]);
+    running = /LeagueClientUx/i.test(txt) || /LeagueClientUx\.exe/i.test(await run('tasklist', ['/FI', 'IMAGENAME eq LeagueClientUx.exe', '/NH']));
   } else {
-    txt = await run('ps', ['-A', '-ww', '-o', 'args']);
-    txt = txt.split('\n').filter((l) => /LeagueClientUx/.test(l)).join('\n');
+    txt = (await run('ps', ['-A', '-ww', '-o', 'args'])).split('\n').filter((l) => /LeagueClientUx/.test(l)).join('\n');
+    running = !!txt;
   }
+  if (process.env.DRAFTLAB_LCU) { const [p, t] = process.env.DRAFTLAB_LCU.split(':'); return { port: +p, token: t }; } // tests
+  if (!running) return null;
+  // 2. port et mot de passe : ligne de commande du processus, sinon fichier lockfile
   const port = txt.match(/--app-port=(\d+)/)?.[1], token = txt.match(/--remoting-auth-token=([\w-]+)/)?.[1];
   if (port && token) return { port: +port, token };
   const candidates = process.platform === 'win32'
@@ -48,7 +53,6 @@ async function findLcu() {
   for (const f of candidates) {
     try { const [, , p, pw] = fs.readFileSync(f, 'utf8').split(':'); if (p && pw) return { port: +p, token: pw.trim() }; } catch {}
   }
-  if (process.env.DRAFTLAB_LCU) { const [p, t] = process.env.DRAFTLAB_LCU.split(':'); return { port: +p, token: t }; } // tests
   return null;
 }
 
@@ -68,10 +72,18 @@ async function readQueue(get) {
 }
 async function champSelect(lcu) {
   const get = (p) => localGet(lcu.port, p, lcu.token);
-  const phase = await get('/lol-gameflow/v1/gameflow-phase').catch(() => null);
+  // une erreur de connexion = client fermé : on ne prétend pas être connecté
+  const phase = await get('/lol-gameflow/v1/gameflow-phase');
   const queue = ['Lobby', 'Matchmaking', 'ReadyCheck', 'ChampSelect', 'InProgress'].includes(phase) ? await readQueue(get) : null;
+  // compte connecté au client (affiché : « Connecté · Pseudo#TAG »)
+  if (!lcu.summoner) {
+    const me = await get('/lol-summoner/v1/current-summoner').catch(() => null);
+    if (me?.gameName) lcu.summoner = `${me.gameName}${me.tagLine ? '#' + me.tagLine : ''}`;
+    else if (me?.displayName) lcu.summoner = me.displayName;
+  }
+  const summoner = lcu.summoner ?? null;
   const s = phase === 'ChampSelect' ? await get('/lol-champ-select/v1/session').catch(() => null) : null;
-  if (!s) return { phase: phase || 'None', queue };
+  if (!s) return { phase: phase || 'None', queue, summoner };
   const mySide = (s.myTeam?.[0]?.team ?? 1) === 1 ? 'blue' : 'red';
   const region = await get('/riotclient/region-locale').then((r) => r?.region ?? r?.webRegion).catch(() => null);
   const member = async (m) => {
@@ -92,7 +104,7 @@ async function champSelect(lcu) {
     const list = isMine ? bans.mine : bans.theirs;
     if (!list.includes(a.championId)) list.push(a.championId);
   }
-  return { phase: 'ChampSelect', source: 'client', queue, mySide, region, teams: { [mySide]: mine, [mySide === 'blue' ? 'red' : 'blue']: theirs }, bans: { [mySide]: bans.mine, [mySide === 'blue' ? 'red' : 'blue']: bans.theirs } };
+  return { phase: 'ChampSelect', source: 'client', queue, summoner, mySide, region, teams: { [mySide]: mine, [mySide === 'blue' ? 'red' : 'blue']: theirs }, bans: { [mySide]: bans.mine, [mySide === 'blue' ? 'red' : 'blue']: bans.theirs } };
 }
 
 async function inGame() {
@@ -111,7 +123,7 @@ async function inGame() {
     return { champKey, champName: p.championName, role: POS_GAME[p.position] ?? (smite ? 'J' : null), riotId: masked ? null : `${name}#${tag}`, me: (p.riotId || p.summonerName) === me, locked: true };
   };
   const teams = { blue: d.allPlayers.filter((p) => p.team === 'ORDER').map(player), red: d.allPlayers.filter((p) => p.team === 'CHAOS').map(player) };
-  return { phase: 'InProgress', source: 'jeu', queue: lastQueue ?? (d.gameData?.gameMode === 'CLASSIC' ? null : { label: d.gameData?.gameMode }), mySide, teams, bans: { blue: [], red: [] }, time: d.gameData?.gameTime ?? 0 };
+  return { phase: 'InProgress', source: 'jeu', summoner: me || null, queue: lastQueue ?? (d.gameData?.gameMode === 'CLASSIC' ? null : { label: d.gameData?.gameMode }), mySide, teams, bans: { blue: [], red: [] }, time: d.gameData?.gameTime ?? 0 };
 }
 
 // Boucle : le jeu d'abord (si une partie tourne), sinon la sélection des champions
@@ -120,13 +132,13 @@ async function poll(send) {
   try {
     const g = await inGame();
     if (g) return send(g);
-    if (!lcu || Date.now() - lastLcuTry > 15000) { lastLcuTry = Date.now(); lcu = (await findLcu()) || lcu; }
+    if (!lcu || Date.now() - lastLcuTry > 15000) { lastLcuTry = Date.now(); lcu = await findLcu(); }
     if (!lcu) return send({ phase: 'NoClient' });
     const cs = await champSelect(lcu).catch((e) => { lcu = null; return { phase: 'NoClient', error: e.message }; });
     send(cs);
   } catch (e) { send({ phase: 'Error', error: e.message }); }
 }
-function startLive(send) { stopLive(); poll(send); timer = setInterval(() => poll(send), 2000); }
+function startLive(send) { stopLive(); lcu = null; poll(send); timer = setInterval(() => poll(send), 2000); }
 function stopLive() { if (timer) clearInterval(timer); timer = null; }
 
 module.exports = { startLive, stopLive, champSelect, inGame, findLcu };

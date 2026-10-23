@@ -923,14 +923,14 @@ async function startFromPlayers() {
 }
 
 // ---------- Partie en direct (soloQ) ----------
-const LIVE = { on: false, sig: '', loaded: { blue: '', red: '' } };
+const LIVE = { on: false, sig: '', conn: null, loaded: { blue: '', red: '' } };
 const champByKey = (k) => (k == null ? null : state.list.find((c) => String(c.key) === String(k))?.id ?? null);
 const champByName = (n) => (n ? state.P[n]?.id ?? findChamp(n)?.id ?? null : null);
-const LIVE_TXT = { NoClient: ['En attente du client League', 'Lance League of Legends sur cet ordinateur.'], None: ['Client connecté', 'En attente de la sélection des champions.'], Lobby: ['Client connecté', 'Dans le salon : lance la recherche.'], Matchmaking: ['Recherche de partie', 'La draft s’affichera dès la sélection des champions.'], ReadyCheck: ['Partie trouvée', 'Accepte la partie.'], ChampSelect: ['Sélection des champions en direct', 'Picks, bans et lanes mis à jour en temps réel.'], InProgress: ['Partie en cours', 'Les 10 joueurs viennent du jeu ; op.gg chargé pour les joueurs visibles.'], Error: ['Direct indisponible', ''] };
+const LIVE_TXT = { NoClient: ['En attente', 'Lance League of Legends sur cet ordinateur.'], None: ['Prêt', 'En attente de la sélection des champions.'], Lobby: ['Dans le salon', 'Lance la recherche : la draft s’affichera à la sélection des champions.'], Matchmaking: ['Recherche de partie', 'La draft s’affichera dès la sélection des champions.'], ReadyCheck: ['Partie trouvée', 'Accepte la partie.'], ChampSelect: ['Sélection des champions en direct', 'Picks, bans et lanes mis à jour en temps réel.'], InProgress: ['Partie en cours', 'Les 10 joueurs viennent du jeu ; op.gg chargé pour les joueurs visibles.'], Error: ['Direct indisponible', ''] };
 function startLiveMode() {
   if (!api.liveStart) { toast('Disponible uniquement dans l’application'); return; }
   state.players = { blue: [], red: [] }; state.teamInput = { blue: '', red: '' }; state.flow = 'players';
-  LIVE.on = true; LIVE.sig = ''; LIVE.loaded = { blue: '', red: '' };
+  LIVE.on = true; LIVE.sig = ''; LIVE.conn = null; $('liveBar').dataset.conn = ''; $('liveConnTxt').textContent = 'Recherche du client…'; LIVE.loaded = { blue: '', red: '' };
   reset(); closeMenu();
   $('liveBar').hidden = false; $('liveTitle').textContent = 'Connexion au client…'; $('liveText').textContent = '';
   api.liveStart();
@@ -941,6 +941,14 @@ function onLive(d) {
   const [t, sub] = LIVE_TXT[d.phase] ?? ['Client connecté', d.phase];
   $('liveTitle').textContent = t; $('liveText').textContent = d.error ? `${sub} (${d.error})` : sub;
   $('liveBar').dataset.phase = d.phase;
+  // état de la connexion au client League, bien visible : non détecté / connecté / en sélection / en jeu
+  const conn = d.phase === 'NoClient' ? 'off' : d.phase === 'Error' ? 'err' : d.phase === 'ChampSelect' ? 'select' : d.phase === 'InProgress' ? 'game' : 'on';
+  $('liveBar').dataset.conn = conn;
+  const who = d.summoner || null;
+  $('liveConnTxt').textContent = conn === 'off' ? 'Client League non détecté' : conn === 'err' ? 'Erreur de connexion' : who ? `Connecté · ${who}` : 'Client League connecté';
+  $('liveConn').title = conn === 'off' ? 'Aucun client League ouvert sur cet ordinateur' : d.summoner ? `Compte connecté au client : ${d.summoner}` : '';
+  if (conn === 'off') $('liveText').textContent = 'Ouvre le client League of Legends (pas seulement le Riot Client) sur cet ordinateur : la détection est automatique, toutes les 2 secondes.';
+  if (conn !== LIVE.conn) { if (LIVE.conn === 'off' && conn !== 'err') toast(`Client League détecté ✓${who ? ' — ' + who : ''}`); else if (LIVE.conn && LIVE.conn !== 'off' && conn === 'off') toast('Client League fermé ou déconnecté'); LIVE.conn = conn; }
   // mode de la partie (Solo/Duo, Flex, Normale, Personnalisée…) : la Flex est mise en avant en Flex, la Solo ailleurs
   const qm = $('liveMode');
   if (d.queue?.label) { qm.textContent = d.queue.label; qm.hidden = false; } else if (d.phase === 'NoClient' || d.phase === 'None') qm.hidden = true;
@@ -1257,6 +1265,7 @@ function initLive() {
   initWinSize();
   $('startLive').onclick = startLiveMode;
   $('liveStop').onclick = () => { stopLiveMode(); toast('Direct arrêté'); };
+  $('liveRetry').onclick = () => { $('liveConnTxt').textContent = 'Recherche du client…'; $('liveBar').dataset.conn = ''; api.liveStart?.(); };
   api.onLive?.(onLive);
 }
 function initShot() {
