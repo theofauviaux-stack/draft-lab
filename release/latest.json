@@ -1,7 +1,7 @@
 {
-  "version": "2.27.0",
-  "sha256": "50331846f6a5026e46275790b700fc98a580edf0d7bcd94981783e364135350d",
-  "file": "draftlab-2.27.0.json.gz",
-  "notes": "Direct : état du client clair (non détecté / connecté avec ton pseudo), bouton Actualiser, plus de faux « connecté » avec un vieux lockfile",
-  "date": "2026-10-23T01:12:03.790Z"
+  "version": "2.27.1",
+  "sha256": "f9ea5a37d1ad65d7d0152eb345c56bd3422dacb06f3efc33ff134eefc05f1103",
+  "file": "draftlab-2.27.1.json.gz",
+  "notes": "Direct : bouton Actualiser retiré (vérification automatique)",
+  "date": "2026-10-23T01:14:07.806Z"
 }

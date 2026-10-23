@@ -1265,7 +1265,6 @@ function initLive() {
   initWinSize();
   $('startLive').onclick = startLiveMode;
   $('liveStop').onclick = () => { stopLiveMode(); toast('Direct arrêté'); };
-  $('liveRetry').onclick = () => { $('liveConnTxt').textContent = 'Recherche du client…'; $('liveBar').dataset.conn = ''; api.liveStart?.(); };
   api.onLive?.(onLive);
 }
 function initShot() {
