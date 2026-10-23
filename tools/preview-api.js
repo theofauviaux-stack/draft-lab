@@ -83,12 +83,12 @@
   function liveStart() {
     liveStop(); let k = 0;
     const tick = () => {
-      if (!liveCb) return;
+      if (!liveCb || window.__livePause) return;
       const st = STEPS[Math.min(k, STEPS.length - 1)];
       liveCb(st.phase === 'InProgress' ? gameSnap((k - STEPS.length + 1) * 30) : st);
       k++;
     };
-    tick(); liveTimer = setInterval(tick, 1700);
+    tick(); liveTimer = setInterval(tick, window.__liveMs || 1700);
   }
   function liveStop() { if (liveTimer) clearInterval(liveTimer); liveTimer = null; }
 

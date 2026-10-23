@@ -1,7 +1,7 @@
 {
-  "version": "2.27.4",
-  "sha256": "c9ad98cd1976e23378c0f529d820cb456eb13ced5059c0073ef68ae45a418cfd",
-  "file": "draftlab-2.27.4.json.gz",
-  "notes": "Menu : Partie en direct pour tous les modes",
-  "date": "2026-10-23T13:08:49.836Z"
+  "version": "2.27.5",
+  "sha256": "327d5f670b08d1eff70ad903eae5b1e498069c83383c0d9b395500cb75d9bb58",
+  "file": "draftlab-2.27.5.json.gz",
+  "notes": "Recherche : la grille se réaffiche après un choix avec Entrée",
+  "date": "2026-10-23T14:03:25.933Z"
 }

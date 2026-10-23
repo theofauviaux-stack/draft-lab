@@ -1527,7 +1527,7 @@ function initControls() {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
     if (e.key === 'Escape' && $('startMenu').hidden) { state.selected = null; render(); }
     if (e.key === 'Enter' && document.activeElement === $('search')) {
-      const first = $('grid').querySelector('.tile:not(.used)'); first?.click(); $('search').value = ''; state.search = '';
+      const first = $('grid').querySelector('.tile:not(.used)'); first?.click(); $('search').value = ''; state.search = ''; render();
     }
   });
   api.onUpdated((d) => ingest(d));
