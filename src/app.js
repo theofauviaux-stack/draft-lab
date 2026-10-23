@@ -265,8 +265,11 @@ function renderTeams() {
     el.classList.toggle('turn', !!tg && tg[0] === side);
     const sPairs = teamSynergy(team(side)).pairs;
     // Une ligne fixe par lane (Top, Jungle, Mid, ADC, Support) : les champions ne « sautent » plus d'une ligne à l'autre
+    // cases vides : le prochain ordre de pick (B1, B2… / R1, R2…) de haut en bas, la lane n'apparaît qu'une fois le champion choisi
+    let nextPick = state.slots[side].filter(Boolean).length;
     ROLES.map((r) => state.roles[side].indexOf(r)).forEach((i) => {
       const id = state.slots[side][i];
+      const po = id ? null : `${side === 'blue' ? 'B' : 'R'}${++nextPick}`;
       const r = state.roles[side][i];
       const c = id ? state.P[id] : null;
       const s = document.createElement('div');
@@ -274,9 +277,9 @@ function renderTeams() {
       s.className = 'slot' + (state.selected && state.selected[0] === side && state.selected[1] === i ? ' target' : '') + (c ? '' : ' empty');
       const roleSel = c ? `<span class="rolebadge ${state.lock[side][i] ? 'locked' : ''}" title="${state.lock[side][i] ? 'Lane choisie' : 'Lane attribuée automatiquement'} — clic pour changer">${ROLE_LABEL[r]}</span>` : '';
       s.innerHTML = `
-        <div class="portrait">${c ? `<img src="${img(id)}" alt="">` : `<span class="lane-ph">${ROLE_LABEL[r]}</span>`}</div>
+        <div class="portrait">${c ? `<img src="${img(id)}" alt="">` : `<span class="lane-ph po">${LIVE.on ? ROLE_LABEL[r] : po}</span>`}</div>
         <div>
-          <div class="name">${c ? c.name : `<span class="muted">${ROLE_LABEL[r]} · à choisir</span>`}</div>
+          <div class="name">${c ? c.name : `<span class="muted">${LIVE.on ? ROLE_LABEL[r] : 'Pick ' + po} · à choisir</span>`}</div>
           <div class="meta">${roleSel}${(() => { const pl = c ? playerFor(side, state.roles[side][i]) : null; const e = pl?.pool?.find((x) => x.id === id); return e && e.games ? `<span class="pgw ${e.wins / e.games >= 0.5 ? 'up' : 'down'}" title="${playerLabel(pl)} : ${e.games} games, ${Math.round((e.wins / e.games) * 100)} % de victoires">${e.games} g · ${Math.round((e.wins / e.games) * 100)} %</span>` : ''; })()}${c?.wr != null ? `<span class="wrtag" title="Winrate estimé : games pro + Master+ (one-tricks atténués)">${c.wr.toFixed(1)} % WR</span>` : ''}</div>
           ${c ? archBar(c) : ''}
           ${c ? sPairs.filter((x) => x.a.id === id || x.b.id === id).slice(0, 2).map((x) => { const o = x.a.id === id ? x.b : x.a; return `<span class="slink" style="--k:${KINDS[x.kind]?.color ?? '#6b7280'}" title="${x.title} : ${x.why.replace(/"/g, '&quot;')}">🔗 ${o.name} · ${KINDS[x.kind]?.label ?? ''}</span>`; }).join('') : ''}
@@ -329,7 +332,7 @@ function renderWr(ev) {
       <div class="sb-title">${side === 'blue' ? 'Équipe 1' : 'Équipe 2'} <span>${side === 'blue' ? 'côté bleu' : 'côté rouge'}${state.mySide === side ? ' · toi' : ''}</span></div>
       <div class="sb-pct">${pct.toFixed(1)}<small>%</small></div>
       <div class="sb-meta">${t ? `<span class="tier" style="--c:${tierColor(t.rank)}">${pointsLabel(t.rank)}</span>${t.wr != null ? `<span>${t.wr} % saison</span>` : ''}${t.hot ? `<span>🔥 ${t.hot} en forme</span>` : ''}` : '<span class="muted">joueurs inconnus</span>'}</div>
-      <div class="sb-picks">${[0, 1, 2, 3, 4].map((j) => { const id = state.slots[side][j], po = `${side === 'blue' ? 'B' : 'R'}${j + 1}`; /* ordre de pick tant que la case est vide, lane une fois le champion choisi */ return `<div class="sb-pick ${id ? '' : 'empty'}${LIVE.on ? ' lane' : ''}" title="${id ? `${state.P[id].name} · ${ROLE_LABEL[state.roles[side][j]]}${LIVE.on ? '' : ' · pick ' + po}` : LIVE.on ? ROLE_LABEL[state.roles[side][j] ?? ROLES[j]] : `Pick ${po}`}">${id ? `<img src="${img(id)}" alt="">` : ''}<span>${id || LIVE.on ? ROLE_LABEL[state.roles[side][j] ?? ROLES[j]] : po}</span></div>`; }).join('')}</div>
+      <div class="sb-picks">${ROLES.map((r) => { const i = state.roles[side].indexOf(r), id = state.slots[side][i]; return `<div class="sb-pick ${id ? '' : 'empty'}" title="${id ? state.P[id].name : ''}">${id ? `<img src="${img(id)}" alt="">` : ''}<span>${ROLE_LABEL[r]}</span></div>`; }).join('')}</div>
       <div class="sb-players">${ROLES.map((r) => {
         const p = list.find((x) => x.role === r);
         const pts = p ? rankPoints(p.rank) : null;

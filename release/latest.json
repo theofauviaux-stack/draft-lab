@@ -1,7 +1,7 @@
 {
-  "version": "2.27.7",
-  "sha256": "d09e60710faa0b82b906510d867c9dc09641af4976fcd1b0e4f9af600792215f",
-  "file": "draftlab-2.27.7.json.gz",
-  "notes": "Direct : les cases restent rangées par lane",
-  "date": "2026-10-23T22:30:10.729Z"
+  "version": "2.27.8",
+  "sha256": "dda06842d7c8bdf92ee8de5b140e6a052395b91030b8e197561f19704b9b4769",
+  "file": "draftlab-2.27.8.json.gz",
+  "notes": "Draft : ordre de pick (B1…R5) sur les lignes vides ; encadrés d'équipe remis par lane",
+  "date": "2026-10-23T22:45:17.352Z"
 }
