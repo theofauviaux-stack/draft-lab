@@ -1039,3 +1039,4 @@ body.q-flex .sb-p .sbr-flex { font-size: 12.5px; } body.q-flex .sb-p .sbr-flex u
 .sb-pick.empty span { font-size: 17px; letter-spacing: .5px; }
 .sb-team.blue .sb-pick.empty span { color: color-mix(in srgb, var(--blue) 70%, var(--muted)); }
 .sb-team.red .sb-pick.empty span { color: color-mix(in srgb, var(--red) 70%, var(--muted)); }
+.sb-pick.empty.lane span { font-size: 12.5px; }
