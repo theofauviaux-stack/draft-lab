@@ -82,6 +82,13 @@ async function champSelect(lcu) {
     else if (me?.displayName) lcu.summoner = me.displayName;
   }
   const summoner = lcu.summoner ?? null;
+  // fin de partie : victoire ou défaite (écran de fin de game du client)
+  if (['PreEndOfGame', 'EndOfGame', 'WaitingForStats'].includes(phase)) {
+    const eog = await get('/lol-end-of-game/v1/eog-stats-block').catch(() => null);
+    const mine = eog?.teams?.find((t) => t.isPlayerTeam);
+    const result = mine ? (mine.isWinningTeam ? 'win' : 'loss') : eog?.localPlayer?.stats ? (eog.localPlayer.stats.WIN ? 'win' : eog.localPlayer.stats.LOSE ? 'loss' : null) : null;
+    return { phase, queue, summoner, result, gameId: eog?.gameId ?? null };
+  }
   const s = phase === 'ChampSelect' ? await get('/lol-champ-select/v1/session').catch(() => null) : null;
   if (!s) return { phase: phase || 'None', queue, summoner };
   const mySide = (s.myTeam?.[0]?.team ?? 1) === 1 ? 'blue' : 'red';

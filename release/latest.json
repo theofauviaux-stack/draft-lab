@@ -1,7 +1,7 @@
 {
-  "version": "2.31.1",
-  "sha256": "23c5907234ac5e98cc23be3e3e46364366ce83ab5ab379ca6a32b568f15a3c98",
-  "file": "draftlab-2.31.1.json.gz",
-  "notes": "Rangs : Master, Grand Master et Challenger affichés tels quels (plus devinés d'après les LP)",
-  "date": "2026-10-24T16:47:35.345Z"
+  "version": "2.32.0",
+  "sha256": "2773c8985d39e6908197aa85b330ad20732df033fd384bab66c5443d97b7cbae",
+  "file": "draftlab-2.32.0.json.gz",
+  "notes": "Direct : l'écran se vide à la fin de la partie (ou si la sélection est annulée), résultat victoire/défaite lu dans le client, historique des parties regroupé par session",
+  "date": "2026-10-24T16:57:31.345Z"
 }

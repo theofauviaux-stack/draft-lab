@@ -249,7 +249,7 @@ function render() {
   document.body.classList.toggle('flow-zero', state.flow !== 'players');
   $('flowChip').textContent = state.flow === 'players' ? '⚔ Draft depuis des joueurs' : '✦ Draft de zéro';
   document.querySelectorAll('.seg-b').forEach((b) => b.classList.toggle('on', b.dataset.side === state.mySide));
-  renderPlayers(); renderSaves(); renderBanPlan();
+  renderPlayers(); renderSaves(); renderHistory(); renderBanPlan();
   renderPentagon(ev); renderPentaAdvice(ev); renderScaling(); renderAdvice();
 }
 
@@ -296,7 +296,7 @@ function renderTeams() {
       s.className = 'slot' + (state.selected && state.selected[0] === side && state.selected[1] === i ? ' target' : '') + (c ? '' : ' empty');
       const roleSel = c ? `<span class="rolebadge ${state.lock[side][i] ? 'locked' : ''}" title="${state.lock[side][i] ? 'Lane choisie' : 'Lane attribuée automatiquement'} — clic pour changer">${ROLE_LABEL[r]}</span>` : '';
       s.innerHTML = `
-        <div class="portrait">${c ? `<img src="${img(id)}" alt="">` : `<span class="lane-ph po">${LIVE.on ? ROLE_LABEL[r] : po}</span>`}</div>
+        <div class="portrait">${c ? `<img src="${img(id)}" alt="">` : `<span class="lane-ph ${LIVE.on ? '' : 'po'}">${LIVE.on ? ROLE_LABEL[r] : po}</span>`}</div>
         <div>
           <div class="name">${c ? c.name : `<span class="muted">${LIVE.on ? ROLE_LABEL[r] : 'Pick ' + po} · à choisir</span>`}</div>
           <div class="meta">${roleSel}${(() => { const pl = c ? playerFor(side, state.roles[side][i]) : null; const e = pl?.pool?.find((x) => x.id === id); return e && e.games ? `<span class="pgw ${e.wins / e.games >= 0.5 ? 'up' : 'down'}" title="${playerLabel(pl)} : ${e.games} games, ${Math.round((e.wins / e.games) * 100)} % de victoires">${e.games} g · ${Math.round((e.wins / e.games) * 100)} %</span>` : ''; })()}${c?.wr != null ? `<span class="wrtag" title="Winrate estimé : games pro + Master+ (one-tricks atténués)">${c.wr.toFixed(1)} % WR</span>` : ''}</div>
@@ -407,6 +407,7 @@ function renderWr(ev) {
   const fc = playersForecast(state.players.blue, state.players.red);
   const glob = combineWr(ev.wr, fc.wr);
   const main = fc.wr != null ? glob : ev.wr;
+  state.lastMain = main;
   renderGauge(main, fc.wr != null ? 'Pronostic global' : 'Winrate de la draft');
 
   const bars = [['Draft', ev.wr, 'composition, synergies, méta']];
@@ -1081,10 +1082,83 @@ async function startFromPlayers() {
 }
 
 // ---------- Partie en direct (soloQ) ----------
-const LIVE = { on: false, sig: '', conn: null, loaded: { blue: '', red: '' } };
+const LIVE = { on: false, sig: '', conn: null, loaded: { blue: '', red: '' }, game: null, lastId: null, wasSelect: false };
+// Historique des parties en direct (sur cet ordinateur)
+const HIST_KEY = 'draftlab-live-history';
+const readHist = () => { try { return JSON.parse(localStorage.getItem(HIST_KEY)) ?? []; } catch { return []; } };
+const writeHist = (h) => { try { localStorage.setItem(HIST_KEY, JSON.stringify(h.slice(0, 40))); } catch {} };
+function histUpsert(entry) { const h = readHist(), k = h.findIndex((x) => x.id === entry.id); if (k >= 0) h[k] = { ...h[k], ...entry }; else h.unshift(entry); writeHist(h); renderHistory(); }
+// photo de la partie en cours : draft, joueurs, mode, pronostic au moment de la partie
+function liveSnapshot(d) {
+  const me = d.mySide, myRow = (d.teams?.[me] ?? []).find((m) => m.me) ?? (d.summoner ? (d.teams?.[me] ?? []).find((m) => m.riotId && m.riotId === d.summoner) : null);
+  const myId = myRow ? (myRow.champKey ? champByName(myRow.champKey) ?? champByName(myRow.champName) : champByKey(myRow.champ)) : null;
+  const wr = state.lastMain != null ? (me === 'blue' ? state.lastMain : 100 - state.lastMain) : null;
+  return { id: LIVE.game?.id ?? Date.now(), date: LIVE.game?.date ?? Date.now(), queue: d.queue?.label ?? null, mySide: me, summoner: d.summoner ?? null, myChamp: myId,
+    wr: wr != null ? +wr.toFixed(1) : null, slots: structuredClone(state.slots), roles: structuredClone(state.roles), lock: structuredClone(state.lock),
+    players: structuredClone(state.players), result: LIVE.game?.result ?? null };
+}
+// la partie (ou la sélection) est finie : on archive et on nettoie l'écran
+function liveEndGame(d) {
+  if (LIVE.game) {
+    histUpsert({ ...LIVE.game, result: d.result ?? LIVE.game.result ?? null });
+    LIVE.lastId = LIVE.game.id;
+    toast(d.result ? `Partie terminée : ${d.result === 'win' ? 'victoire ✓' : 'défaite'} · ajoutée à l’historique` : 'Partie terminée : ajoutée à l’historique');
+  }
+  LIVE.game = null; LIVE.wasSelect = false; LIVE.sig = ''; LIVE.loaded = { blue: '', red: '' };
+  state.players = { blue: [], red: [] };
+  $('liveReco').hidden = true;
+  reset();
+}
+// Sessions : parties jouées à moins de 2 h d'écart
+const SESSION_GAP = 2 * 3600 * 1000;
+function histSessions(h) {
+  const games = [...h].sort((a, b) => a.date - b.date), out = [];
+  for (const g of games) { const last = out[out.length - 1]; if (last && g.date - last.end < SESSION_GAP) { last.games.push(g); last.end = g.date; } else out.push({ start: g.date, end: g.date, games: [g] }); }
+  return out.reverse().map((s) => ({ ...s, games: s.games.reverse() }));
+}
+function renderHistory() {
+  const h = readHist(), box = $('histBox');
+  if (!box) return;
+  box.hidden = !h.length;
+  $('histCount').textContent = h.length ? `(${h.length})` : '';
+  if (!h.length) { $('histList').innerHTML = ''; return; }
+  const day = (t) => new Date(t).toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit' });
+  const hm = (t) => new Date(t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  const mini = (ids) => (ids ?? []).map((id) => (id && state.P[id] ? `<img src="${img(id)}" alt="" title="${state.P[id].name}">` : '<i></i>')).join('');
+  $('histList').innerHTML = histSessions(h).map((s, si) => {
+    const w = s.games.filter((g) => g.result === 'win').length, l = s.games.filter((g) => g.result === 'loss').length;
+    const wrs = s.games.filter((g) => g.wr != null), avg = wrs.length ? Math.round(wrs.reduce((a, g) => a + g.wr, 0) / wrs.length) : null;
+    // le pronostic avait-il raison ? (favori = pronostic > 50 %)
+    const judged = s.games.filter((g) => g.result && g.wr != null && Math.abs(g.wr - 50) >= 1), right = judged.filter((g) => (g.wr > 50) === (g.result === 'win')).length;
+    return `<div class="hs"><div class="hs-h"><b>Session du ${day(s.start)}</b><span>${hm(s.start)}${s.games.length > 1 ? ` – ${hm(s.end)}` : ''} · ${s.games.length} partie${s.games.length > 1 ? 's' : ''}</span>
+        ${w + l ? `<span class="hs-rec"><em class="w">${w} V</em> <em class="l">${l} D</em></span>` : ''}${avg != null ? `<span class="muted">pronostic moyen ${avg} %</span>` : ''}${judged.length ? `<span class="muted">pronostic juste ${right}/${judged.length}</span>` : ''}
+        ${si === 0 ? '' : ''}</div>
+      ${s.games.map((g) => { const mine = g.slots?.[g.mySide] ?? [], theirs = g.slots?.[g.mySide === 'blue' ? 'red' : 'blue'] ?? [];
+        return `<div class="hg ${g.result ?? ''}"><span class="hg-t">${hm(g.date)}</span><span class="hg-q">${g.queue ?? 'Partie'}</span>
+          ${g.myChamp && state.P[g.myChamp] ? `<img class="hg-me" src="${img(g.myChamp)}" title="Ton champion : ${state.P[g.myChamp].name}" alt="">` : '<span class="hg-me"></span>'}
+          <span class="hg-tm b">${mini(mine)}</span><em>vs</em><span class="hg-tm r">${mini(theirs)}</span>
+          <span class="hg-wr" title="Pronostic de Draft Lab pour ton équipe au début de la partie">${g.wr != null ? `${g.wr.toFixed(1)} %` : '—'}</span>
+          <span class="hg-res">${g.result === 'win' ? 'Victoire' : g.result === 'loss' ? 'Défaite' : 'Résultat inconnu'}</span>
+          <button class="hg-open" data-id="${g.id}" title="Ouvrir cette partie dans la draft">Revoir</button><button class="hg-del" data-id="${g.id}" title="Retirer de l’historique">×</button></div>`; }).join('')}</div>`;
+  }).join('') + '<div class="hs-foot"><button id="histClear" class="tb-btn">Effacer l’historique</button></div>';
+  $('histList').querySelectorAll('.hg-open').forEach((b) => (b.onclick = () => openHistGame(+b.dataset.id)));
+  $('histList').querySelectorAll('.hg-del').forEach((b) => (b.onclick = () => { writeHist(readHist().filter((x) => x.id !== +b.dataset.id)); renderHistory(); }));
+  $('histClear').onclick = (e) => { if (!e.currentTarget.dataset.ok) { e.currentTarget.dataset.ok = '1'; e.currentTarget.textContent = 'Confirmer : tout effacer'; return; } writeHist([]); renderHistory(); toast('Historique effacé'); };
+}
+// revoir une partie : elle s'ouvre dans la draft (le direct s'arrête)
+function openHistGame(id) {
+  const g = readHist().find((x) => x.id === id); if (!g) return;
+  if (LIVE.on) stopLiveMode();
+  state.fromShot = true; // pas de série Fearless sur une partie passée
+  Object.assign(state, { mySide: g.mySide, slots: structuredClone(g.slots), roles: structuredClone(g.roles), lock: structuredClone(g.lock ?? { blue: Array(5).fill(null), red: Array(5).fill(null) }), history: [], selected: null,
+    players: structuredClone(g.players ?? { blue: [], red: [] }), flow: (g.players?.blue?.length || g.players?.red?.length) ? 'players' : 'zero' });
+  $('mySide').value = state.mySide; closeMenu(); render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  toast(`Partie du ${new Date(g.date).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}${g.result ? ` · ${g.result === 'win' ? 'victoire' : 'défaite'}` : ''}`);
+}
 const champByKey = (k) => (k == null ? null : state.list.find((c) => String(c.key) === String(k))?.id ?? null);
 const champByName = (n) => (n ? state.P[n]?.id ?? findChamp(n)?.id ?? null : null);
-const LIVE_TXT = { NoClient: ['En attente', 'Lance League of Legends sur cet ordinateur.'], None: ['Prêt', 'En attente de la sélection des champions.'], Lobby: ['Dans le salon', 'Lance la recherche : la draft s’affichera à la sélection des champions.'], Matchmaking: ['Recherche de partie', 'La draft s’affichera dès la sélection des champions.'], ReadyCheck: ['Partie trouvée', 'Accepte la partie.'], ChampSelect: ['Sélection des champions en direct', 'Picks, bans et lanes mis à jour en temps réel.'], InProgress: ['Partie en cours', 'Les 10 joueurs viennent du jeu ; op.gg chargé pour les joueurs visibles.'], Error: ['Direct indisponible', ''] };
+const LIVE_TXT = { NoClient: ['En attente', 'Lance League of Legends sur cet ordinateur.'], None: ['Prêt', 'En attente de la sélection des champions.'], Lobby: ['Dans le salon', 'Lance la recherche : la draft s’affichera à la sélection des champions.'], Matchmaking: ['Recherche de partie', 'La draft s’affichera dès la sélection des champions.'], ReadyCheck: ['Partie trouvée', 'Accepte la partie.'], ChampSelect: ['Sélection des champions en direct', 'Picks, bans et lanes mis à jour en temps réel.'], InProgress: ['Partie en cours', 'Les 10 joueurs viennent du jeu ; op.gg chargé pour les joueurs visibles.'], Error: ['Direct indisponible', ''], PreEndOfGame: ['Partie terminée', 'Résultat enregistré dans l’historique.'], EndOfGame: ['Partie terminée', 'Résultat enregistré dans l’historique. Relance une file pour la suivante.'], WaitingForStats: ['Partie terminée', 'En attente des statistiques de fin de partie…'] };
 function startLiveMode() {
   if (!api.liveStart) { toast('Disponible uniquement dans l’application'); return; }
   state.players = { blue: [], red: [] }; state.teamInput = { blue: '', red: '' }; state.flow = 'players';
@@ -1093,7 +1167,7 @@ function startLiveMode() {
   $('liveBar').hidden = false; $('liveTitle').textContent = 'Connexion au client…'; $('liveText').textContent = '';
   api.liveStart();
 }
-function stopLiveMode() { LIVE.on = false; api.liveStop?.(); $('liveBar').hidden = true; $('liveReco').hidden = true; $('liveMode').hidden = true; document.body.classList.remove('q-flex'); }
+function stopLiveMode() { LIVE.on = false; api.liveStop?.(); $('liveBar').hidden = true; $('liveReco').hidden = true; $('liveMode').hidden = true; document.body.classList.remove('q-flex'); render(); }
 function onLive(d) {
   if (!LIVE.on) return;
   const [t, sub] = LIVE_TXT[d.phase] ?? ['Client connecté', d.phase];
@@ -1111,7 +1185,15 @@ function onLive(d) {
   const qm = $('liveMode');
   if (d.queue?.label) { qm.textContent = d.queue.label; qm.hidden = false; } else if (d.phase === 'NoClient' || d.phase === 'None') qm.hidden = true;
   document.body.classList.toggle('q-flex', d.queue?.id === 440);
-  if (!d.teams) { $('liveReco').hidden = true; return; }
+  // résultat qui arrive après coup (écran de fin de game) : on complète la dernière partie de l'historique
+  if (d.result && !LIVE.game && LIVE.lastId) { const h = readHist().find((x) => x.id === LIVE.lastId); if (h && !h.result) histUpsert({ id: LIVE.lastId, result: d.result }); }
+  if (!d.teams) {
+    $('liveReco').hidden = true;
+    // fin de partie ou sélection annulée : l'écran de la partie ne reste pas affiché
+    if (LIVE.game || LIVE.wasSelect) liveEndGame(d);
+    return;
+  }
+  if (d.phase === 'ChampSelect') LIVE.wasSelect = true;
   const sig = JSON.stringify([d.teams, d.bans, d.mySide]);
   if (sig === LIVE.sig) return;
   LIVE.sig = sig;
@@ -1156,6 +1238,7 @@ function onLive(d) {
   }
   render();
   liveReco(d);
+  if (d.phase === 'InProgress') { LIVE.game = liveSnapshot(d); histUpsert(LIVE.game); }
 }
 // Pendant la sélection des champions : les meilleures réponses pour TON pick (lane, matchup, compo, ton pool)
 function liveReco(d) {
@@ -1424,6 +1507,7 @@ function initLive() {
   initWinSize();
   $('startLive').onclick = startLiveMode;
   $('liveStop').onclick = () => { stopLiveMode(); toast('Direct arrêté'); };
+  $('liveHist').onclick = () => { const b = $('histBox'); if (b.hidden) { toast('Aucune partie dans l’historique pour l’instant'); return; } b.open = true; b.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
   api.onLive?.(onLive);
 }
 function initShot() {

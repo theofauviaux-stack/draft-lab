@@ -84,8 +84,10 @@
     liveStop(); let k = 0;
     const tick = () => {
       if (!liveCb || window.__livePause) return;
-      const st = STEPS[Math.min(k, STEPS.length - 1)];
-      liveCb(st.phase === 'InProgress' ? gameSnap((k - STEPS.length + 1) * 30) : st);
+      const st = STEPS[Math.min(k, STEPS.length - 1)], after = k - STEPS.length + 1;
+      // démo : la partie dure 14 relevés, puis écran de fin (victoire) et retour au salon
+      if (st.phase === 'InProgress' && after > 14) liveCb(after < 17 ? { phase: 'EndOfGame', summoner: 'Moi#EUW', queue: { id: 420, label: 'Solo/Duo' }, result: 'win' } : { phase: 'Lobby', summoner: 'Moi#EUW', queue: { id: 420, label: 'Solo/Duo' } });
+      else liveCb(st.phase === 'InProgress' ? gameSnap(after * 30) : st);
       k++;
     };
     tick(); liveTimer = setInterval(tick, window.__liveMs || 1700);

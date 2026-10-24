@@ -36,7 +36,7 @@
     </div>
   </header>
 
-  <div id="liveBar" class="livebar" hidden><span class="lv-conn" id="liveConn"><span class="lv-dot"></span><span id="liveConnTxt">Recherche du client…</span></span><b id="liveTitle">Partie en direct</b><span id="liveMode" class="lv-mode" hidden></span><span id="liveText" class="muted"></span><button id="liveStop" class="tb-btn">Arrêter le direct</button></div>
+  <div id="liveBar" class="livebar" hidden><span class="lv-conn" id="liveConn"><span class="lv-dot"></span><span id="liveConnTxt">Recherche du client…</span></span><b id="liveTitle">Partie en direct</b><span id="liveMode" class="lv-mode" hidden></span><span id="liveText" class="muted"></span><button id="liveHist" class="tb-btn" title="Tes parties précédentes, regroupées par session">📜 Historique</button><button id="liveStop" class="tb-btn">Arrêter le direct</button></div>
   <div id="liveReco" class="live-reco" hidden></div>
   <div id="flBar" class="flbar" hidden></div>
   <section class="tools">
@@ -64,6 +64,10 @@
       <summary>Mes drafts <span id="savesCount"></span></summary>
       <div class="row"><input id="saveName" placeholder="Nom de la draft (ex : Scrim vs KC, game 2)" /><button id="saveBtn">Sauvegarder la draft actuelle</button></div>
       <div id="savesList"></div>
+    </details>
+    <details class="box" id="histBox" hidden>
+      <summary>Historique des parties en direct <span id="histCount"></span></summary>
+      <div id="histList"></div>
     </details>
   </section>
 

@@ -1124,3 +1124,18 @@ body.fearless .board .grid { box-shadow: inset 0 0 0 2px color-mix(in srgb, #b04
 .tile.fl:hover { transform: none !important; box-shadow: none !important; }
 .ms-fl { display: block; width: min(760px, 100%); margin: 0 auto 10px; padding: 10px 14px !important; border-radius: 12px !important; background: #b0452f !important; color: #fff !important; border: 0 !important; font-weight: 700; cursor: pointer; text-align: center; }
 .ms-fl:hover { filter: brightness(1.08); }
+/* historique des parties en direct */
+.hs { margin-top: 10px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.hs-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; padding: 9px 12px; background: var(--panel-2); font-size: 12.5px; }
+.hs-h b { font-size: 13.5px; }
+.hs-rec em { font-style: normal; font-weight: 800; } .hs-rec .w { color: #1f9d55; } .hs-rec .l { color: var(--red); }
+.hg { display: grid; grid-template-columns: 44px 120px 30px auto 22px auto 64px 96px auto 26px; align-items: center; gap: 8px; padding: 7px 12px; border-top: 1px solid var(--line); font-size: 12.5px; border-left: 4px solid var(--line); }
+.hg.win { border-left-color: #1f9d55; } .hg.loss { border-left-color: var(--red); }
+.hg-t { color: var(--muted); } .hg-q { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hg-me { width: 30px; height: 30px; border-radius: 7px; }
+.hg-tm { display: flex; gap: 2px; } .hg-tm img, .hg-tm i { width: 22px; height: 22px; border-radius: 5px; display: block; background: var(--panel-2); }
+.hg > em { font-style: normal; font-size: 10.5px; color: var(--muted); text-align: center; }
+.hg-wr { font-weight: 700; text-align: right; }
+.hg-res { font-weight: 700; } .hg.win .hg-res { color: #1f9d55; } .hg.loss .hg-res { color: var(--red); } .hg:not(.win):not(.loss) .hg-res { color: var(--muted); font-weight: 500; }
+.hg-open { font-size: 12px; padding: 4px 10px; } .hg-del { border: 0; background: none; color: var(--muted); font-size: 16px; cursor: pointer; }
+.hs-foot { display: flex; justify-content: flex-end; margin-top: 8px; }
