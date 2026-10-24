@@ -14,27 +14,40 @@ async function getJson(url) {
   } finally { clearTimeout(t); }
 }
 
-// Accepte un lien multi op.gg (www.op.gg/multisearch/euw?summoners=A%23TAG,B%23TAG)
-// ou une liste collée "Nom#TAG, Nom#TAG" (une ligne ou plusieurs).
-function parseInput(input, fallbackRegion = 'euw', max = 5) {
-  let region = fallbackRegion;
-  let list = String(input || '').trim();
+// Accepte un ou plusieurs liens op.gg (multi-search ou page d'un joueur), une liste collée
+// "Nom#TAG, Nom#TAG" (une ligne ou plusieurs), le chat du salon, ou un mélange de tout ça :
+// on ne garde que les pseudos.
+const URL_RE = /(?:https?:\/\/)?(?:[a-z]+\.)?op\.gg\/\S+/gi;
+function namesFromUrl(raw) {
   try {
-    if (/^https?:\/\//i.test(list) || /op\.gg/i.test(list)) {
-      const u = new URL(/^https?:/i.test(list) ? list : `https://${list}`);
-      const m = u.pathname.match(/multisearch\/([a-z]+)/i) || u.pathname.match(/summoners\/([a-z]+)\//i);
-      if (m && REGIONS.includes(m[1].toLowerCase())) region = m[1].toLowerCase();
-      if (u.searchParams.get('region')) region = u.searchParams.get('region').toLowerCase();
-      const s = u.searchParams.get('summoners');
-      if (s) list = s;
-      else {
-        const one = u.pathname.match(/summoners\/[a-z]+\/([^/]+)/i);
-        if (one) list = decodeURIComponent(one[1]).replace(/-([^-]+)$/, '#$1');
-      }
-    }
+    const u = new URL(/^https?:/i.test(raw) ? raw : `https://${raw}`);
+    const m = u.pathname.match(/multisearch\/([a-z]+)/i) || u.pathname.match(/summoners\/([a-z]+)\//i);
+    let region = m && REGIONS.includes(m[1].toLowerCase()) ? m[1].toLowerCase() : null;
+    if (u.searchParams.get('region')) region = u.searchParams.get('region').toLowerCase();
+    const s = u.searchParams.get('summoners');
+    if (s) return { region, names: s.split(/[,\n]+/) };
+    const one = u.pathname.match(/summoners\/[a-z]+\/([^/]+)/i);
+    if (one) return { region, names: [decodeURIComponent(one[1]).replace(/-([^-]+)$/, '#$1')] };
   } catch {}
-  const names = list.split(/[,\n;]+/).map((x) => x.replace(/\s+joined the lobby.*/i, '').trim()).filter(Boolean).slice(0, max);
-  return { region, names };
+  return { region: null, names: [] };
+}
+function parseInput(input, fallbackRegion = 'euw', max = 5) {
+  let region = null;
+  const text = String(input || '');
+  const names = [];
+  for (const m of text.match(URL_RE) ?? []) {
+    const r = namesFromUrl(m.replace(/[,;]+$/, ''));
+    region ??= r.region;
+    names.push(...r.names);
+  }
+  // le reste du texte (hors liens) : pseudos séparés par des virgules, des lignes ou des points-virgules
+  for (const x of text.replace(URL_RE, '\n').split(/[,\n;]+/)) names.push(x);
+  const seen = new Set();
+  const out = names
+    .map((x) => x.replace(/\s+(joined the lobby|a rejoint le salon).*/i, '').replace(/\s+/g, ' ').trim())
+    .filter((x) => x && !/^https?:/i.test(x) && !seen.has(x.toLowerCase()) && seen.add(x.toLowerCase()))
+    .slice(0, max);
+  return { region: region ?? fallbackRegion, names: out };
 }
 
 const normTag = (t) => String(t || '').replace(/\s+/g, '').toLowerCase();

@@ -1,7 +1,7 @@
 {
-  "version": "2.35.1",
-  "sha256": "afb865a5d2330605c14d49592cb8cfeb3c62e28acefd002b61e4e6053670a3bc",
-  "file": "draftlab-2.35.1.json.gz",
-  "notes": "Équilibrage : elo toujours déterminé automatiquement (Solo/Duo, saison passée, Flex, sinon moyenne du groupe)",
-  "date": "2026-10-24T19:17:06.308Z"
+  "version": "2.35.2",
+  "sha256": "a08086733af70de6605ebd56eaafb8216d7fa41f4190e3cb3d098cb3643689a2",
+  "file": "draftlab-2.35.2.json.gz",
+  "notes": "Pseudos lus dans n'importe quel collage : plusieurs liens op.gg, listes, chat du salon",
+  "date": "2026-10-24T19:21:31.592Z"
 }
