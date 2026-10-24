@@ -1,7 +1,7 @@
 {
-  "version": "2.36.0",
-  "sha256": "ddc289b5afeac7fcef84dddca12f5068b5a0ad28d5de5d04d90f4db487d65018",
-  "file": "draftlab-2.36.0.json.gz",
-  "notes": "Équilibrage : 3 rôles par joueur, explication du calcul retirée",
-  "date": "2026-10-24T19:30:31.067Z"
+  "version": "2.37.0",
+  "sha256": "bd2183f61bd38833e8ff50e09adeb2fa6813e9b09d4bd0d72db9049fb1e376c9",
+  "file": "draftlab-2.37.0.json.gz",
+  "notes": "Équilibrage : joueurs gardés en mémoire, un nouveau lien op.gg s'ajoute à la liste",
+  "date": "2026-10-24T19:40:06.615Z"
 }

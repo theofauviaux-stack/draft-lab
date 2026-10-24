@@ -1086,6 +1086,7 @@ function balElo(p) {
   return { pts: others.length ? others.reduce((a, x) => a + x, 0) / others.length : 1600, src: 'pas classé : moyenne du groupe', guess: true };
 }
 const balPts = (p) => balElo(p).pts;
+const balActive = () => BAL.players.filter((p) => p.on !== false);
 const balLabel = (p) => { const e = balElo(p), n = p.rank?.tier || p.rank?.prevTier ? rankName(p.rank) : null; return { ...e, label: n ? n.label : pointsLabel(e.pts), color: n ? rankColor(p.rank) : tierColor(e.pts) }; };
 function openBalance() {
   $('startMenu').classList.add('form'); $('startChoices').hidden = true; $('balanceBox').hidden = false;
@@ -1097,41 +1098,48 @@ function openBalance() {
 function closeBalance() { $('balanceBox').hidden = true; $('startChoices').hidden = false; $('startMenu').classList.remove('form'); }
 async function balSearch() {
   const raw = $('balInput').value.trim();
-  if (!raw) { toast('Entre les pseudos des 10 joueurs'); return; }
+  if (!raw) { toast('Entre des pseudos ou colle un lien op.gg'); return; }
   if (!api.loadPlayers) { toast('Disponible uniquement dans l’application'); return; }
   const btn = $('balSearch'); btn.disabled = true; btn.textContent = 'Recherche sur op.gg…';
   try {
     const res = await api.loadPlayers({ input: raw, region: $('balRegion').value });
     if (res.error) throw new Error(res.error);
-    // on garde les réglages déjà faits à la main pour un joueur déjà présent
-    const prev = new Map(BAL.players.map((p) => [p.key, p]));
-    BAL.players = res.players.map((p) => {
+    // Mémoire : les joueurs déjà dans la liste restent (seul le ✕ les retire). Un joueur déjà présent
+    // est mis à jour (elo, rôles op.gg) en gardant les rôles réglés à la main ; les nouveaux s'ajoutent.
+    let added = 0, updated = 0;
+    for (const p of res.players) {
       const key = (p.riotId ?? '').toLowerCase().replace(/\s+/g, '');
       const auto = rolesFromPool(p.all ?? p.pool, state.data?.stats);
-      const old = prev.get(key);
-      return {
-        key, riotId: p.riotId, error: p.error ?? null, rank: p.rank ?? null, top: (p.pool ?? []).slice(0, 3).map((c) => c.id),
-        auto, main: old?.edited ? old.main : auto?.main ?? 'FILL', second: old?.edited ? old.second : auto?.second ?? 'FILL', third: old?.edited ? old.third ?? auto?.third ?? 'FILL' : auto?.third ?? 'FILL',
-        edited: old?.edited ?? false
-      };
-    });
+      const old = BAL.players.find((x) => x.key === key || (!key.includes('#') && x.key.split('#')[0] === key));
+      const base = { key, riotId: p.riotId, error: p.error ?? null, rank: p.rank ?? null, top: (p.pool ?? []).slice(0, 3).map((c) => c.id), auto };
+      if (old) {
+        Object.assign(old, base, old.edited ? {} : { main: auto?.main ?? 'FILL', second: auto?.second ?? 'FILL', third: auto?.third ?? 'FILL' });
+        updated++;
+      } else {
+        // un nouveau joueur joue d'office tant qu'il y a moins de 10 joueurs cochés
+        BAL.players.push({ ...base, main: auto?.main ?? 'FILL', second: auto?.second ?? 'FILL', third: auto?.third ?? 'FILL', edited: false, on: balActive().length < 10 });
+        added++;
+      }
+    }
+    $('balInput').value = '';
     balSave(); renderBalList();
+    toast(`${added} joueur${added > 1 ? 's' : ''} ajouté${added > 1 ? 's' : ''}${updated ? ` · ${updated} mis à jour` : ''}`);
   } catch (e) { toast(`op.gg : ${e.message}`); }
-  btn.disabled = false; btn.textContent = 'Rechercher sur op.gg';
+  btn.disabled = false; btn.textContent = 'Ajouter depuis op.gg';
 }
 function renderBalList() {
-  const L = $('balList'), n = BAL.players.length;
-  $('balCount').textContent = n ? `${n}/10 joueurs` : '';
-  const ok = n === 10;
+  const L = $('balList'), n = BAL.players.length, act = balActive().length;
+  $('balCount').textContent = n ? (n > 10 ? `${act}/10 en jeu · ${n} joueurs gardés` : `${n}/10 joueurs`) : '';
+  const ok = act === 10;
   $('balGo').disabled = !ok;
-  $('balGo').title = ok ? '' : 'Il faut exactement 10 joueurs';
+  $('balGo').title = ok ? '' : n > 10 ? 'Coche exactement 10 joueurs' : 'Il faut 10 joueurs';
   const roleSel = (p, f) => `<select data-f="${f}">${[...BAL_ROLES, 'FILL'].map((r) => `<option value="${r}" ${(p[f] ?? p.auto?.[f] ?? 'FILL') === r ? 'selected' : ''}>${RL[r]}</option>`).join('')}</select>`;
   L.innerHTML = BAL.players.map((p, i) => {
     const e = balLabel(p);
     const rk = `<span class="bal-rk ${e.src === 'Solo/Duo' ? '' : 'est'}" style="--c:${e.color}" title="${e.src}">${e.src === 'Solo/Duo' ? '' : '≈ '}${e.label}${p.rank?.tier && p.rank.lp != null ? ` <small>${p.rank.lp} LP</small>` : ` <small>${e.src === 'Solo/Duo' ? '' : e.src.replace('Solo/Duo ', '')}</small>`}</span>`;
     const pc = p.auto?.pct ? Object.entries(p.auto.pct).sort((a, b) => b[1] - a[1]).filter(([, v]) => v >= 5).slice(0, 3).map(([r, v]) => `${RL[r]} ${v} %`).join(' · ') : '';
-    return `<div class="bal-row ${p.error ? 'err' : ''}" data-i="${i}">
-      <span class="bal-n">${i + 1}</span>
+    return `<div class="bal-row ${p.error ? 'err' : ''} ${p.on === false ? 'off' : ''}" data-i="${i}">
+      ${n > 10 ? `<label class="bal-on" title="Joue cette partie"><input type="checkbox" ${p.on !== false ? 'checked' : ''}></label>` : `<span class="bal-n">${i + 1}</span>`}
       <span class="bal-id"><b>${p.riotId ?? '?'}</b><small>${p.error ? `⚠ ${p.error}` : pc ? `op.gg : ${pc}` : 'rôles inconnus'}</small></span>
       <span class="bal-ch">${p.top.map((id) => `<img src="${img(id)}" alt="">`).join('')}</span>
       ${rk}
@@ -1139,7 +1147,7 @@ function renderBalList() {
       <label class="bal-r">Rôle 2 ${roleSel(p, 'second')}</label>
       <label class="bal-r">Rôle 3 ${roleSel(p, 'third')}</label>
       <button class="bal-x" title="Retirer ce joueur">✕</button></div>`;
-  }).join('') || '<p class="muted bal-empty">Entre les 10 pseudos puis lance la recherche : l’elo et les rôles de chacun sont récupérés automatiquement.</p>';
+  }).join('') || '<p class="muted bal-empty">Entre les pseudos ou colle des liens op.gg puis lance la recherche : l’elo et les rôles de chacun sont récupérés automatiquement. Les joueurs restent en mémoire.</p>';
   L.querySelectorAll('.bal-row').forEach((row) => {
     const p = BAL.players[+row.dataset.i];
     row.querySelectorAll('select').forEach((sel) => (sel.onchange = () => {
@@ -1148,10 +1156,12 @@ function renderBalList() {
       balSave(); renderBalList();
     }));
     row.querySelector('.bal-x').onclick = () => { BAL.players.splice(+row.dataset.i, 1); balSave(); renderBalList(); };
+    const cb = row.querySelector('.bal-on input');
+    if (cb) cb.onchange = () => { p.on = cb.checked; balSave(); renderBalList(); };
   });
 }
 function balRun() {
-  const ps = BAL.players;
+  const ps = BAL.team = balActive();
   const input = ps.map((p) => ({ value: balValue(balPts(p)), main: p.main, second: p.second, third: p.third ?? p.auto?.third ?? 'FILL', wins: p.rank?.wins, losses: p.rank?.losses, hot: p.rank?.hot }));
   BAL.sols = balanceTeams(input); BAL.k = 0; BAL.swap = false;
   if (!BAL.sols.length) { toast('Il faut exactement 10 joueurs'); return; }
@@ -1166,14 +1176,14 @@ function renderBalResult() {
   const unval = (v) => (v > 2800 ? 2800 + (v - 2800) * 2 : v); // LP au-dessus de Master : comptés à moitié dans le calcul
   const FIT = { main: ['①', 'rôle 1'], second: ['②', 'rôle 2'], third: ['③', 'rôle 3'], fill: ['②', 'fill'], off: ['⚠', 'hors de ses 3 rôles'] };
   const cell = (pi, ri, v, side) => {
-    const p = BAL.players[pi], fit = roleFit({ ...p, third: p.third ?? p.auto?.third ?? 'FILL' }, BAL_ROLES[ri]), e = balLabel(p);
+    const p = BAL.team[pi], fit = roleFit({ ...p, third: p.third ?? p.auto?.third ?? 'FILL' }, BAL_ROLES[ri]), e = balLabel(p);
     return `<div class="bal-p ${side} ${fit}"><span class="bal-fit" title="${FIT[fit][1]}">${FIT[fit][0]}</span><b>${p.riotId}</b><span class="bal-rk" style="--c:${e.color}" title="${e.src}">${e.src === 'Solo/Duo' ? '' : '≈ '}${e.label}</span></div>`;
   };
   const rows = BAL_ROLES.map((role, ri) => {
     const d = vb[ri] - vr[ri];
     return `<div class="bal-lane">${cell(b[ri], ri, vb[ri], 'blue')}<div class="bal-mid"><span>${RL[role]}</span><i class="${Math.abs(d) < 150 ? 'eq' : d > 0 ? 'b' : 'r'}" title="Écart de niveau à cette lane (rôle compris)">${Math.abs(d) < 150 ? '≈' : `${d > 0 ? '◀' : ''} ${(Math.round(Math.abs(d) / 10) / 10).toLocaleString('fr-FR')} div. ${d < 0 ? '▶' : ''}`}</i></div>${cell(r[ri], ri, vr[ri], 'red')}</div>`;
   }).join('');
-  const fits = [...b, ...r].map((pi, k) => { const p = BAL.players[pi]; return roleFit({ ...p, third: p.third ?? p.auto?.third ?? 'FILL' }, BAL_ROLES[k % 5]); });
+  const fits = [...b, ...r].map((pi, k) => { const p = BAL.team[pi]; return roleFit({ ...p, third: p.third ?? p.auto?.third ?? 'FILL' }, BAL_ROLES[k % 5]); });
   const nMain = fits.filter((f) => f === 'main').length, nOff = fits.filter((f) => f === 'off').length;
   $('balResult').innerHTML = `
     <div class="bal-top">
@@ -1188,7 +1198,7 @@ function renderBalResult() {
 function balDraft() {
   const sol = BAL.sols[BAL.k]; if (!sol) return;
   const [b, r] = BAL.swap ? [sol.red, sol.blue] : [sol.blue, sol.red];
-  const ids = (t) => t.map((pi) => BAL.players[pi].riotId).join(', ');
+  const ids = (t) => t.map((pi) => BAL.team[pi].riotId).join(', ');
   $('menuBlue').value = ids(b); $('menuRed').value = ids(r); $('menuRegion').value = $('balRegion').value;
   $('balanceBox').hidden = true; $('startForm').hidden = false;
   toast('Équipes prêtes : choisis ton côté puis lance la draft');

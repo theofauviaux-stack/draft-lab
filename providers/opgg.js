@@ -120,7 +120,7 @@ async function pageSummary(region, s) {
 
 // Jusqu'à 10 joueurs (équilibrage in house) : rang et champions joués, sans le complément dpm.lol
 async function fetchPlayers(input, champions, fallbackRegion) {
-  const { region, names } = parseInput(input, fallbackRegion, 10);
+  const { region, names } = parseInput(input, fallbackRegion, 20);
   if (!names.length) throw new Error('Aucun joueur trouvé dans la liste');
   const byKey = new Map(champions.map((c) => [String(c.key), c.id]));
   const players = await Promise.all(names.map((n) => fetchPlayer(region, n, byKey).catch((e) => ({ riotId: n, error: e.message }))));
