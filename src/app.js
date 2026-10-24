@@ -90,9 +90,23 @@ function skipBan() {
 }
 // Fearless : les champions joués dans les games précédentes de la série sont verrouillés pour les deux équipes
 const FL_KEY = 'draftlab-fearless';
-state.fearless = (() => { try { return JSON.parse(localStorage.getItem(FL_KEY)) ?? { on: false, games: [] }; } catch { return { on: false, games: [] }; } })();
+// Série Fearless : chaque game garde sa draft complète (picks, bans, lanes) — on peut revenir sur n'importe quelle game.
+// fearless = { on, bo: 3|5, cur: index de la game affichée, games: [{ slots, roles, lock, history } | null] }
+const FL_OFF = () => ({ on: false, bo: 5, cur: 0, games: [] });
+function flMigrate(f) {
+  if (!f || !f.on) return FL_OFF();
+  if (f.games?.length && f.games[0] && f.games[0].blue && !f.games[0].slots) { // ancien format : seulement les picks des games finies
+    const games = f.games.map((g) => ({ slots: { ...emptySlots(), blue: [...g.blue], red: [...g.red] }, roles: { blue: [...ROLES], red: [...ROLES] }, lock: { blue: Array(5).fill(null), red: Array(5).fill(null) }, history: [] }));
+    return { on: true, bo: 5, cur: games.length, games: [...games, null] };
+  }
+  return { bo: 5, cur: 0, games: [], ...f };
+}
+state.fearless = (() => { try { return flMigrate(JSON.parse(localStorage.getItem(FL_KEY))); } catch { return FL_OFF(); } })();
 const saveFearless = () => { try { localStorage.setItem(FL_KEY, JSON.stringify(state.fearless)); } catch {} };
-const flLocked = () => { const m = new Map(); if (state.fearless?.on && flAllowed()) state.fearless.games.forEach((g, k) => [...g.blue, ...g.red].forEach((id) => id && !m.has(id) && m.set(id, k + 1))); return m; };
+const flSnap = () => ({ slots: structuredClone(state.slots), roles: structuredClone(state.roles), lock: structuredClone(state.lock), history: structuredClone(state.history) });
+const flPicks = (g) => (g ? [...g.slots.blue, ...g.slots.red].filter(Boolean) : []);
+// champions joués dans les AUTRES games de la série : verrouillés pour les deux équipes
+const flLocked = () => { const m = new Map(), f = state.fearless; if (f?.on && flAllowed()) f.games.forEach((g, k) => { if (k !== f.cur) flPicks(g).forEach((id) => !m.has(id) && m.set(id, k + 1)); }); return m; };
 const used = () => new Set([...Object.values(state.slots).flat().filter(Boolean), ...flLocked().keys()]);
 // ---------- Joueurs (multi op.gg) ----------
 // Un champion du pool ne compte que s'il est joué à la lane du joueur
@@ -138,7 +152,6 @@ function toast(msg) {
 // ---------- Actions ----------
 function place(id) {
   const tg = target();
-  if (tg && flLocked().has(id) && !Object.values(state.slots).flat().includes(id)) { toast(`🔒 ${state.P[id]?.name ?? id} est verrouillé (Fearless : joué en game ${flLocked().get(id)})`); return; }
   if (!tg || used().has(id)) return;
   const [t, i] = tg;
   state.slots[t][i] = id;
@@ -967,6 +980,8 @@ function openMenu() {
   if (LIVE.on) stopLiveMode();
   $('startMenu').hidden = false;
   $('startMenu').classList.remove('leaving', 'form');
+  if ($('startModeBox')) $('startModeBox').hidden = true;
+  try { window.scrollTo(0, 0); document.getElementById('appview')?.scrollTo(0, 0); } catch {}
   startBackground();
   $('startForm').hidden = true; $('startChoices').hidden = false;
   $('menuBlue').value = state.teamInput.blue ?? ''; $('menuRed').value = state.teamInput.red ?? '';
@@ -976,11 +991,15 @@ function openMenu() {
 // liste des drafts sauvegardées du menu (re-dessinée quand les données arrivent : sinon les portraits restent vides)
 function renderMenuSaves() {
   const saves = readSaves();
+  const f = state.fearless;
+  const resume = f?.on && f.games.some((g) => g && flPicks(g).length) ? `<button class="ms-fl" id="menuFlResume">⚔ Reprendre la série Fearless Bo${f.bo} · game ${f.cur + 1}</button>` : '';
   const mini = (ids) => (ids ?? []).map((id) => (id && id !== NO_BAN && img(id) ? `<img src="${img(id)}" alt="" title="${state.P[id]?.name ?? id}">` : '<span></span>')).join('');
   $('menuSaves').innerHTML = saves.length ? `<details class="ms-list"><summary>📂 Reprendre une draft sauvegardée <span>(${saves.length})</span></summary>
     <div class="ms-rows">${saves.map((d) => `<button class="msave" data-id="${d.id}">
       <span class="ms-n"><b>${d.name.replace(/</g, '&lt;')}</b><small>${new Date(d.date).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}</small></span>
       <span class="ms-p b">${mini(d.slots?.blue)}</span><em>vs</em><span class="ms-p r">${mini(d.slots?.red)}</span></button>`).join('')}</div></details>` : '';
+  $('menuSaves').insertAdjacentHTML('afterbegin', resume);
+  if ($('menuFlResume')) $('menuFlResume').onclick = () => { state.fromShot = false; if (f.flow) state.flow = f.flow; render(); closeMenu(); };
   $('menuSaves').querySelectorAll('.msave').forEach((b) => (b.onclick = () => { loadDraft(+b.dataset.id); closeMenu(); }));
 }
 const closeMenu = () => {
@@ -991,45 +1010,56 @@ const closeMenu = () => {
 };
 function renderFearless() {
   const f = state.fearless, el = $('flBar');
-  const ok = flAllowed(), on = !!f?.on && ok;
-  $('flToggle').hidden = !ok; $('flToggle').classList.toggle('on', on);
-  $('flToggle').textContent = on ? `⚔ Fearless · G${f.games.length + 1}` : '⚔ Fearless';
+  const on = !!f?.on && flAllowed();
+  $('flToggle').hidden = !on;
+  if (on) $('flToggle').textContent = `⚔ Fearless Bo${f.bo} · Game ${f.cur + 1}`;
   el.hidden = !on;
   document.body.classList.toggle('fearless', on);
-  if (el.hidden) return;
-  const n = f.games.length + 1;
-  el.innerHTML = `<b class="fl-t">⚔ Fearless · Game ${n}</b>
-    <div class="fl-games">${f.games.length ? f.games.map((g, k) => `<span class="fl-g" title="Game ${k + 1} : verrouillés pour toute la série"><em>G${k + 1}</em>${[...g.blue, ...g.red].filter(Boolean).map((id) => `<img src="${img(id)}" title="${state.P[id]?.name ?? id} (game ${k + 1})" alt="">`).join('')}</span>`).join('') : '<span class="muted">Game 1 : aucun champion verrouillé pour l’instant. À la fin de la game, clique sur « Game suivante ».</span>'}</div>
-    <div class="fl-acts">${f.games.length ? '<button id="flUndo" class="tb-btn" title="Revenir à la game précédente (ses picks reviennent dans la draft)">↶ Game précédente</button>' : ''}${f.games.length < 4 ? '<button id="flNext" class="tb-btn primary" title="Verrouille les champions joués et lance la game suivante">Game suivante →</button>' : '<span class="fl-last">Game 5 : dernière game d’un Bo5</span>'}<button id="flEnd" class="tb-btn" title="Termine la série et désactive le Fearless">Terminer la série</button></div>`;
+  if (!on) return;
+  if (flRestored) { f.games[f.cur] = flSnap(); saveFearless(); } // mémoire : la game affichée est enregistrée à chaque changement
+  const tab = (k) => {
+    const g = f.games[k], picks = k === f.cur ? flPicks(f.games[k]) : flPicks(g);
+    const reach = k <= f.games.length && (k === 0 || flPicks(f.games[k - 1]).length > 0 || f.games[k]); // on avance game par game
+    return `<button class="fl-tab ${k === f.cur ? 'cur' : ''} ${picks.length ? 'played' : ''}" data-k="${k}" ${reach ? '' : 'disabled'} title="${reach ? `Game ${k + 1}${picks.length ? ` : ${picks.length} champions joués` : ''}` : 'Joue d’abord la game précédente'}">
+      <em>G${k + 1}</em>${picks.length ? `<span class="fl-ic">${picks.slice(0, 10).map((id) => `<img src="${img(id)}" alt="" title="${state.P[id]?.name ?? id}">`).join('')}</span>` : `<span class="fl-empty">${k === f.cur ? 'en cours' : reach ? 'à jouer' : '—'}</span>`}</button>`;
+  };
+  el.innerHTML = `<b class="fl-t">⚔ Fearless · Bo${f.bo}</b>
+    <div class="fl-tabs">${Array.from({ length: f.bo }, (_, k) => tab(k)).join('')}</div>
+    <div class="fl-acts">${f.cur < f.bo - 1 ? '<button id="flNext" class="tb-btn primary" title="Passe à la game suivante (la draft actuelle reste enregistrée)">Game suivante →</button>' : ''}<button id="flEnd" class="tb-btn" title="Termine la série et revient en draft classique">Terminer la série</button></div>`;
+  el.querySelectorAll('.fl-tab:not([disabled])').forEach((b) => (b.onclick = () => flGo(+b.dataset.k)));
   if ($('flNext')) $('flNext').onclick = () => {
-    const picks = { blue: [...state.slots.blue], red: [...state.slots.red] };
-    if (![...picks.blue, ...picks.red].some(Boolean)) { toast('Aucun champion joué dans cette game'); return; }
-    f.games.push(picks); saveFearless(); reset();
-    toast(`Game ${f.games.length + 1} : ${flLocked().size} champions verrouillés pour les deux équipes`);
+    if (!flPicks(f.games[f.cur]).length) { toast('Joue au moins un pick dans cette game avant de passer à la suivante'); return; }
+    flGo(f.cur + 1);
   };
-  if ($('flUndo')) $('flUndo').onclick = (e) => {
-    // la draft en cours serait remplacée : on demande un 2e clic pour confirmer
-    if (Object.values(state.slots).flat().some(Boolean) && !e.currentTarget.dataset.ok) { e.currentTarget.dataset.ok = '1'; e.currentTarget.textContent = 'Confirmer : la draft en cours sera effacée'; toast('Reclique pour revenir à la game précédente (la draft en cours sera effacée)'); return; }
-    const g = f.games.pop(); saveFearless();
-    state.slots = emptySlots(); state.slots.blue = [...g.blue]; state.slots.red = [...g.red]; assignRoles('blue'); assignRoles('red'); render();
-    toast(`Retour à la game ${f.games.length + 1}`);
-  };
-  $('flEnd').onclick = () => { state.fearless = { on: false, games: [] }; saveFearless(); render(); toast('Série terminée : Fearless désactivé'); };
+  $('flEnd').onclick = () => { state.fearless = FL_OFF(); saveFearless(); render(); toast('Série terminée : retour en draft classique'); };
 }
-// Fearless : proposé seulement en « Draft de zéro » et « Draft depuis des joueurs » (bouton dans la barre du haut)
+// affiche une autre game de la série : la game courante est gardée telle quelle
+function flGo(k) {
+  const f = state.fearless;
+  if (k === f.cur || k < 0 || k >= f.bo) return;
+  f.games[f.cur] = flSnap();
+  const g = f.games[k];
+  f.cur = k;
+  if (g) { state.slots = structuredClone(g.slots); state.roles = structuredClone(g.roles); state.lock = structuredClone(g.lock); state.history = structuredClone(g.history ?? []); state.selected = null; render(); }
+  else reset();
+  saveFearless();
+  const n = flLocked().size;
+  toast(`Game ${k + 1}${n ? ` : ${n} champions verrouillés (joués dans les autres games)` : ''}`);
+}
+// Fearless : proposé seulement en « Draft de zéro » et « Draft depuis des joueurs »
 const flAllowed = () => !LIVE.on && !state.fromShot && (state.flow === 'zero' || state.flow === 'players');
-function startSeries() { state.fromShot = false; }
-function toggleFearless() {
-  if (state.fearless?.on) { state.fearless = { on: false, games: [] }; toast('Fearless désactivé'); }
-  else { state.fearless = { on: true, games: [] }; toast('Fearless activé : série en cours, game 1'); }
-  saveFearless(); render();
+// mode choisi dans le menu : 'classic', 'fl3' ou 'fl5'
+function startSeries(mode) {
+  state.fromShot = false;
+  state.fearless = mode === 'fl3' || mode === 'fl5' ? { on: true, bo: mode === 'fl3' ? 3 : 5, cur: 0, games: [], flow: state.flow } : FL_OFF();
+  saveFearless();
 }
-function startFromZero() {
-  startSeries();
+function startFromZero(mode = 'classic') {
+  startSeries(mode);
   state.players = { blue: [], red: [] }; state.teamInput = { blue: '', red: '' }; state.flow = 'zero';
   $('opggBlue').value = ''; $('opggRed').value = '';
   reset(); closeMenu();
-  toast('Draft de zéro : winrate et plan de jeu selon la méta du patch');
+  toast(mode === 'classic' ? 'Draft de zéro : winrate et plan de jeu selon la méta du patch' : `Draft de zéro · Fearless Bo${state.fearless.bo} : game 1`);
 }
 async function startFromPlayers() {
   const blue = $('menuBlue').value.trim(), red = $('menuRed').value.trim();
@@ -1039,7 +1069,7 @@ async function startFromPlayers() {
   savePrefs();
   $('opggBlue').value = blue; $('opggRed').value = red;
   state.flow = 'players';
-  startSeries();
+  startSeries(document.querySelector('#menuMode .on')?.dataset.mode ?? 'classic');
   reset();
   const go = $('menuGo'); go.disabled = true; go.textContent = 'Chargement des joueurs…';
   await Promise.all([loadTeam('blue'), loadTeam('red')]);
@@ -1390,7 +1420,6 @@ async function initWinSize() {
 new ResizeObserver(() => { if (state.list?.length) renderScaling(); }).observe(document.querySelector('.scal-plot'));
 function initLive() {
   initWinSize();
-  $('flToggle').onclick = toggleFearless;
   $('startLive').onclick = startLiveMode;
   $('liveStop').onclick = () => { stopLiveMode(); toast('Direct arrêté'); };
   api.onLive?.(onLive);
@@ -1436,7 +1465,7 @@ function saveDraft() {
     id: Date.now(), name, date: Date.now(), flow: state.flow, mySide: state.mySide,
     slots: structuredClone(state.slots), roles: structuredClone(state.roles), lock: structuredClone(state.lock), history: structuredClone(state.history),
     players: structuredClone(state.players), teamInput: { ...state.teamInput },
-    fearless: state.fearless?.on && flAllowed() ? structuredClone(state.fearless) : null
+    fearless: state.fearless?.on && flAllowed() ? structuredClone({ ...state.fearless, games: state.fearless.games.map((g, k) => (k === state.fearless.cur ? flSnap() : g)) }) : null
   };
   const same = list.findIndex((x) => x.name === name);
   if (same >= 0) list[same] = { ...entry, id: list[same].id }; else list.unshift(entry);
@@ -1453,12 +1482,12 @@ function loadDraft(id) {
     flow: d.flow ?? ([...(d.players?.blue ?? []), ...(d.players?.red ?? [])].some((p) => p.riotId || p.pool?.length) ? 'players' : 'zero')
   });
   // la série Fearless sauvegardée avec la draft revient avec elle (sinon : pas de série)
-  state.fromShot = false; state.fearless = d.fearless ? structuredClone(d.fearless) : { on: false, games: [] }; saveFearless();
+  state.fromShot = false; state.fearless = d.fearless ? flMigrate(structuredClone(d.fearless)) : FL_OFF(); saveFearless();
   $('mySide').value = state.mySide;
   $('opggBlue').value = state.teamInput.blue ?? ''; $('opggRed').value = state.teamInput.red ?? '';
   savePrefs();
   ingest(state.data);
-  toast(`« ${d.name} » chargée${d.fearless ? ` · Fearless game ${d.fearless.games.length + 1}` : ''}`);
+  toast(`« ${d.name} » chargée${state.fearless.on ? ` · Fearless Bo${state.fearless.bo}, game ${state.fearless.cur + 1}` : ''}`);
 }
 // Elo bien visible dans les encadrés d'équipe : Solo/Duo en grand (compté), Flex en petit (affiché)
 const SHORT_T = { Fer: 'Fer', Bronze: 'Bronze', Argent: 'Argent', Or: 'Or', Platine: 'Plat', 'Émeraude': 'Émer', Diamant: 'Diam', Master: 'Master', 'Grand Master': 'GM', Challenger: 'Chall' };
@@ -1617,6 +1646,17 @@ function ingest(data) {
   render();
   if (!$('startMenu').hidden) renderMenuSaves();
   resumeAfterUpdate();
+  flRestore();
+}
+// au démarrage : la game Fearless en cours revient dans la draft (sinon la mémoire serait écrasée par une draft vide)
+let flRestored = false;
+function flRestore() {
+  if (flRestored) return; flRestored = true;
+  const f = state.fearless, g = f?.on ? f.games[f.cur] : null;
+  if (!g || Object.values(state.slots).flat().some(Boolean)) return;
+  state.slots = structuredClone(g.slots); state.roles = structuredClone(g.roles); state.lock = structuredClone(g.lock); state.history = structuredClone(g.history ?? []);
+  if (f.flow) state.flow = f.flow;
+  render(); if (!$('startMenu').hidden) renderMenuSaves();
 }
 
 async function load(force = false) {
@@ -1633,7 +1673,11 @@ function initControls() {
   $('undo').onclick = undo; $('menuBtn').onclick = openMenu;
   $('reset').onclick = () => { reset(); toast('Nouvelle draft : mêmes joueurs, picks et bans vidés'); };
   document.querySelectorAll('.seg-b').forEach((b) => (b.onclick = () => { $('mySide').value = b.dataset.side; $('mySide').onchange({ target: $('mySide') }); }));
-  $('startZero').onclick = startFromZero;
+  // Draft de zéro : petit menu « classique / Fearless Bo3 / Fearless Bo5 »
+  $('startZero').onclick = () => { $('startMenu').classList.add('form'); $('startChoices').hidden = true; $('startModeBox').hidden = false; };
+  $('modeBack').onclick = () => { $('startMenu').classList.remove('form'); $('startModeBox').hidden = true; $('startChoices').hidden = false; };
+  document.querySelectorAll('#startModeBox .sm-o').forEach((b) => (b.onclick = () => { $('startModeBox').hidden = true; $('startChoices').hidden = false; $('startMenu').classList.remove('form'); startFromZero(b.dataset.mode); }));
+  document.querySelectorAll('#menuMode button').forEach((b) => (b.onclick = () => { document.querySelectorAll('#menuMode button').forEach((x) => x.classList.toggle('on', x === b)); }));
   $('startPlayers').onclick = () => { $('startMenu').classList.add('form'); $('startChoices').hidden = true; $('startForm').hidden = false; $('menuBlue').focus(); };
   $('menuBack').onclick = () => { $('startMenu').classList.remove('form'); $('startForm').hidden = true; $('startChoices').hidden = false; };
   $('menuGo').onclick = startFromPlayers;

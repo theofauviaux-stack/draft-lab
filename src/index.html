@@ -17,7 +17,7 @@
     </div>
     <div class="tb-group tb-draft">
       <span class="tb-mode" id="flowChip" title="Type de draft — « Nouvelle draft » pour changer">Draft de zéro</span>
-      <button id="flToggle" class="tb-btn fl-tog" hidden title="Mode Fearless (série Bo3 / Bo5) : un champion joué ne peut plus être repris dans la série">⚔ Fearless</button>
+      <span id="flToggle" class="fl-tog on" hidden title="Série Fearless en cours : un champion joué dans une game ne peut plus être repris">⚔ Fearless</span>
       <div class="seg" role="group" aria-label="Mon côté">
         <span class="seg-l">Je joue</span>
         <button class="seg-b blue" data-side="blue">Bleu</button>
@@ -187,6 +187,15 @@
           <span class="st-go">Importer une capture →</span>
         </button>
       </div>
+      <div id="startModeBox" class="start-form st-form st-mode" hidden>
+        <b class="sm-t">Draft de zéro : quel format ?</b>
+        <div class="sm-opts">
+          <button class="sm-o" data-mode="classic"><span class="sm-ic">✦</span><b>Draft classique</b><small>Une draft seule : tous les champions sont disponibles.</small></button>
+          <button class="sm-o fl" data-mode="fl3"><span class="sm-ic">⚔</span><b>Draft Fearless · Bo3</b><small>Série en 3 games : un champion joué ne peut plus être repris.</small></button>
+          <button class="sm-o fl" data-mode="fl5"><span class="sm-ic">⚔</span><b>Draft Fearless · Bo5</b><small>Série en 5 games : un champion joué ne peut plus être repris.</small></button>
+        </div>
+        <div class="form-row"><button id="modeBack">Retour</button></div>
+      </div>
       <div id="startForm" class="start-form st-form" hidden>
         <label class="blue">Équipe 1 — côté bleu<input id="menuBlue" placeholder="Lien multi op.gg ou Nom#TAG, Nom#TAG…" /></label>
         <label class="red">Équipe 2 — côté rouge<input id="menuRed" placeholder="Lien multi op.gg ou Nom#TAG, Nom#TAG…" /></label>
@@ -194,6 +203,7 @@
           <label>Je suis <select id="menuSide"><option value="blue">Équipe 1 (bleu)</option><option value="red">Équipe 2 (rouge)</option></select></label>
           <label>Région <select id="menuRegion"><option value="euw">EUW</option><option value="eune">EUNE</option><option value="na">NA</option><option value="kr">KR</option><option value="br">BR</option><option value="tr">TR</option><option value="lan">LAN</option><option value="las">LAS</option><option value="oce">OCE</option><option value="jp">JP</option><option value="me">ME</option></select></label>
         </div>
+        <div class="form-row fm-mode"><span>Format</span><div class="seg-mode" id="menuMode"><button type="button" class="on" data-mode="classic">Draft classique</button><button type="button" data-mode="fl3">⚔ Fearless Bo3</button><button type="button" data-mode="fl5">⚔ Fearless Bo5</button></div></div>
         <p class="muted">Ordre des joueurs : Top, Jungle, Mid, ADC, Support (modifiable ensuite). La région est lue dans le lien op.gg ; le menu ne sert que si tu colles des noms.</p>
         <div class="form-row"><button id="menuBack">Retour</button><button id="menuGo" class="primary">Lancer la draft</button></div>
       </div>

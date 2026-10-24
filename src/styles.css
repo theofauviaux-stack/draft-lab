@@ -1092,3 +1092,35 @@ body.fearless .board .grid { box-shadow: inset 0 0 0 2px color-mix(in srgb, #b04
 .pchamp.fl img { filter: grayscale(1) brightness(.6); } .pchamp.fl { position: relative; }
 .pchamp.fl::after { content: '🔒'; position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); font-size: 13px; }
 .fl-last { font-size: 12px; font-weight: 700; color: #b0452f; align-self: center; }
+/* menu : choix du format de draft */
+.st-mode { text-align: center; }
+.sm-t { display: block; font-size: 18px; margin-bottom: 14px; color: var(--st-ink, var(--text)); }
+.sm-opts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.sm-o { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: left; padding: 16px !important; border-radius: 14px !important; background: var(--panel) !important; border: 1px solid var(--line) !important; cursor: pointer; transition: transform .15s, border-color .15s; }
+.sm-o:hover { transform: translateY(-2px); border-color: var(--gold) !important; }
+.sm-o.fl:hover { border-color: #b0452f !important; }
+.sm-o .sm-ic { font-size: 22px; color: var(--gold); } .sm-o.fl .sm-ic, .sm-o.fl b { color: #b0452f; }
+.sm-o b { font-size: 15px; } .sm-o small { color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+.fm-mode { align-items: center; gap: 10px; } .fm-mode > span { font-weight: 700; font-size: 13px; }
+.seg-mode { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.seg-mode button { border: 0 !important; border-radius: 0 !important; padding: 7px 12px; background: var(--panel) !important; font-size: 12.5px; cursor: pointer; }
+.seg-mode button + button { border-left: 1px solid var(--line) !important; }
+.seg-mode button.on { background: var(--gold) !important; color: #fff !important; }
+.seg-mode button.on[data-mode^="fl"] { background: #b0452f !important; }
+/* série Fearless : onglets de games */
+.fl-tog { display: inline-flex; align-items: center; padding: 6px 12px; border-radius: 9px; font-size: 12.5px; font-weight: 700; background: #b0452f; color: #fff; white-space: nowrap; }
+.fl-tog[hidden] { display: none; }
+.fl-tabs { flex: 1; display: flex; gap: 6px; min-width: 0; }
+.fl-tab { display: flex; align-items: center; gap: 6px; padding: 5px 8px !important; border-radius: 9px !important; border: 1px solid var(--line) !important; background: var(--panel-2) !important; cursor: pointer; min-width: 0; }
+.fl-tab em { font-style: normal; font-weight: 800; font-size: 12px; color: var(--muted); }
+.fl-tab.cur { border-color: #b0452f !important; background: color-mix(in srgb, #b0452f 10%, var(--panel)) !important; box-shadow: 0 0 0 2px color-mix(in srgb, #b0452f 25%, transparent); }
+.fl-tab.cur em { color: #b0452f; }
+.fl-tab[disabled] { opacity: .45; cursor: not-allowed; }
+.fl-ic { display: flex; } .fl-ic img { width: 20px; height: 20px; border-radius: 4px; margin-right: -3px; border: 1px solid var(--panel); }
+.fl-tab:not(.cur) .fl-ic img { filter: grayscale(.6); }
+.fl-empty { font-size: 11.5px; color: var(--muted); }
+/* champion verrouillé : grisé et non sélectionnable */
+.tile.fl { cursor: not-allowed !important; pointer-events: auto; }
+.tile.fl:hover { transform: none !important; box-shadow: none !important; }
+.ms-fl { display: block; width: min(760px, 100%); margin: 0 auto 10px; padding: 10px 14px !important; border-radius: 12px !important; background: #b0452f !important; color: #fff !important; border: 0 !important; font-weight: 700; cursor: pointer; text-align: center; }
+.ms-fl:hover { filter: brightness(1.08); }

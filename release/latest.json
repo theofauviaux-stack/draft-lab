@@ -1,7 +1,7 @@
 {
-  "version": "2.30.0",
-  "sha256": "7a2bbe8d25c7592c30897d0e2208745ba7035fdd185b39f4c0a6648d2421cf02",
-  "file": "draftlab-2.30.0.json.gz",
-  "notes": "Fearless : messages verrouillés, pool marqué, confirmation Game précédente, limite Bo5, série gardée dans les sauvegardes ; bans phase 2 sans doublons ; textes corrigés (plaques, supports conseillés, styles, accords)",
-  "date": "2026-10-24T15:16:16.228Z"
+  "version": "2.31.0",
+  "sha256": "278781eecd3599015a200e0bebc49cae98d454be1d1de90463b609fd5e972641",
+  "file": "draftlab-2.31.0.json.gz",
+  "notes": "Fearless : choix du format au lancement (classique / Fearless Bo3 / Bo5), mémoire de chaque game avec onglets, champions verrouillés non sélectionnables, reprise de la série au démarrage",
+  "date": "2026-10-24T15:34:19.880Z"
 }
