@@ -1,7 +1,7 @@
 {
-  "version": "2.31.0",
-  "sha256": "278781eecd3599015a200e0bebc49cae98d454be1d1de90463b609fd5e972641",
-  "file": "draftlab-2.31.0.json.gz",
-  "notes": "Fearless : choix du format au lancement (classique / Fearless Bo3 / Bo5), mémoire de chaque game avec onglets, champions verrouillés non sélectionnables, reprise de la série au démarrage",
-  "date": "2026-10-24T15:34:19.880Z"
+  "version": "2.31.1",
+  "sha256": "23c5907234ac5e98cc23be3e3e46364366ce83ab5ab379ca6a32b568f15a3c98",
+  "file": "draftlab-2.31.1.json.gz",
+  "notes": "Rangs : Master, Grand Master et Challenger affichés tels quels (plus devinés d'après les LP)",
+  "date": "2026-10-24T16:47:35.345Z"
 }

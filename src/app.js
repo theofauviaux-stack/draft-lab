@@ -3,7 +3,7 @@ import { detectSlots, matchBanner } from './shotauto.js';
 import {
   ROLES, ROLE_LABEL, ARCH, ORDER, rel, relText, laneEdge, proEdge, LANE_OPP,
   buildProfiles, evaluate, setDetailSource, applyProGames, proInfo, recommend, recommendBans, projectPicks, gamePlan, powerCurve,
-  comfortPts, proposeDrafts, playerLabel, analyzeDraft, matchPlan, pentagonView, styleBreakdown, compLabel, playersForecast, combineWr, pointsLabel, rankPoints, RANK_OPTIONS, playerRating, dominant, teamShares, predictPicks, enemyScenarios, predictedBans
+  comfortPts, proposeDrafts, playerLabel, rankName, analyzeDraft, matchPlan, pentagonView, styleBreakdown, compLabel, playersForecast, combineWr, pointsLabel, rankPoints, RANK_OPTIONS, playerRating, dominant, teamShares, predictPicks, enemyScenarios, predictedBans
 } from './engine.js';
 
 // ---------- Accès aux données (app Electron, ou navigateur en secours) ----------
@@ -398,6 +398,8 @@ function renderStep() {
   el.className = 'step ' + (tg[0].startsWith('blue') ? 'blue' : 'red');
 }
 
+const APEX_COLOR = { MASTER: '#b65cff', GRANDMASTER: '#d64552', CHALLENGER: '#e2b13c' };
+const rankColor = (r) => { const n = rankName(r); return n ? APEX_COLOR[n.tier] ?? tierColor(rankPoints(r)) : tierColor(null); };
 const TIER_COLOR = [[2800, '#b65cff'], [2400, '#5b8cff'], [2000, '#2ec27e'], [1600, '#3fb8a6'], [1200, '#d4a837'], [800, '#9aa5b1'], [400, '#a0673c'], [0, '#7a7a7a']];
 const tierColor = (pts) => (pts == null ? '#c3cad5' : pts >= 3600 ? '#f5d36b' : pts >= 3200 ? '#d64552' : TIER_COLOR.find(([v]) => pts >= v)[1]);
 
@@ -427,7 +429,7 @@ function renderWr(ev) {
         const p = list.find((x) => x.role === r);
         const pts = p ? rankPoints(p.rank) : null;
         const fx = p?.rank?.flex ? rankPoints(p.rank.flex) : null;
-        return `<div class="sb-p" title="${p ? playerLabel(p) + (pts != null ? ' — Solo/Duo ' + pointsLabel(pts) : ' — Solo/Duo non classé') + (fx != null ? ' · Flex ' + pointsLabel(fx) : '') : ROLE_LABEL[r]}"><i style="background:${tierColor(pts)}"></i><span>${ROLE_LABEL[r]}</span><b>${p && p.riotId ? playerLabel(p) : '—'}</b>${p && p.riotId ? sbRank(pts, p.rank?.tier ? p.rank.lp : null, fx, p.rank?.flex?.lp) : ''}</div>`;
+        return `<div class="sb-p" title="${p ? playerLabel(p) + (pts != null ? ' — Solo/Duo ' + (rankName(p.rank)?.label ?? '') : ' — Solo/Duo non classé') + (fx != null ? ' · Flex ' + (rankName(p.rank.flex)?.label ?? '') : '') : ROLE_LABEL[r]}"><i style="background:${p ? rankColor(p.rank) : tierColor(null)}"></i><span>${ROLE_LABEL[r]}</span><b>${p && p.riotId ? playerLabel(p) : '—'}</b>${p && p.riotId ? sbRank(p.rank, p.rank?.flex) : ''}</div>`;
       }).join('')}</div>`;
   }
 }
@@ -776,7 +778,7 @@ function renderPlayers() {
           <input class="pinput" data-i="${i}" value="${(p.riotId || '').replace(/"/g, '&quot;')}" placeholder="Nom#TAG" />
           <div class="pinfo">
             ${p.error ? `<span class="perr">⚠ ${p.error}</span>`
-              : pts != null ? `<div class="prk"><span class="qtag" title="Solo/Duo : seul classement utilisé pour le pronostic">Solo</span><span class="tier" style="--c:${tierColor(pts)}">${pointsLabel(pts)}${p.rank?.tier && p.rank.lp != null ? ` · ${p.rank.lp} LP` : ''}${!p.rank?.tier ? ' (saison passée)' : ''}</span>${g ? `<span class="pwr ${p.rank.wins / g >= 0.5 ? 'up' : 'down'}">${Math.round((p.rank.wins / g) * 100)} %</span><span class="muted">${g} g</span>` : ''}${p.rank?.hot ? '<span title="série de victoires">🔥</span>' : ''}</div>${flexTag(p)}`
+              : pts != null ? `<div class="prk"><span class="qtag" title="Solo/Duo : seul classement utilisé pour le pronostic">Solo</span><span class="tier" style="--c:${rankColor(p.rank)}">${rankName(p.rank)?.label ?? '?'}${p.rank?.tier && p.rank.lp != null ? ` · ${p.rank.lp} LP` : ''}${!p.rank?.tier ? ' (saison passée)' : ''}</span>${g ? `<span class="pwr ${p.rank.wins / g >= 0.5 ? 'up' : 'down'}">${Math.round((p.rank.wins / g) * 100)} %</span><span class="muted">${g} g</span>` : ''}${p.rank?.hot ? '<span title="série de victoires">🔥</span>' : ''}</div>${flexTag(p)}`
               : p.riotId ? `<div class="prk"><span class="qtag">Solo</span><span class="muted">non classé</span></div>${flexTag(p)}` : '<span class="muted">joueur non renseigné</span>'}
             ${p.dpm ? `<span class="pdpm" title="${p.dpm}">${/lues/.test(p.dpm) ? 'dpm ✓' : 'dpm —'}</span>` : ''}
           </div>
@@ -1491,21 +1493,17 @@ function loadDraft(id) {
 }
 // Elo bien visible dans les encadrés d'équipe : Solo/Duo en grand (compté), Flex en petit (affiché)
 const SHORT_T = { Fer: 'Fer', Bronze: 'Bronze', Argent: 'Argent', Or: 'Or', Platine: 'Plat', 'Émeraude': 'Émer', Diamant: 'Diam', Master: 'Master', 'Grand Master': 'GM', Challenger: 'Chall' };
-function rankParts(pts) {
-  const l = pointsLabel(pts), m = l.match(/^(.*?)\s+(I{1,3}|IV)$/);
-  return m ? [m[1], m[2]] : [l, ''];
-}
-function sbRank(pts, lp, fx, flp) {
-  const [t, d] = pts != null ? rankParts(pts) : ['Non classé', ''];
-  const [ft, fd] = fx != null ? rankParts(fx) : [null, ''];
-  return `<div class="sbr-solo ${pts == null ? 'none' : ''}" style="--c:${tierColor(pts)}" title="Solo/Duo (compté dans le pronostic) : ${pts != null ? pointsLabel(pts) : 'non classé'}${lp != null ? ' · ' + lp + ' LP' : ''}"><div class="sr1"><u>Solo</u>${lp != null ? `<small>${lp} LP</small>` : ''}</div><b>${pts != null ? `${(t + d).length > 8 ? SHORT_T[t] ?? t : t} ${d}` : 'Non classé'}</b></div>
-    <div class="sbr-flex" title="Flex 5c5 (affiché, non compté)${fx != null ? ' : ' + pointsLabel(fx) + (flp != null ? ' · ' + flp + ' LP' : '') : ''}"><u>Flex</u>${ft ? `<span style="color:${tierColor(fx)}">${SHORT_T[ft] ?? ft} ${fd}</span>` : '<span class="muted">—</span>'}</div>`;
+function sbRank(r, f) {
+  const n = rankName(r), fn = f ? rankName(f) : null, lp = r?.tier ? r.lp : null;
+  const short = (x) => (x.name + x.div).length > 8 ? SHORT_T[x.name] ?? x.name : x.name;
+  return `<div class="sbr-solo ${n ? '' : 'none'}" style="--c:${rankColor(r)}" title="Solo/Duo (compté dans le pronostic) : ${n ? n.label + (n.prev ? ' (saison passée)' : '') : 'non classé'}${lp != null ? ' · ' + lp + ' LP' : ''}"><div class="sr1"><u>Solo</u>${lp != null ? `<small>${lp} LP</small>` : ''}</div><b>${n ? `${short(n)} ${n.div}`.trim() : 'Non classé'}</b></div>
+    <div class="sbr-flex" title="Flex 5c5 (affiché, non compté)${fn ? ' : ' + fn.label + (f.lp != null ? ' · ' + f.lp + ' LP' : '') : ''}"><u>Flex</u>${fn ? `<span style="color:${rankColor(f)}">${`${SHORT_T[fn.name] ?? fn.name} ${fn.div}`.trim()}</span>` : '<span class="muted">—</span>'}</div>`;
 }
 // Classement Flex : affiché à côté (jamais compté dans le pronostic)
 function flexTag(p) {
   const f = p?.rank?.flex; if (!f) return '';
   const pts = rankPoints(f), g = (f.wins ?? 0) + (f.losses ?? 0);
-  return `<div class="prk"><span class="qtag flex" title="Flex 5c5 : affiché pour info, pas compté dans le pronostic">Flex</span><span class="tier flexr" style="--c:${tierColor(pts)}">${pointsLabel(pts)}${f.lp != null ? ` · ${f.lp} LP` : ''}</span>${g ? `<span class="muted">${Math.round((f.wins / g) * 100)} % · ${g} g</span>` : ''}</div>`;
+  return `<div class="prk"><span class="qtag flex" title="Flex 5c5 : affiché pour info, pas compté dans le pronostic">Flex</span><span class="tier flexr" style="--c:${rankColor(f)}">${rankName(f)?.label ?? '?'}${f.lp != null ? ` · ${f.lp} LP` : ''}</span>${g ? `<span class="muted">${Math.round((f.wins / g) * 100)} % · ${g} g</span>` : ''}</div>`;
 }
 function renderSaves() {
   const el = $('savesList'), list = readSaves();

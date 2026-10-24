@@ -508,9 +508,19 @@ export function rankPoints(r) {
   }
   return null;
 }
+// Nom exact du rang d'un joueur, lu tel quel (Master, Grand Master et Challenger dépendent du classement
+// du ladder, pas des LP : un Master à 1200 LP reste Master)
+export function rankName(r) {
+  if (!r) return null;
+  const tier = r.tier ?? r.prevTier, div = r.tier ? r.division : r.prevDivision;
+  if (!tier || !TIER_FR[tier]) return null;
+  const apex = TIER_BASE[tier] >= 2800;
+  return { tier, apex, name: TIER_FR[tier], div: apex ? '' : DIV[div ?? 4] ?? '', label: apex ? TIER_FR[tier] : `${TIER_FR[tier]} ${DIV[div ?? 4] ?? ''}`.trim(), prev: !r.tier };
+}
+// Libellé d'une moyenne de points (équipe) : au-delà de Diamant I on ne devine pas GM / Challenger
 export function pointsLabel(pts) {
   if (pts == null) return 'inconnu';
-  if (pts >= 2800) return pts >= 3600 ? 'Challenger' : pts >= 3200 ? 'Grand Master' : 'Master';
+  if (pts >= 2800) return `Master+ · ${Math.round(pts - 2800)} LP moy.`;
   const tiers = ['IRON', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'EMERALD', 'DIAMOND'];
   const t = tiers[Math.min(6, Math.floor(pts / 400))];
   const d = 4 - Math.min(3, Math.floor((pts % 400) / 100));
