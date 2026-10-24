@@ -67,7 +67,9 @@ async function readQueue(get) {
   const q = g?.gameData?.queue;
   if (!q) return lastQueue;
   const custom = g?.gameData?.isCustomGame;
-  lastQueue = { id: q.id ?? null, label: custom ? 'Personnalisée 5c5' : QUEUES[q.id] ?? (q.description || q.gameMode || 'Autre mode'), ranked: q.id === 420 || q.id === 440 };
+  // identifiant de la partie : permet de retrouver le résultat plus tard dans l'historique de matchs du client
+  const gid = g?.gameData?.gameId;
+  lastQueue = { id: q.id ?? null, label: custom ? 'Personnalisée 5c5' : QUEUES[q.id] ?? (q.description || q.gameMode || 'Autre mode'), ranked: q.id === 420 || q.id === 440, gameId: gid > 0 ? gid : lastQueue?.gameId ?? null };
   return lastQueue;
 }
 async function champSelect(lcu) {
@@ -141,7 +143,7 @@ async function poll(send) {
     if (!lcu || Date.now() - lastLcuTry > 15000) { lastLcuTry = Date.now(); lcu = (await findLcu()) ?? (g ? lcu : null); }
     if (g) {
       // en jeu : le mode de la partie vient du client (utile si Draft Lab a été ouvert pendant la partie)
-      if (lcu) { const get = (p) => localGet(lcu.port, p, lcu.token); const q = await readQueue(get).catch(() => null); if (q) g.queue = q; g.summoner = g.summoner ?? lcu.summoner ?? null; }
+      if (lcu) { const get = (p) => localGet(lcu.port, p, lcu.token); const q = await readQueue(get).catch(() => null); if (q) { g.queue = q; g.gameId = q.gameId; } g.summoner = g.summoner ?? lcu.summoner ?? null; }
       return send(g);
     }
     if (!lcu) return send({ phase: 'NoClient' });
@@ -152,4 +154,21 @@ async function poll(send) {
 function startLive(send) { stopLive(); lcu = null; poll(send); timer = setInterval(() => poll(send), 2000); }
 function stopLive() { if (timer) clearInterval(timer); timer = null; }
 
-module.exports = { startLive, stopLive, champSelect, inGame, findLcu };
+// Résultats retrouvés dans l'historique de matchs du client (parties interrompues : client fermé, crash…)
+async function matchResults(ids) {
+  const want = new Set((ids ?? []).map(Number)), out = {};
+  if (!want.size) return out;
+  const c = lcu ?? (await findLcu()); if (!c) return out;
+  const get = (p) => localGet(c.port, p, c.token);
+  const me = await get('/lol-summoner/v1/current-summoner').catch(() => null);
+  const h = await get('/lol-match-history/v1/products/lol/current-summoner/matches?begIndex=0&endIndex=40').catch(() => null);
+  for (const m of h?.games?.games ?? []) {
+    if (!want.has(Number(m.gameId))) continue;
+    const ident = (m.participantIdentities ?? []).find((x) => (me?.puuid && x.player?.puuid === me.puuid) || (me?.summonerId && x.player?.summonerId === me.summonerId));
+    const part = (m.participants ?? []).find((x) => x.participantId === ident?.participantId) ?? (m.participants?.length === 1 ? m.participants[0] : null);
+    if (part?.stats && typeof part.stats.win === 'boolean') out[m.gameId] = part.stats.win ? 'win' : 'loss';
+  }
+  return out;
+}
+
+module.exports = { startLive, stopLive, champSelect, inGame, findLcu, matchResults };

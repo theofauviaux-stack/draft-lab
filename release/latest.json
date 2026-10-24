@@ -1,7 +1,7 @@
 {
-  "version": "2.32.1",
-  "sha256": "35a9567542c38cc35f7067f7082ee3bfd1b2879a84bf99d9f8f87b5d76e837b6",
-  "file": "draftlab-2.32.1.json.gz",
-  "notes": "Direct : mode de la partie lu dans le client même si Draft Lab est ouvert en pleine partie",
-  "date": "2026-10-24T17:13:31.721Z"
+  "version": "2.33.0",
+  "sha256": "99a9191747bedc7f6f8b83014109fc55add2ca5907019ebd67cf9482caca0806",
+  "file": "draftlab-2.33.0.json.gz",
+  "notes": "Historique : résultats inconnus comptés (« 1 ? ») et retrouvés automatiquement dans l'historique de matchs du client",
+  "date": "2026-10-24T17:38:27.578Z"
 }

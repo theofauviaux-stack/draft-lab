@@ -1095,12 +1095,12 @@ function liveSnapshot(d) {
   const wr = state.lastMain != null ? (me === 'blue' ? state.lastMain : 100 - state.lastMain) : null;
   return { id: LIVE.game?.id ?? Date.now(), date: LIVE.game?.date ?? Date.now(), queue: d.queue?.label ?? null, mySide: me, summoner: d.summoner ?? null, myChamp: myId,
     wr: wr != null ? +wr.toFixed(1) : null, slots: structuredClone(state.slots), roles: structuredClone(state.roles), lock: structuredClone(state.lock),
-    players: structuredClone(state.players), result: LIVE.game?.result ?? null };
+    players: structuredClone(state.players), result: LIVE.game?.result ?? null, gameId: d.gameId ?? d.queue?.gameId ?? LIVE.game?.gameId ?? null };
 }
 // la partie (ou la sélection) est finie : on archive et on nettoie l'écran
 function liveEndGame(d) {
   if (LIVE.game) {
-    histUpsert({ ...LIVE.game, result: d.result ?? LIVE.game.result ?? null });
+    histUpsert({ ...LIVE.game, result: d.result ?? LIVE.game.result ?? null, gameId: LIVE.game.gameId ?? d.gameId ?? null });
     LIVE.lastId = LIVE.game.id;
     toast(d.result ? `Partie terminée : ${d.result === 'win' ? 'victoire ✓' : 'défaite'} · ajoutée à l’historique` : 'Partie terminée : ajoutée à l’historique');
   }
@@ -1126,19 +1126,19 @@ function renderHistory() {
   const hm = (t) => new Date(t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   const mini = (ids) => (ids ?? []).map((id) => (id && state.P[id] ? `<img src="${img(id)}" alt="" title="${state.P[id].name}">` : '<i></i>')).join('');
   $('histList').innerHTML = histSessions(h).map((s, si) => {
-    const w = s.games.filter((g) => g.result === 'win').length, l = s.games.filter((g) => g.result === 'loss').length;
+    const w = s.games.filter((g) => g.result === 'win').length, l = s.games.filter((g) => g.result === 'loss').length, u = s.games.length - w - l;
     const wrs = s.games.filter((g) => g.wr != null), avg = wrs.length ? Math.round(wrs.reduce((a, g) => a + g.wr, 0) / wrs.length) : null;
     // le pronostic avait-il raison ? (favori = pronostic > 50 %)
     const judged = s.games.filter((g) => g.result && g.wr != null && Math.abs(g.wr - 50) >= 1), right = judged.filter((g) => (g.wr > 50) === (g.result === 'win')).length;
     return `<div class="hs"><div class="hs-h"><b>Session du ${day(s.start)}</b><span>${hm(s.start)}${s.games.length > 1 ? ` – ${hm(s.end)}` : ''} · ${s.games.length} partie${s.games.length > 1 ? 's' : ''}</span>
-        ${w + l ? `<span class="hs-rec"><em class="w">${w} V</em> <em class="l">${l} D</em></span>` : ''}${avg != null ? `<span class="muted">pronostic moyen ${avg} %</span>` : ''}${judged.length ? `<span class="muted">pronostic juste ${right}/${judged.length}</span>` : ''}
+        <span class="hs-rec"><em class="w">${w} V</em> <em class="l">${l} D</em>${u ? ` <em class="u" title="Résultat inconnu : client fermé avant la fin. Il sera retrouvé automatiquement à la prochaine connexion au client si possible.">${u} ?</em>` : ''}</span>${avg != null ? `<span class="muted">pronostic moyen ${avg} %</span>` : ''}${judged.length ? `<span class="muted">pronostic juste ${right}/${judged.length}</span>` : ''}
         ${si === 0 ? '' : ''}</div>
       ${s.games.map((g) => { const mine = g.slots?.[g.mySide] ?? [], theirs = g.slots?.[g.mySide === 'blue' ? 'red' : 'blue'] ?? [];
         return `<div class="hg ${g.result ?? ''}"><span class="hg-t">${hm(g.date)}</span><span class="hg-q">${g.queue ?? 'Partie'}</span>
           ${g.myChamp && state.P[g.myChamp] ? `<img class="hg-me" src="${img(g.myChamp)}" title="Ton champion : ${state.P[g.myChamp].name}" alt="">` : '<span class="hg-me"></span>'}
           <span class="hg-tm b">${mini(mine)}</span><em>vs</em><span class="hg-tm r">${mini(theirs)}</span>
           <span class="hg-wr" title="Pronostic de Draft Lab pour ton équipe au début de la partie">${g.wr != null ? `${g.wr.toFixed(1)} %` : '—'}</span>
-          <span class="hg-res">${g.result === 'win' ? 'Victoire' : g.result === 'loss' ? 'Défaite' : 'Résultat inconnu'}</span>
+          <span class="hg-res" ${g.recovered ? 'title="Résultat retrouvé dans l’historique de matchs du client"' : !g.result ? 'title="Client fermé avant la fin : le résultat sera cherché à la prochaine connexion"' : ''}>${g.result === 'win' ? 'Victoire' : g.result === 'loss' ? 'Défaite' : 'Résultat inconnu'}${g.recovered ? ' ↻' : ''}</span>
           <button class="hg-open" data-id="${g.id}" title="Ouvrir cette partie dans la draft">Revoir</button><button class="hg-del" data-id="${g.id}" title="Retirer de l’historique">×</button></div>`; }).join('')}</div>`;
   }).join('') + '<div class="hs-foot"><button id="histClear" class="tb-btn">Effacer l’historique</button></div>';
   $('histList').querySelectorAll('.hg-open').forEach((b) => (b.onclick = () => openHistGame(+b.dataset.id)));
@@ -1185,6 +1185,11 @@ function onLive(d) {
   const qm = $('liveMode');
   if (d.queue?.label) { qm.textContent = d.queue.label; qm.hidden = false; } else if (d.phase === 'NoClient' || d.phase === 'None') qm.hidden = true;
   document.body.classList.toggle('q-flex', d.queue?.id === 440);
+  // résultats inconnus (client fermé avant la fin) : on les cherche dans l'historique de matchs du client, au plus 1 fois par minute
+  if (conn === 'on' && api.liveResults && Date.now() - (LIVE.lastFix ?? 0) > 60000) {
+    const pend = readHist().filter((g) => !g.result && g.gameId && Date.now() - g.date < 7 * 864e5);
+    if (pend.length) { LIVE.lastFix = Date.now(); api.liveResults(pend.map((g) => g.gameId)).then((res) => { let n = 0; for (const g of pend) if (res?.[g.gameId]) { histUpsert({ id: g.id, result: res[g.gameId], recovered: true }); n++; } if (n) toast(`${n} résultat${n > 1 ? 's' : ''} retrouvé${n > 1 ? 's' : ''} dans l’historique du client`); }).catch(() => {}); }
+  }
   // résultat qui arrive après coup (écran de fin de game) : on complète la dernière partie de l'historique
   if (d.result && !LIVE.game && LIVE.lastId) { const h = readHist().find((x) => x.id === LIVE.lastId); if (h && !h.result) histUpsert({ id: LIVE.lastId, result: d.result }); }
   if (!d.teams) {

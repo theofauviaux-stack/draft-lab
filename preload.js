@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('draftlab', {
   onWindowChanged: (cb) => ipcRenderer.on('window:changed', (_e, id) => cb(id)),
   liveStart: () => ipcRenderer.invoke('live:start'),
   liveStop: () => ipcRenderer.invoke('live:stop'),
+  liveResults: (ids) => ipcRenderer.invoke('live:results', ids),
   onLive: (cb) => ipcRenderer.on('live:update', (_e, d) => cb(d)),
   detail: (cid, lane) => ipcRenderer.invoke('lola:detail', { cid, lane }),
   onUpdate: (cb) => ipcRenderer.on('update:status', (_e, st) => cb(st))
