@@ -18,7 +18,7 @@ const CHECK_EVERY = 2 * HOUR; // vérification automatique d'un nouveau patch
 
 let win;
 let cache = {};
-let lastTier = 'master_plus';
+let lastTier = 'emerald_plus';
 let busy = null;
 
 const cacheFile = () => path.join(app.getPath('userData'), 'draftlab-cache.json');
@@ -85,7 +85,7 @@ async function sync({ force = false, tier = lastTier } = {}) {
           return;
         }
         try {
-          const r = await fetchLolalytics(patch, tier, champions, changed);
+          const r = await fetchLolalytics(patch, tier, champions, changed, dataWindows());
           cache.lolalytics = { key: lk, tier, at: now, stats: r.stats, patch: r.patch };
           sources.lolalytics = { ok: true, at: now, patch: r.patch };
           partial(tier, sources);
@@ -134,10 +134,22 @@ function partial(tier, sources) {
 }
 
 // Données disponibles tout de suite (cache), pendant que la synchro tourne en fond.
+// Patchs des 30 derniers jours, du plus récent au plus ancien, avec leur poids : le patch en cours compte
+// plein, le précédent ×0,6, celui d'avant ×0,35 (seulement s'il était encore en jeu il y a 30 jours).
+const WIN_W = [1, 0.6, 0.35];
+function dataWindows() {
+  const cur = cache.ddragon?.patch;
+  const list = (cache.patches?.patches ?? []).filter((x) => x.patch);
+  const from = cache.patches?.from ?? Date.now() - 30 * 864e5;
+  const out = [];
+  for (const x of list) { out.push(x.patch); if (x.start <= from || out.length >= 3) break; }
+  if (!out.length && cur) { const [M, m] = cur.split('.').map(Number); out.push(cur); if (m > 1) out.push(`${M}.${m - 1}`); }
+  return out.slice(0, 3).map((patch, i) => ({ patch, w: WIN_W[i] }));
+}
 // Clé du cache lolalytics : patch, niveau et liste des champions modifiés (la fenêtre de chacun en dépend)
 function lolaKey(patch, tier) {
   const ch = cache.patches?.changed ?? {};
-  return `${patch}|${tier}|30j|` + Object.keys(ch).sort().map((k) => `${k}:${ch[k]}`).join(',');
+  return `${patch}|${tier}|w${dataWindows().map((x) => x.patch).join('-')}|` + Object.keys(ch).sort().map((k) => `${k}:${ch[k]}`).join(',');
 }
 function snapshot(tier, sources) {
   const { version, patch, champions } = cache.ddragon;
@@ -306,11 +318,13 @@ app.whenReady().then(() => {
   });
   // Matchups et duos Master+ d'un champion à sa lane (mis en cache 24 h)
   const details = new Map();
-  ipcMain.handle('lola:detail', async (_e, { cid, lane }) => {
-    const k = `${cid}|${lane}|${cache.patches?.changed?.[cid] ?? '30'}`, c = details.get(k);
-    if (c && Date.now() - c.at < 24 * HOUR) return c.data;
+  // Matchups et duos d'un champion, au niveau (elo) de la partie, patchs récents pondérés
+  ipcMain.handle('lola:detail', async (_e, { cid, lane, tier }) => {
+    const t = tier || 'emerald_plus', wins = dataWindows();
+    const k = `${cid}|${lane}|${t}|${cache.patches?.changed?.[cid] ?? '-'}|${wins.map((x) => x.patch).join('-')}`, c = details.get(k);
+    if (c && Date.now() - c.at < 12 * HOUR) return c.data;
     const since = cache.patches?.changed?.[cid] ?? null, patch = cache.ddragon?.patch;
-    try { const data = await fetchDetail(cid, lane, 'master_plus', { since, patch }); details.set(k, { at: Date.now(), data }); return data; }
+    try { const data = await fetchDetail(cid, lane, t, { since, patch, wins }); details.set(k, { at: Date.now(), data }); return data; }
     catch (e) { return c?.data ?? { error: e.message }; }
   });
   // Partie en direct (client League / jeu sur cet ordinateur)

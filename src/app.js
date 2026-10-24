@@ -2,7 +2,7 @@ import { teamSynergy, KINDS } from './synergy.js';
 import { detectSlots, matchBanner } from './shotauto.js';
 import {
   ROLES, ROLE_LABEL, ARCH, ORDER, rel, relText, laneEdge, proEdge, LANE_OPP,
-  buildProfiles, evaluate, setDetailSource, applyProGames, proInfo, recommend, recommendBans, projectPicks, gamePlan, powerCurve,
+  buildProfiles, evaluate, setDetailSource, setDataTierLabel, dataTierLabel, botDuel, applyProGames, proInfo, recommend, recommendBans, projectPicks, gamePlan, powerCurve,
   comfortPts, proposeDrafts, playerLabel, rankName, analyzeDraft, matchPlan, pentagonView, styleBreakdown, compLabel, playersForecast, combineWr, pointsLabel, rankPoints, RANK_OPTIONS, playerRating, dominant, teamShares, predictPicks, enemyScenarios, predictedBans
 } from './engine.js';
 import { balanceTeams, rolesFromPool, balValue, roleFit, BAL_ROLES, BAL_COST } from './balance.js';
@@ -45,7 +45,7 @@ const shortLabel = ([t, i]) => (t.endsWith('Bans') ? null : `${t === 'blue' ? 'B
 // ---------- État ----------
 const state = {
   data: null, P: {}, list: [],
-  mode: 'soloq', tier: 'master_plus', mySide: 'blue',
+  mode: 'soloq', tier: 'emerald_plus', tierPref: 'auto', mySide: 'blue',
   slots: emptySlots(),
   roles: { blue: [...ROLES], red: [...ROLES] },
   selected: null, history: [],
@@ -59,10 +59,10 @@ function emptySlots() {
 }
 try {
   const saved = JSON.parse(localStorage.getItem('draftlab-prefs') ?? '{}');
-  Object.assign(state, { mySide: saved.mySide ?? state.mySide, wantArch: saved.wantArch ?? null, theme: saved.theme ?? 'light' });
+  Object.assign(state, { mySide: saved.mySide ?? state.mySide, wantArch: saved.wantArch ?? null, theme: saved.theme ?? 'light', tierPref: saved.tierPref ?? 'auto' });
 } catch {}
-// Une seule base : soloQ Master+ (lolalytics, effet one-trick atténué) + compétition (gol.gg).
-const savePrefs = () => { try { localStorage.setItem('draftlab-prefs', JSON.stringify({ mySide: state.mySide, wantArch: state.wantArch, theme: state.theme })); } catch {} };
+// Une seule base : soloQ à l'elo de la partie (lolalytics, effet one-trick atténué) + compétition (gol.gg).
+const savePrefs = () => { try { localStorage.setItem('draftlab-prefs', JSON.stringify({ mySide: state.mySide, wantArch: state.wantArch, theme: state.theme, tierPref: state.tierPref })); } catch {} };
 
 const $ = (id) => document.getElementById(id);
 // ---------- Thème clair / sombre ----------
@@ -128,17 +128,39 @@ function withComfort(c, side, role) {
 }
 const pickPos = (side, i) => PICKS.findIndex(([t, j]) => t === side && j === i);
 const team = (side) => state.slots[side].map((id, i) => (id ? { ...withComfort(state.P[id], side, state.roles[side][i]), lane: state.roles[side][i], po: pickPos(side, i) } : null)).filter(Boolean);
-// Matchups et duos Master+ : chargés à la demande pour chaque champion pické, à sa lane
+// ---------- Niveau des données : l'elo de la partie ----------
+// Auto : elo Solo/Duo moyen des joueurs connus (niveau exact : Platine, Émeraude…) ; sans joueurs, Émeraude+.
+const TIER_LABEL = { iron: 'Fer', bronze: 'Bronze', silver: 'Argent', gold: 'Or', platinum: 'Platine', emerald: 'Émeraude', diamond: 'Diamant', master_plus: 'Master+', gold_plus: 'Or+', platinum_plus: 'Platine+', emerald_plus: 'Émeraude+', diamond_plus: 'Diamant+' };
+const SINGLE = ['iron', 'bronze', 'silver', 'gold', 'platinum', 'emerald', 'diamond'];
+function autoTier() {
+  const pts = ['blue', 'red'].flatMap((s) => state.players[s] ?? []).map((p) => rankPoints(p.rank)).filter((x) => x != null);
+  if (!pts.length) return 'emerald_plus';
+  const avg = pts.reduce((a, x) => a + x, 0) / pts.length;
+  return avg >= 2800 ? 'master_plus' : SINGLE[Math.max(0, Math.min(6, Math.floor(avg / 400)))];
+}
+const wantedTier = () => (state.tierPref && state.tierPref !== 'auto' ? state.tierPref : autoTier());
+let tierLoading = null;
+function syncTier() {
+  const t = wantedTier();
+  setDataTierLabel(TIER_LABEL[t] ?? t);
+  const sel = $('tierSel');
+  if (sel) { sel.value = state.tierPref ?? 'auto'; sel.options[0].textContent = `Auto · ${TIER_LABEL[autoTier()]}`; }
+  if (t === state.tier || tierLoading === t) return;
+  // nouveau niveau : winrates des champions (listes) et face-à-face rechargés à ce niveau
+  tierLoading = t; state.tier = t; DET.clear();
+  (api.load({ tier: t }) ?? Promise.resolve(null)).then((d) => { tierLoading = null; if (d && !d.error) ingest(d); }).catch(() => { tierLoading = null; });
+}
+// Matchups et duos au niveau de la partie : chargés à la demande pour chaque champion pické, à sa lane
 const DET = new Map();
-setDetailSource((key, lane) => DET.get(`${key}|${lane}`)?.data ?? null);
+setDetailSource((key, lane) => DET.get(`${key}|${lane}|${state.tier}`)?.data ?? null);
 function ensureDetails() {
   if (!api.detail) return;
   for (const side of ['blue', 'red']) state.slots[side].forEach((id, i) => {
     if (!id) return;
-    const c = state.P[id], lane = state.roles[side][i], k = `${c.key}|${lane}`;
+    const c = state.P[id], lane = state.roles[side][i], t = state.tier, k = `${c.key}|${lane}|${t}`;
     if (DET.has(k)) return;
     DET.set(k, { loading: true });
-    api.detail(c.id, lane).then((d) => { DET.set(k, { data: d && !d.error ? d : null }); render(); }).catch(() => DET.set(k, { data: null }));
+    api.detail(c.id, lane, t).then((d) => { DET.set(k, { data: d && !d.error ? d : null }); render(); }).catch(() => DET.set(k, { data: null }));
   });
 }
 // Data Dragon 16.21 = patch 26.21 dans le jeu et les notes de patch
@@ -245,6 +267,7 @@ function select(t, i) {
 // ---------- Rendu ----------
 function render() {
   if (!state.data) return;
+  syncTier();
   ensureDetails();
   renderBans(); renderTeams(); renderStep(); renderFearless();
   const ev = evaluate(team('blue'), team('red'));
@@ -331,17 +354,26 @@ function showMatchups(side, i, anchor) {
   const lane = me.lane, c = me;
   const pct = (v) => `${v > 0 ? '+' : ''}${v.toFixed(1)}`;
   const opps = them.filter((o) => LANE_OPP[lane]?.includes(o.lane));
-  // face-à-face : Master+ (lolalytics) et games pro (gol.gg), sur 30 jours ou depuis le dernier changement
+  // face-à-face : soloQ à l'elo de la partie (lolalytics) et games pro (gol.gg) ; bot en 2v2
   const rows = opps.map((o) => ({ o, le: laneEdge(c, lane, o, o.lane), pe: proEdge(c, o) }));
   const champArch = ORDER.reduce((a, b) => (c[b] > c[a] ? b : a));
   const enemyDom = them.length ? dominant(teamShares(them)) : null;
   const sPairs = teamSynergy(team(side)).pairs.filter((x) => x.a.id === id || x.b.id === id);
   const PH = ['', 'early', 'milieu de partie', 'late'];
   const plus = [], minus = [], tips = [];
+  // bot : la lane se joue en 2v2 (ADC + support des deux côtés)
+  const bd = lane === 'A' || lane === 'S' ? botDuel(team(side), them) : null;
+  const bdTxt = bd ? `${bd.blue.map((x) => `<b>${x.name}</b>`).join(' + ')} contre ${bd.red.map((x) => `<b>${x.name}</b>`).join(' + ')}` : '';
+  if (bd) {
+    const v = `${(50 + bd.raw).toFixed(1).replace('.', ',')} %`;
+    if (bd.raw >= 1) plus.push(`Bot 2v2 gagnant : ${bdTxt} (${v}).`);
+    else if (bd.raw <= -1) minus.push(`Bot 2v2 perdant : ${bdTxt} (${v}).`);
+    else tips.push(`Bot 2v2 équilibré : ${bdTxt} (${v}) : la lane se jouera sur les timings du jungle.`);
+  }
   for (const { o, le, pe } of rows) {
     const v = le?.raw ?? (pe ? pe.edge : null);
     if (v == null) continue;
-    const src = le ? `${le.n} games Master+` : `${pe.n} games pro`;
+    const src = le ? `${le.n} games ${dataTierLabel()}` : `${pe.n} games pro`;
     if (v >= 1) plus.push(`Gagne son face-à-face contre <b>${o.name}</b> (${pct(v)} pts de winrate, ${src}).`);
     else if (v <= -1) minus.push(`Perd son face-à-face contre <b>${o.name}</b> (${pct(v)} pts, ${src}).`);
     else tips.push(`Face-à-face équilibré contre ${o.name} (${pct(v)} pts, ${src}) : c'est la jungle et les timings qui feront la différence.`);
@@ -368,12 +400,12 @@ function showMatchups(side, i, anchor) {
   const bad = them.filter((o) => !LANE_OPP[lane]?.includes(o.lane) && rel(ORDER.reduce((a, b) => (o[b] > o[a] ? b : a)), champArch) > 0);
   if (bad.length) minus.push(`Hors lane, ${bad.slice(0, 2).map((o) => `<b>${o.name}</b>`).join(' et ')} ${bad.length > 1 ? 'ont' : 'a'} un profil qui contre le sien.`);
   const rowHtml = rows.length ? rows.map(({ o, le, pe }) => `<div class="mu-row"><img src="${img(o.id)}" alt=""><b>${o.name}</b><small>${ROLE_LABEL[o.lane]}</small>
-      <span class="mu-v ${le ? (le.raw >= 0 ? 'up' : 'down') : 'na'}" title="Master+ (lolalytics)">${le ? `${pct(le.raw)} <i>${le.n} g</i>` : 'Master+ —'}</span>
+      <span class="mu-v ${le ? (le.raw >= 0 ? 'up' : 'down') : 'na'}" title="${dataTierLabel()} (lolalytics)">${le ? `${pct(le.raw)} <i>${le.n} g</i>` : `${dataTierLabel()} —`}</span>
       <span class="mu-v ${pe ? (pe.edge >= 0 ? 'up' : 'down') : 'na'}" title="Games pro des 30 derniers jours (gol.gg)">${pe ? `pro ${pe.w}/${pe.n}` : 'pro —'}</span></div>`).join('')
     : `<div class="muted mu-empty">Son adversaire de lane n'est pas encore choisi.</div>`;
   box.innerHTML = `<div class="mu-card ${side}">
     <div class="mu-h"><img src="${img(id)}" alt=""><div><b>${c.name}</b><span>${ROLE_LABEL[lane]} · ${side === 'blue' ? 'Équipe 1' : 'Équipe 2'}${c.wr != null ? ` · ${c.wr.toFixed(1)} % WR` : ''}</span></div><button class="mu-x" title="Fermer">×</button></div>
-    <h6>Face-à-face</h6>${rowHtml}
+    <h6>Face-à-face</h6>${bd ? `<div class="mu-row mu-2v2"><b>Bot 2v2</b><small>${bd.blue.map((x) => x.name).join(' + ')} vs ${bd.red.map((x) => x.name).join(' + ')}</small><span class="mu-v ${bd.raw >= 0 ? 'up' : 'down'}" title="4 face-à-face croisés moyennés + synergie des deux duos (${dataTierLabel()})">${(50 + bd.raw).toFixed(1).replace('.', ',')} % <i>${bd.n} g</i></span></div>` : ''}${rowHtml}
     <div class="mu-cols"><div><h6 class="g">Forces</h6>${plus.length ? `<ul>${plus.map((t) => `<li>${t}</li>`).join('')}</ul>` : '<p class="muted">Rien de marquant pour l’instant.</p>'}</div>
       <div><h6 class="r">Faiblesses</h6>${minus.length ? `<ul>${minus.map((t) => `<li>${t}</li>`).join('')}</ul>` : '<p class="muted">Pas de faiblesse nette dans cette draft.</p>'}</div></div>
     ${tips.length ? `<h6>Comment le jouer</h6><ul class="mu-tips">${tips.map((t) => `<li>${t}</li>`).join('')}</ul>` : ''}
@@ -1919,6 +1951,7 @@ function initControls() {
   document.querySelectorAll('#startModeBox .sm-o').forEach((b) => (b.onclick = () => { $('startModeBox').hidden = true; $('startChoices').hidden = false; $('startMenu').classList.remove('form'); startFromZero(b.dataset.mode); }));
   document.querySelectorAll('#menuMode button').forEach((b) => (b.onclick = () => { document.querySelectorAll('#menuMode button').forEach((x) => x.classList.toggle('on', x === b)); }));
   initBalance();
+  $('tierSel').onchange = () => { state.tierPref = $('tierSel').value; savePrefs(); render(); };
   $('startPlayers').onclick = () => { $('startMenu').classList.add('form'); $('startChoices').hidden = true; $('startForm').hidden = false; $('menuBlue').focus(); };
   $('menuBack').onclick = () => { $('startMenu').classList.remove('form'); $('startForm').hidden = true; $('startChoices').hidden = false; };
   $('menuGo').onclick = startFromPlayers;
@@ -1997,7 +2030,7 @@ function resumeAfterUpdate() {
 }
 function initUpdates() {
   // le numéro de version n'est plus affiché en haut (il reste dans le menu)
-  $('verPill').hidden = true; document.querySelector('.tb-dot').hidden = true;
+  $('verPill').hidden = true; if ($('verPill').previousElementSibling?.classList.contains('tb-dot')) $('verPill').previousElementSibling.hidden = true;
   if (!api.version) return;
   api.version().then((v) => { $('menuVer').textContent = `Draft Lab v${v} · rechercher une mise à jour`; $('menuVer').hidden = false; });
   let timer = null;

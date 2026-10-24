@@ -122,7 +122,7 @@ function damagePenalty(s) {
 const frontPenalty = (s) => (s.n >= 4 && s.f < 3 ? -W.frontline : 0);
 const engagePenalty = (s) => (s.n >= 4 && s.e + s.c < 3 ? -W.engageTool : 0);
 
-// ---------- Données Master+ (lolalytics) : face-à-face par lane et duos ----------
+// ---------- Données soloQ (lolalytics, elo de la partie) : face-à-face par lane et duos ----------
 // DETAIL(key, lane) renvoie { vs: { lane: { cid: [vsWr, n] } }, team: { lane: { cid: [wr, d2, n] } } } ou null.
 let DETAIL = () => null;
 export const setDetailSource = (fn) => { DETAIL = fn; };
@@ -158,6 +158,29 @@ export function duoEdge(a, la, b, lb) {
   return { edge: d * shrink(n, 300), raw: +d.toFixed(1), n, wr: vals[0][2] };
 }
 const LN_FR = { T: 'Top', J: 'Jungle', M: 'Mid', A: 'ADC', S: 'Support' };
+// Niveau des données (elo de la partie), pour les textes : « Émeraude+ », « Platine »…
+let TL = 'Émeraude+';
+export const setDataTierLabel = (t) => { TL = t || TL; };
+export const dataTierLabel = () => TL;
+const isBot = (c) => c.lane === 'A' || c.lane === 'S';
+// Bot lane en 2v2 : les 4 face-à-face croisés (ADC et support contre ADC et support) sont moyennés,
+// pondérés par leurs games (c'est une seule lane, pas quatre), puis la synergie mesurée de chaque duo
+// s'ajoute. Renvoie null tant qu'aucun champion bot n'est choisi des deux côtés.
+export function botDuel(blue, red) {
+  const bb = blue.filter(isBot), rb = red.filter(isBot);
+  if (!bb.length || !rb.length) return null;
+  const cross = [];
+  for (const a of bb) for (const b of rb) { const e = laneEdge(a, a.lane, b, b.lane); if (e) cross.push({ a, b, ...e }); }
+  if (!cross.length) return null;
+  // poids = confiance de chaque face-à-face (n ÷ (n + 250)) : un face-à-face très joué ne doit pas écraser les autres
+  const n = cross.reduce((x, c) => x + c.n, 0), wt = (c) => c.n / (c.n + 250), tw = cross.reduce((x, c) => x + wt(c), 0);
+  const avg = cross.reduce((x, c) => x + c.edge * wt(c), 0) / tw, avgRaw = cross.reduce((x, c) => x + c.raw * wt(c), 0) / tw;
+  const syn = (t) => { if (t.length < 2) return null; const e = duoEdge(t[0], t[0].lane, t[1], t[1].lane); return e && e.n >= 40 ? e : null; };
+  const sB = syn(bb), sR = syn(rb);
+  const edge = avg + 0.9 * ((sB?.edge ?? 0) - (sR?.edge ?? 0));
+  const raw = avgRaw + (sB?.raw ?? 0) - (sR?.raw ?? 0);
+  return { edge, raw: +raw.toFixed(1), n: Math.round(n / 2), cross, synBlue: sB, synRed: sR, blue: bb, red: rb };
+}
 // ---------- Games pro des 30 derniers jours (gol.gg) ----------
 // Ordre officiel : B1 R1 R2 B2 B3 R3 R4 B4 B5 R5
 const ORDER_POS = { b: [0, 3, 4, 7, 8], r: [1, 2, 5, 6, 9] };
@@ -225,8 +248,15 @@ export function proEdge(a, b) {
 
 function gmFactors(blue, red) {
   let lane = 0, duo = 0; const lt = [], dt = [];
+  // bot lane : un seul 2v2 (face-à-face croisés moyennés + synergie des deux duos)
+  const bd = botDuel(blue, red);
+  if (bd) {
+    lane += bd.edge;
+    if (Math.abs(bd.raw) >= 1) lt.push(`Bot 2v2 : ${bd.blue.map((c) => c.name).join(' + ')} contre ${bd.red.map((c) => c.name).join(' + ')} (${(50 + bd.raw).toFixed(1).replace('.', ',')} %)`);
+  }
   for (const a of blue) for (const b of red) {
     if (!a.lane || !b.lane || !LANE_OPP[a.lane].includes(b.lane)) continue;
+    if (bd && isBot(a) && isBot(b)) continue;
     const e = laneEdge(a, a.lane, b, b.lane);
     if (!e) continue;
     lane += e.edge;
@@ -236,6 +266,7 @@ function gmFactors(blue, red) {
     for (let i = 0; i < t.length; i++) for (let j = i + 1; j < t.length; j++) {
       const a = t[i], b = t[j];
       if (!a.lane || !b.lane) continue;
+      if (bd && isBot(a) && isBot(b)) continue; // déjà compté dans le 2v2 du bot
       const e = duoEdge(a, a.lane, b, b.lane);
       if (!e || e.n < 40) continue;
       duo += sg * e.edge;
@@ -269,16 +300,20 @@ export function evaluate(blue, red) {
   }
   add('clarity', 'Clarté du plan de jeu', (clarity(sb) * (B.n / 5) - clarity(sr) * (R.n / 5)) * W.clarity,
     'Une compo avec une identité nette joue mieux ses fights');
-  if (B.hasWr || R.hasWr) add('strength', 'Force des champions (pro + Master+)', (B.wr - R.wr) * W.strength,
-    'Winrate Master+ (one-tricks atténués) mélangé au winrate pro de la saison : détail par champion ci-dessous');
+  // Force générale d'un champion : seulement tant que son vis-à-vis direct n'est pas choisi ;
+  // ensuite c'est le face-à-face (ou le 2v2 au bot) qui compte, pour ne pas compter deux fois la même chose.
+  const freeWr = (t, them) => t.filter((c) => c.wr != null && !(c.lane && them.some((o) => o.lane && LANE_OPP[c.lane]?.includes(o.lane))));
+  const fB = freeWr(blue, red), fR = freeWr(red, blue);
+  if (fB.length || fR.length) add('strength', 'Force des champions (vis-à-vis pas encore choisi)', (fB.reduce((a, c) => a + c.wr - 50, 0) - fR.reduce((a, c) => a + c.wr - 50, 0)) * W.strength,
+    `Winrate ${TL} du champion contre tous les adversaires, tant que son adversaire direct n'est pas choisi : ${[...fB, ...fR].map((c) => c.name).join(', ')}`);
   const synB = teamSynergy(blue), synR = teamSynergy(red);
   const gm = gmFactors(blue, red);
-  // quand les duos sont mesurés en Master+, la table de synergies théoriques pèse moins
+  // quand les duos sont mesurés, la table de synergies théoriques pèse moins
   const synW = gm.dt.length || Math.abs(gm.duo) > 0.2 ? W.synergy * 0.55 : W.synergy;
   const synV = Math.max(-6, Math.min(6, (synB.total - synR.total) * synW));
-  add('lanes', 'Face-à-face des lanes (Master+)', gm.lane, gm.lt.length ? gm.lt.slice(0, 4).join(' · ') : 'Winrates des matchups en Master+ (lolalytics, 30 derniers jours), lissés selon le nombre de games');
+  add('lanes', `Face-à-face des lanes (${TL})`, gm.lane, gm.lt.length ? gm.lt.slice(0, 4).join(' · ') : `Winrates des face-à-face en ${TL} (lolalytics, 30 derniers jours, patchs récents comptés plus), lissés selon le nombre de games ; bot en 2v2`);
   if (PRO.games) add('pro', 'Réponses en pro (30 derniers jours)', gm.pro, gm.pt.length ? gm.pt.slice(0, 4).join(' · ') : `Face-à-face des lanes dans les ${PRO.games} games pro des 30 derniers jours, selon l’ordre de pick`);
-  add('duos', 'Duos mesurés (Master+)', gm.duo, gm.dt.length ? gm.dt.slice(0, 4).join(' · ') : 'Synergie réelle des duos en Master+');
+  add('duos', `Duos mesurés (${TL})`, gm.duo, gm.dt.length ? gm.dt.slice(0, 4).join(' · ') : `Synergie réelle des duos en ${TL}`);
   const pairTxt = (pp) => pp.slice(0, 2).map((x) => `${x.a.name} + ${x.b.name} (${x.title})`).join(', ');
   add('synergy', 'Synergies entre champions', synV,
     [synB.pairs.length ? `Bleu : ${pairTxt(synB.pairs)}` : '', synR.pairs.length ? `Rouge : ${pairTxt(synR.pairs)}` : ''].filter(Boolean).join(' · ') || 'Aucune synergie notable');
@@ -973,7 +1008,7 @@ export function matchPlan(mine, theirs) {
     return laneEarly(at(roster, lane), lane);
   };
   const lanes = {};
-  // Face-à-face mesurés en Master+ (lolalytics) : ils corrigent l'estimation théorique de la lane
+  // Face-à-face mesurés (lolalytics, elo de la partie) : ils corrigent l'estimation théorique de la lane
   const measured = (L) => {
     const roles = L === 'B' ? ['A', 'S'] : [L];
     let sum = 0, any = false, best = null;
@@ -995,7 +1030,7 @@ export function matchPlan(mine, theirs) {
     lanes[L] = { edge, state: edge == null ? 'inconnu' : edge > 0.07 ? 'fort' : edge < -0.07 ? 'faible' : 'égal',
       mine: L === 'B' ? [at(mine, 'A'), at(mine, 'S')].filter(Boolean) : [at(mine, L)].filter(Boolean),
       theirs: L === 'B' ? [at(theirs, 'A'), at(theirs, 'S')].filter(Boolean) : [at(theirs, L)].filter(Boolean),
-      gm: m?.best ? `Master+ : ${m.best.a.name} ${(50 + m.best.raw).toFixed(0)} % contre ${m.best.b.name} (${m.best.n} games)` : null };
+      gm: m?.best ? `${TL} : ${m.best.a.name} ${(50 + m.best.raw).toFixed(0)} % contre ${m.best.b.name} (${m.best.n} games)` : null };
   }
   const known = Object.entries(lanes).filter(([, v]) => v.edge != null);
   const strong = known.length ? known.reduce((a, b) => (b[1].edge > a[1].edge ? b : a)) : null;

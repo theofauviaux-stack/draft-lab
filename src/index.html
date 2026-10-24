@@ -13,7 +13,7 @@
     <div class="tb-group tb-brand">
       <button id="menuBtn" class="tb-menu" title="Menu : draft de zéro, draft depuis des joueurs, drafts sauvegardées, quitter">☰ Menu</button>
       <div class="brand"><span class="logo">◆</span> Draft Lab</div>
-      <div class="tb-meta"><span id="patchPill">Patch …</span><span class="tb-dot">·</span><button class="verpill" id="verPill" title="Version de l’application — cliquer pour chercher une mise à jour">v…</button></div>
+      <div class="tb-meta"><span id="patchPill">Patch …</span><span class="tb-dot">·</span><select id="tierSel" class="tier-sel" title="Niveau des données (winrates et face-à-face). Auto : elo Solo/Duo moyen des joueurs de la partie ; sans joueurs, Émeraude+."><option value="auto">Auto · Émeraude+</option><option value="gold_plus">Or+</option><option value="platinum_plus">Platine+</option><option value="emerald_plus">Émeraude+</option><option value="diamond_plus">Diamant+</option><option value="master_plus">Master+</option></select><span class="tb-dot">·</span><button class="verpill" id="verPill" title="Version de l’application — cliquer pour chercher une mise à jour">v…</button></div>
     </div>
     <div class="tb-group tb-draft">
       <span class="tb-mode" id="flowChip" title="Type de draft — « Nouvelle draft » pour changer">Draft de zéro</span>
@@ -128,7 +128,7 @@
   </section>
 
   <footer>
-    Données : Riot Data Dragon (patch & champions), lolalytics (soloQ Master+, champions peu joués atténués pour limiter l’effet one-trick : winrates, face-à-face des lanes et duos), gol.gg (games pro : winrates, rôles et présence), op.gg (pools des joueurs), ta feuille de compos (synergies)
+    Données : Riot Data Dragon (patch & champions), lolalytics (soloQ à l’elo de la partie, 30 derniers jours, patchs récents comptés plus, champions peu joués atténués pour limiter l’effet one-trick : winrates, face-à-face des lanes et duos), gol.gg (games pro : winrates, rôles et présence), op.gg (pools des joueurs), ta feuille de compos (synergies)
     et <span class="credit">guide support season 16 de coach k</span> (duos bot / jungle, counters et fiches support).
     Le pourcentage est une estimation de modèle, pas une certitude. Draft Lab n’est pas affilié à Riot Games.
   </footer>

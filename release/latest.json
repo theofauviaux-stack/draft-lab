@@ -1,7 +1,7 @@
 {
-  "version": "2.37.2",
-  "sha256": "6c2fa19820522751ebb61d62dc395e5bf5411b42350c8e165e83a35e262399db",
-  "file": "draftlab-2.37.2.json.gz",
-  "notes": "Joueur retrouvé après un changement de tag (ex. UC akirielle#YOLO → #PANDA)",
-  "date": "2026-10-24T20:09:52.080Z"
+  "version": "2.38.0",
+  "sha256": "809e38348564da31819a403e7c8a53c657b7ff8f8992c77e9c60e9bd30f4ca6b",
+  "file": "draftlab-2.38.0.json.gz",
+  "notes": "Winrates à l'elo de la partie, patchs récents comptés plus, face-à-face seul (force générale avant le vis-à-vis), bot en 2v2",
+  "date": "2026-10-24T20:29:20.754Z"
 }
