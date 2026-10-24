@@ -1,7 +1,7 @@
 {
-  "version": "2.29.1",
-  "sha256": "ca6874d915851089888fd3db62a9ebd4fcfc83f82bd1a3593a91c1b5db5ede6a",
-  "file": "draftlab-2.29.1.json.gz",
-  "notes": "Fearless : bouton dans la barre du haut (draft de zéro et depuis des joueurs uniquement), visuel de série",
-  "date": "2026-10-24T15:02:39.939Z"
+  "version": "2.30.0",
+  "sha256": "7a2bbe8d25c7592c30897d0e2208745ba7035fdd185b39f4c0a6648d2421cf02",
+  "file": "draftlab-2.30.0.json.gz",
+  "notes": "Fearless : messages verrouillés, pool marqué, confirmation Game précédente, limite Bo5, série gardée dans les sauvegardes ; bans phase 2 sans doublons ; textes corrigés (plaques, supports conseillés, styles, accords)",
+  "date": "2026-10-24T15:16:16.228Z"
 }

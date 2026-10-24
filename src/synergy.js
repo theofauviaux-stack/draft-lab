@@ -3,7 +3,7 @@
 // combos connus, et règles générales (balle d'Orianna, atterrissage de Galio, projections + Yasuo/Yone…).
 // Chaque synergie : { v (force), kind (type), title (titre court), why (explication), src }
 import { COACH } from './coachdata.js';
-import { fr } from './coach_fr.js';
+import { fr, supPref } from './coach_fr.js';
 
 export const KINDS = {
   ulti: { label: 'Synergie d’ultime', color: '#c8aa6e' },
@@ -107,7 +107,7 @@ for (const [a, b, kind, v, title, why, src] of COMBOS) TABLE.set(key(a, b), { v,
 // Duo bot du guide (ADC + support)
 const BOT = new Map();
 for (const [adc, d] of Object.entries(COACH.adc)) {
-  d.sup.forEach((s, i) => BOT.set(`${adc}|${s}`, { v: 1.4 - Math.min(i, 8) * 0.08, type: fr(d.type), rank: i + 1 }));
+  d.sup.forEach((s, i) => BOT.set(`${adc}|${s}`, { v: 1.4 - Math.min(i, 8) * 0.08, type: supPref(d.type), rank: i + 1 }));
 }
 // Duo jungle-support du guide : ne compte que si le champion est vraiment joué jungle
 const JUNGLE = new Map();
@@ -129,7 +129,7 @@ export function pair(a, b) {
   for (const [x, y] of [[a, b], [b, a]]) {
     hits.push(...mechanics(x, y));
     const bt = is(x, 'A') && is(y, 'S') ? BOT.get(`${x.id}|${y.id}`) : null;
-    if (bt) hits.push({ v: bt.v, kind: 'lane', title: 'Duo bot conseillé', why: `${y.name} fait partie des meilleurs supports de ${x.name} (n°${bt.rank}, profil ${bt.type}) : la lane gagne ses trades et contrôle la vague pour le drake.`, src: 'duo conseillé' });
+    if (bt) hits.push({ v: bt.v, kind: 'lane', title: 'Duo bot conseillé', why: `${y.name} fait partie des ${bt.rank <= 5 ? 'meilleurs supports' : 'supports conseillés'} de ${x.name} (n°${bt.rank} de sa liste ; ${x.name} préfère en général un support ${bt.type}) : la lane gagne ses trades et contrôle la vague pour le drake.`, src: 'duo conseillé' });
     const jg = JUNGLE.get(`${x.id}|${y.id}`);
     if (jg && is(x, 'J') && is(y, 'S')) hits.push({ v: jg.v, kind: 'jgl', title: 'Duo jungle-support', why: `${y.name} est un des meilleurs supports pour ${x.name} (n°${jg.rank}) : roams, vision et ganks synchronisés autour des objectifs.`, src: 'duo conseillé' });
     if (x.id === 'Orianna' && BALL_CARRIERS.has(y.id) && !t) hits.push({ v: 1.2, kind: 'ulti', title: 'Balle d’Orianna', why: `Orianna pose sa balle sur ${y.name} qui plonge : Onde de choc part du milieu de leur équipe.`, src: 'règle' });

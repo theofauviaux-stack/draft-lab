@@ -2,7 +2,7 @@
 import { profileFor } from './champdb.js';
 import { teamSynergy, synergyWith, pair } from './synergy.js';
 import { COACH, ADC_RANGE, rangeValue } from './coachdata.js';
-import { SUPPORT_FR, fr } from './coach_fr.js';
+import { SUPPORT_FR, fr, supPref } from './coach_fr.js';
 
 const NAMES = {};
 const nm = (id) => NAMES[id] ?? id;
@@ -773,7 +773,7 @@ function botLane(mine, theirs) {
   const out = [];
   if (myA && COACH.adc[myA.id]) {
     const d = COACH.adc[myA.id];
-    out.push(`${myA.name} : lane <b>${fr(d.strength)}</b>, profil ${fr(d.type)}. Supports conseillés : ${d.sup.slice(0, 4).map(nm).join(', ')}.`);
+    out.push(`${myA.name} : lane <b>${fr(d.strength)}</b>, préfère un support ${supPref(d.type)}. Supports conseillés : ${d.sup.slice(0, 4).map(nm).join(', ')}.`);
   }
   if (myA && thA && rangeValue(myA.id) && rangeValue(thA.id)) {
     const a = rangeValue(myA.id), b = rangeValue(thA.id);
@@ -996,7 +996,7 @@ export function matchPlan(mine, theirs) {
     if (endSide) jungle.items.push(`${myJ.name} commence côté <b>${startSide}</b> et finit son premier clear côté <b>${LANE_FR[endSide]}</b> (ton côté fort) : gank ou couverture de ${LANE_FR[endSide]} vers 3:00-3:30, puis drake ${endSide === 'B' ? 'à 5:00' : 'ou Larves à 8:00'}.`);
     else jungle.items.push(`Aucune lane nettement gagnante : ${myJ.name} fait un full clear et joue autour de la lane qui prend la prio en premier.`);
     if (jEdge != null) {
-      if (jEdge > 0.08) jungle.items.push(`${myJ.name} est plus fort que ${thJ.name} en early : invade possible du côté où tes lanes ont la prio, ou contre-jungle sur son trajet.`);
+      if (jEdge > 0.08) jungle.items.push(`${myJ.name} a l’avantage sur ${thJ.name} en early : invade possible du côté où tes lanes ont la prio, ou contre-jungle sur son trajet.`);
       else if (jEdge < -0.08) jungle.items.push(`${thJ.name} est plus fort en early : évite l’invade, garde une ward dans ta jungle côté faible vers 2:45 et contre-gank plutôt que de forcer.`);
     }
     if (weakSide) {
@@ -1076,7 +1076,7 @@ export function matchPlan(mine, theirs) {
   herald.items.push(tag(mid) === 'mine'
     ? 'Tu es plus fort en mid game : prends le Héraut à 15:00 et lâche-le en mid (ou sur la lane la plus avancée) pour ouvrir la carte et la rotation vers le drake suivant.'
     : tag(mid) === 'theirs' ? 'Ils sont plus forts en mid game : ne te bats pas pour le Héraut, prends le drake ou des tours ailleurs pendant qu’ils le font.'
-      : 'À jouer selon la vague mid : le Héraut sert surtout à faire tomber une tour et ses plaques (depuis le patch 26.1, chaque tour T1, T2 et T3 a 5 plaques ; celles des T1 restent toute la partie mais rapportent un peu moins après 11 min).');
+      : 'À jouer selon la vague mid : le Héraut sert surtout à faire tomber une tour et ses plaques (depuis le patch 26.1, les tours T1, T2 et T3 ont chacune 5 plaques, et elles ne disparaissent plus en cours de partie).');
   herald.simple = tag(mid) === 'mine' ? ['high', 'À prioriser', 'Tu es plus fort en mid game : utilise-le pour une tour et ses plaques.']
     : tag(mid) === 'theirs' ? ['low', 'À laisser', 'Ils sont plus forts en mid game : prends un drake ou des tours ailleurs.']
     : ['mid', 'Si la vague mid est poussée', 'À prendre seulement avec la prio mid.'];
@@ -1126,9 +1126,10 @@ export function matchPlan(mine, theirs) {
   ];
 
   // 8) Plan par phase
+  let platesSaid = false; // l'explication des plaques n'est donnée qu'une fois
   const laneTip = (L) => {
     const s = lanes[L];
-    if (s.state === 'fort') return `${LANE_FR[L]} (côté fort) : pousse, trade, prends les plaques (5 par tour, et celles des T1 restent toute la partie depuis le patch 26.1 : une lane gagnante peut continuer à les farmer en mid game, même si elles valent un peu moins après 11 min) et la prio pour ton jungler.`;
+    if (s.state === 'fort') { const why = platesSaid ? '' : ' (5 par tour sur les T1, T2 et T3, et elles restent toute la partie depuis le patch 26.1 : une lane gagnante peut continuer à les prendre en mid game)'; platesSaid = true; return `${LANE_FR[L]} (côté fort) : pousse, trade, prends les plaques${why} et la prio pour ton jungler.`; }
     if (s.state === 'faible') return `${LANE_FR[L]} (côté faible) : freeze près de ta tour, ne meurs pas, garde le TP/flash ; ton but est de perdre le moins possible.`;
     if (s.state === 'égal') return `${LANE_FR[L]} : lane équilibrée, joue les timings de vague et suis le jungler.`;
     return null;

@@ -1089,3 +1089,6 @@ body.fearless .sb-center::before { content: '⚔ FEARLESS'; position: absolute; 
 body.fearless .sb-center { position: relative; }
 body.fearless .board .grid { box-shadow: inset 0 0 0 2px color-mix(in srgb, #b0452f 30%, transparent); border-radius: 12px; }
 .flbar .fl-acts button.primary { background: #b0452f !important; border-color: #b0452f !important; color: #fff !important; }
+.pchamp.fl img { filter: grayscale(1) brightness(.6); } .pchamp.fl { position: relative; }
+.pchamp.fl::after { content: '🔒'; position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); font-size: 13px; }
+.fl-last { font-size: 12px; font-weight: 700; color: #b0452f; align-self: center; }

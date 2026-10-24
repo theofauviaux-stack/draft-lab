@@ -212,3 +212,5 @@ export const LABEL_FR = {
   Ganking: 'ganks', 'Full Clear': 'full clear', Hybrid: 'hybride'
 };
 export const fr = (v) => LABEL_FR[v] ?? v;
+// « préfère un support … »
+export const supPref = (v) => ({ engage: 'd’engage', enchanteur: 'enchanteur', polyvalent: 'de n’importe quel type', 'portée + contrôle': 'à portée avec du contrôle' }[fr(v)] ?? fr(v));

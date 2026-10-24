@@ -138,6 +138,7 @@ function toast(msg) {
 // ---------- Actions ----------
 function place(id) {
   const tg = target();
+  if (tg && flLocked().has(id) && !Object.values(state.slots).flat().includes(id)) { toast(`🔒 ${state.P[id]?.name ?? id} est verrouillé (Fearless : joué en game ${flLocked().get(id)})`); return; }
   if (!tg || used().has(id)) return;
   const [t, i] = tg;
   state.slots[t][i] = id;
@@ -330,8 +331,8 @@ function showMatchups(side, i, anchor) {
   }
   const opp = opps.find((o) => o.lane === lane) ?? opps[0];
   if (opp && c.scale != null && opp.scale != null && c.scale !== opp.scale) {
-    if (c.scale < opp.scale) { plus.push(`Plus fort que <b>${opp.name}</b> en ${PH[c.scale]}.`); minus.push(`<b>${opp.name}</b> scale mieux : il te dépasse en ${PH[opp.scale]}.`); tips.push(`Joue la pression tôt contre ${opp.name} : trades, prio et objectifs avant 14 min.`); }
-    else { plus.push(`Scale mieux que <b>${opp.name}</b> : plus fort en ${PH[c.scale]}.`); minus.push(`<b>${opp.name}</b> est plus fort que toi en ${PH[opp.scale]}.`); tips.push(`Joue safe contre ${opp.name} en early (farm, ward, appel au jungle), ta fenêtre arrive en ${PH[c.scale]}.`); }
+    if (c.scale < opp.scale) { plus.push(`Prend l’avantage sur <b>${opp.name}</b> en ${PH[c.scale]}.`); minus.push(`<b>${opp.name}</b> scale mieux : il te dépasse en ${PH[opp.scale]}.`); tips.push(`Joue la pression tôt contre ${opp.name} : trades, prio et objectifs avant 14 min.`); }
+    else { plus.push(`Scale mieux que <b>${opp.name}</b> : à son avantage en ${PH[c.scale]}.`); minus.push(`<b>${opp.name}</b> a l’avantage en ${PH[opp.scale]}.`); tips.push(`Joue safe contre ${opp.name} en early (farm, ward, appel au jungle), ta fenêtre arrive en ${PH[c.scale]}.`); }
   } else if (c.scale === 1) minus.push('Perd en puissance en late : il faut convertir l’avance tôt.');
   else if (c.scale === 3) minus.push('Faible en early : évite les trades longs avant ses objets clés.');
   for (const k of ORDER) if (c[k] >= 2) plus.push(`Profil <b style="color:${ARCH[k].color}">${ARCH[k].label}</b> (${c[k]}/3) : ${ARCH[k].desc}.`);
@@ -601,7 +602,12 @@ function renderPentaAdvice(ev) {
   const verdict = val(best) > 0.05 ? `joue ${lbl(best)} : ${vsTxt}` : `aucun de ces styles n'a l'avantage ; ${lbl(best)} est le moins risqué (${vsTxt})`;
   el.innerHTML = tied.length > 1
     ? `<div class="pa"><span class="pa-k">Ta compo hésite</span> entre ${tied.map((k) => `${lbl(k)} (${pct(mine[k])})`).join(', ')}. Face à leur ${eTop.map(lbl).join(' / ')}, ${verdict}.<span class="pa-s">Score face à leur compo : ${lbl(best)} ${val(best) >= 0 ? '+' : ''}${val(best).toFixed(2)}${others ? ' · ' + others : ''}</span></div>`
-    : `<div class="pa"><span class="pa-k">Ton style</span> ${lbl(best)} (${pct(mine[best])}) face à leur ${eTop.map(lbl).join(' / ')} : ${vsTxt}.${val(best) < 0 ? ` <span class="pa-w">Plan B conseillé : ${lbl([...ORDER].sort((a, b) => val(b) - val(a))[0])}</span>` : ''}</div>`;
+    : (() => {
+      // alternative : seulement un style déjà présent dans la compo (au moins 18 %), sinon conseil de terrain
+      const alt = ORDER.filter((k) => k !== best && mine[k] >= 0.18 && val(k) > val(best)).sort((a, b) => val(b) - val(a))[0];
+      const tail = val(best) >= 0 ? '' : alt ? ` <span class="pa-w">Ton 2e style, ${lbl(alt)} (${pct(mine[alt])}), s’en sort mieux face à eux.</span>` : ' <span class="pa-w">Aucun autre style de ta compo ne fait mieux : évite leur terrain et cherche les fights hors de leur zone de confort.</span>';
+      return `<div class="pa"><span class="pa-k">Ton style</span> ${lbl(best)} (${pct(mine[best])}) face à leur ${eTop.map(lbl).join(' / ')} : ${vsTxt}.${tail}</div>`;
+    })();
 }
 function renderScaling() {
   const svg = $('scaling');
@@ -763,7 +769,7 @@ function renderPlayers() {
           </div>
         </div>
         <div class="ppool">
-          ${shown.map(({ e, k }) => `<span class="pchamp ${e.manual ? 'manual' : ''}" title="${state.P[e.id]?.name ?? e.id} : ${e.games ? `${e.games} games, ${Math.round((e.wins / e.games) * 100)} %${e.share ? `, ${e.share} % de ses games` : ''}${e.src ? ` (${e.src})` : ''}` : 'ajouté à la main, aucune game trouvée'} — clic pour retirer" data-i="${i}" data-k="${k}"><img src="${img(e.id)}" alt="">${e.games ? `<i>${e.games}</i>` : ''}${e.games ? `<b class="${e.wins / e.games >= 0.5 ? 'up' : 'down'}">${Math.round((e.wins / e.games) * 100)}%</b>` : ''}</span>`).join('') || '<span class="muted pnone">aucun champion à ce rôle</span>'}
+          ${shown.map(({ e, k }) => `<span class="pchamp ${e.manual ? 'manual' : ''} ${flLocked().has(e.id) ? 'fl' : ''}" title="${flLocked().has(e.id) ? `🔒 Fearless : joué en game ${flLocked().get(e.id)}, indisponible pour la série — ` : ''}${state.P[e.id]?.name ?? e.id} : ${e.games ? `${e.games} games, ${Math.round((e.wins / e.games) * 100)} %${e.share ? `, ${e.share} % de ses games` : ''}${e.src ? ` (${e.src})` : ''}` : 'ajouté à la main, aucune game trouvée'} — clic pour retirer" data-i="${i}" data-k="${k}"><img src="${img(e.id)}" alt="">${e.games ? `<i>${e.games}</i>` : ''}${e.games ? `<b class="${e.wins / e.games >= 0.5 ? 'up' : 'down'}">${Math.round((e.wins / e.games) * 100)}%</b>` : ''}</span>`).join('') || '<span class="muted pnone">aucun champion à ce rôle</span>'}
           ${hidden > 0 ? `<span class="phidden" title="Champions joués à d’autres lanes, ignorés pour le rôle ${ROLE_LABEL[p.role]}">+${hidden} autres lanes</span>` : ''}
           <input class="padd" data-i="${i}" list="champList" placeholder="+ champion" />
         </div>
@@ -886,7 +892,7 @@ function renderBanPlan() {
   const done = (from, to) => myBans.slice(from, to).filter(Boolean);
   const slots = (from, to) => `<div class="bp-slots">${myBans.slice(from, to).map((id) => (id && id !== NO_BAN ? `<img src="${img(id)}" title="${state.P[id].name}">` : '<span></span>')).join('')}</div>`;
   const col = (title, sub, state_, body, from, to) => `<div class="bp-col ${state_}"><div class="bp-h"><b>${title}</b><em>${sub}</em>${slots(from, to)}</div>${body}</div>`;
-  const rows = (n) => (list.length ? list.slice(0, n).map((x) => banRow(x, w.k)).join('') : '<p class="muted">Plus rien à bannir : leur équipe est complète.</p>');
+  const rows = (n, skip = 0) => (list.length ? list.slice(skip, skip + n).map((x) => banRow(x, w.k)).join('') : '<p class="muted">Plus rien à bannir : leur équipe est complète.</p>');
   // Les bans de base restent proposés tant que tes slots ne sont pas remplis, même si tu as pické avant de bannir.
   const left1 = 3 - done(0, 3).length, left2 = 2 - done(3, 5).length;
   const p1 = left1 > 0
@@ -894,7 +900,8 @@ function renderBanPlan() {
     : col('Phase 1', 'faite', 'past', '<p class="muted">Tes 3 bans de phase 1 sont posés.</p>', 0, 3);
   const p2state = left2 <= 0 || picks >= 10 ? 'past' : picks >= 6 ? 'now' : 'next';
   const p2 = col('Phase 2', p2state === 'past' ? 'faite' : `${p2state === 'now' ? 'maintenant' : 'aperçu, se précise après R3'} · tes bans : ${myP2} · visent leurs picks ${enemyLast}`, p2state,
-    p2state === 'past' ? '<p class="muted">Phase 2 terminée.</p>' : rows(left2 + 1), 3, 5);
+    // aperçu : on suppose que tes bans de phase 1 partent sur les premiers conseils, pour ne pas les proposer deux fois
+    p2state === 'past' ? '<p class="muted">Phase 2 terminée.</p>' : rows(left2 + 1, p2state === 'next' && left1 > 0 ? left1 + 2 : 0), 3, 5);
   // Ta compo est déjà (en partie) pickée : bans qui la protègent le mieux
   const cb = compBans(w.k);
   const mineIds = state.slots[me].filter(Boolean);
@@ -993,14 +1000,16 @@ function renderFearless() {
   const n = f.games.length + 1;
   el.innerHTML = `<b class="fl-t">⚔ Fearless · Game ${n}</b>
     <div class="fl-games">${f.games.length ? f.games.map((g, k) => `<span class="fl-g" title="Game ${k + 1} : verrouillés pour toute la série"><em>G${k + 1}</em>${[...g.blue, ...g.red].filter(Boolean).map((id) => `<img src="${img(id)}" title="${state.P[id]?.name ?? id} (game ${k + 1})" alt="">`).join('')}</span>`).join('') : '<span class="muted">Game 1 : aucun champion verrouillé pour l’instant. À la fin de la game, clique sur « Game suivante ».</span>'}</div>
-    <div class="fl-acts">${f.games.length ? '<button id="flUndo" class="tb-btn" title="Revenir à la game précédente">↶ Game précédente</button>' : ''}<button id="flNext" class="tb-btn primary" title="Verrouille les 10 champions joués et lance la game suivante">Game suivante →</button><button id="flEnd" class="tb-btn" title="Termine la série et désactive le Fearless">Terminer la série</button></div>`;
-  $('flNext').onclick = () => {
+    <div class="fl-acts">${f.games.length ? '<button id="flUndo" class="tb-btn" title="Revenir à la game précédente (ses picks reviennent dans la draft)">↶ Game précédente</button>' : ''}${f.games.length < 4 ? '<button id="flNext" class="tb-btn primary" title="Verrouille les champions joués et lance la game suivante">Game suivante →</button>' : '<span class="fl-last">Game 5 : dernière game d’un Bo5</span>'}<button id="flEnd" class="tb-btn" title="Termine la série et désactive le Fearless">Terminer la série</button></div>`;
+  if ($('flNext')) $('flNext').onclick = () => {
     const picks = { blue: [...state.slots.blue], red: [...state.slots.red] };
     if (![...picks.blue, ...picks.red].some(Boolean)) { toast('Aucun champion joué dans cette game'); return; }
     f.games.push(picks); saveFearless(); reset();
     toast(`Game ${f.games.length + 1} : ${flLocked().size} champions verrouillés pour les deux équipes`);
   };
-  if ($('flUndo')) $('flUndo').onclick = () => {
+  if ($('flUndo')) $('flUndo').onclick = (e) => {
+    // la draft en cours serait remplacée : on demande un 2e clic pour confirmer
+    if (Object.values(state.slots).flat().some(Boolean) && !e.currentTarget.dataset.ok) { e.currentTarget.dataset.ok = '1'; e.currentTarget.textContent = 'Confirmer : la draft en cours sera effacée'; toast('Reclique pour revenir à la game précédente (la draft en cours sera effacée)'); return; }
     const g = f.games.pop(); saveFearless();
     state.slots = emptySlots(); state.slots.blue = [...g.blue]; state.slots.red = [...g.red]; assignRoles('blue'); assignRoles('red'); render();
     toast(`Retour à la game ${f.games.length + 1}`);
@@ -1426,7 +1435,8 @@ function saveDraft() {
   const entry = {
     id: Date.now(), name, date: Date.now(), flow: state.flow, mySide: state.mySide,
     slots: structuredClone(state.slots), roles: structuredClone(state.roles), lock: structuredClone(state.lock), history: structuredClone(state.history),
-    players: structuredClone(state.players), teamInput: { ...state.teamInput }
+    players: structuredClone(state.players), teamInput: { ...state.teamInput },
+    fearless: state.fearless?.on && flAllowed() ? structuredClone(state.fearless) : null
   };
   const same = list.findIndex((x) => x.name === name);
   if (same >= 0) list[same] = { ...entry, id: list[same].id }; else list.unshift(entry);
@@ -1435,16 +1445,20 @@ function saveDraft() {
 function loadDraft(id) {
   const d = readSaves().find((x) => x.id === id);
   if (!d) return;
+  // un champion inconnu (renommé ou retiré du jeu) est ignoré au lieu de bloquer l'affichage
+  const slots = Object.fromEntries(Object.entries(d.slots).map(([k, arr]) => [k, arr.map((id) => (id === NO_BAN || (id && state.P[id]) ? id : null))]));
   Object.assign(state, {
-    mySide: d.mySide, slots: d.slots, roles: d.roles, lock: d.lock ?? { blue: Array(5).fill(null), red: Array(5).fill(null) }, history: d.history ?? [],
+    mySide: d.mySide, slots, roles: d.roles, lock: d.lock ?? { blue: Array(5).fill(null), red: Array(5).fill(null) }, history: d.history ?? [],
     players: d.players ?? { blue: [], red: [] }, teamInput: d.teamInput ?? { blue: '', red: '' }, selected: null,
     flow: d.flow ?? ([...(d.players?.blue ?? []), ...(d.players?.red ?? [])].some((p) => p.riotId || p.pool?.length) ? 'players' : 'zero')
   });
+  // la série Fearless sauvegardée avec la draft revient avec elle (sinon : pas de série)
+  state.fromShot = false; state.fearless = d.fearless ? structuredClone(d.fearless) : { on: false, games: [] }; saveFearless();
   $('mySide').value = state.mySide;
   $('opggBlue').value = state.teamInput.blue ?? ''; $('opggRed').value = state.teamInput.red ?? '';
   savePrefs();
   ingest(state.data);
-  toast(`« ${d.name} » chargée`);
+  toast(`« ${d.name} » chargée${d.fearless ? ` · Fearless game ${d.fearless.games.length + 1}` : ''}`);
 }
 // Elo bien visible dans les encadrés d'équipe : Solo/Duo en grand (compté), Flex en petit (affiché)
 const SHORT_T = { Fer: 'Fer', Bronze: 'Bronze', Argent: 'Argent', Or: 'Or', Platine: 'Plat', 'Émeraude': 'Émer', Diamant: 'Diam', Master: 'Master', 'Grand Master': 'GM', Challenger: 'Chall' };
@@ -1484,7 +1498,7 @@ function renderSaves() {
   }));
 }
 
-const WHO = { mine: ['toi', 'up'], theirs: ['eux', 'down'], even: ['disputé', ''], skip: ['à échanger', 'muted'], unknown: ['?', 'muted'] };
+const WHO = { mine: ['toi', 'up'], theirs: ['eux', 'down'], even: ['disputé', ''], skip: ['à laisser', 'muted'], unknown: ['?', 'muted'] };
 
 function miniMap(mp, myJ) {
   const col = (st) => (st === 'fort' ? '#1f9d5b' : st === 'faible' ? '#d64552' : st === 'égal' ? '#9a7a3c' : '#c3cad5');
