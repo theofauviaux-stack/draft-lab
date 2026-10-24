@@ -1,7 +1,7 @@
 {
-  "version": "2.34.0",
-  "sha256": "31ba5e171de14497734c927d46b651adc30e278bcef63a626eac5603754230bd",
-  "file": "draftlab-2.34.0.json.gz",
-  "notes": "Données sur les 30 derniers jours ; un champion modifié par un patch pendant cette période ne garde que ses games depuis ce patch (notes de patch Riot)",
-  "date": "2026-10-24T18:19:05.021Z"
+  "version": "2.34.1",
+  "sha256": "6cf0bb89c615fa8c19b617e527239f00bdb1831dfe61bf0211253fb036ea9ef5",
+  "file": "draftlab-2.34.1.json.gz",
+  "notes": "Affiche seulement le patch (26.21), sans autre indication visuelle",
+  "date": "2026-10-24T18:51:34.798Z"
 }

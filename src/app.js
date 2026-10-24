@@ -372,7 +372,6 @@ function showMatchups(side, i, anchor) {
     : `<div class="muted mu-empty">Son adversaire de lane n'est pas encore choisi.</div>`;
   box.innerHTML = `<div class="mu-card ${side}">
     <div class="mu-h"><img src="${img(id)}" alt=""><div><b>${c.name}</b><span>${ROLE_LABEL[lane]} · ${side === 'blue' ? 'Équipe 1' : 'Équipe 2'}${c.wr != null ? ` · ${c.wr.toFixed(1)} % WR` : ''}</span></div><button class="mu-x" title="Fermer">×</button></div>
-    ${(() => { const ch = [c, ...opps].filter((x) => x.changed); return ch.length ? `<p class="mu-win">🔧 ${ch.map((x) => `${x.name} modifié au patch ${patchLabel(x.changed)}`).join(' · ')} : ${ch.length > 1 ? 'seules les games depuis le changement le plus récent comptent' : 'seules les games depuis ce patch comptent'}.</p>` : ''; })()}
     <h6>Face-à-face</h6>${rowHtml}
     <div class="mu-cols"><div><h6 class="g">Forces</h6>${plus.length ? `<ul>${plus.map((t) => `<li>${t}</li>`).join('')}</ul>` : '<p class="muted">Rien de marquant pour l’instant.</p>'}</div>
       <div><h6 class="r">Faiblesses</h6>${minus.length ? `<ul>${minus.map((t) => `<li>${t}</li>`).join('')}</ul>` : '<p class="muted">Pas de faiblesse nette dans cette draft.</p>'}</div></div>
@@ -540,14 +539,12 @@ function renderGrid(info) {
       ${pj?.wr != null ? `<span class="proj ${pj.delta >= 0 ? 'up' : 'down'}" title="Winrate projeté de ton côté avec ce pick">${pj.wr.toFixed(1)}%</span>` : ''}
       ${pj?.inPool ? '<span class="star" title="Dans le pool du joueur">★</span>' : ''}
       <div class="dots">${ORDER.filter((k) => c[k] >= 2).map((k) => `<i style="background:${ARCH[k].color}"></i>`).join('')}</div>
-      ${c.changed ? `<span class="chg">${patchLabel(c.changed)}</span>` : ''}
       <div class="nm">${c.name}</div>`;
     t.title = `${c.name} — ${(c.roles.length ? c.roles : c.soloRoles).map((r) => ROLE_LABEL[r]).join('/')}` +
       (c.soloWr != null ? ` · soloQ ${c.soloWr.toFixed(1)} %` : '') +
       (c.proPicks ? ` · pro ${c.proPicks} games, ${c.presence} % présence` : ' · jamais joué en pro cette saison') +
       (c.proRoleStats ? `\nRôles en pro : ${Object.entries(c.proRoleStats).sort((a, b) => b[1].picks - a[1].picks).map(([r, v]) => `${ROLE_LABEL[r]} ${v.picks}`).join(', ')}` : '') +
       (c.offmeta ? '\n⚠ Pas un pick pro à ce rôle' : '') +
-      (c.changed ? `\n🔧 Modifié au patch ${patchLabel(c.changed)} : stats depuis ce patch uniquement` : '') +
       `\n${ORDER.map((k) => `${ARCH[k].label} ${c[k]}/3`).join(' · ')} · Scaling ${['', 'early', 'mid', 'late'][c.scale]}${c.guessed ? ' (profil estimé)' : ''}`;
     if (flg && t.className.includes(' fl')) t.title = `🔒 Fearless : ${c.name} a été joué en game ${flg}, il ne peut plus être repris dans la série`;
     t.onclick = () => place(c.id);
@@ -1723,11 +1720,7 @@ function renderSources() {
     el.title = bad.map(([n, st]) => `${n} : ${st.ok ? `dernière mise à jour le ${new Date(st.at).toLocaleDateString('fr-FR')}` : st.cached ? `hors ligne, on utilise les données du ${st.at ? new Date(st.at).toLocaleDateString('fr-FR') : '?'}` : `indisponible (${st.error ?? 'erreur'})`}`).join('\n') + '\nClique pour réessayer.';
     el.onclick = () => load(true);
   }
-  const nch = Object.keys(state.data.changes ?? {}).length, wp = state.data.window?.patches ?? [];
-  $('patchPill').textContent = `Patch ${patchLabel(state.data.patch)} · 30 j`;
-  $('patchPill').title = `Données des 30 derniers jours (soloQ Master+ et games pro).` +
-    (nch ? `\n${nch} champion${nch > 1 ? 's' : ''} modifié${nch > 1 ? 's' : ''} directement pendant cette période : pour eux, seulement les games depuis leur changement.` : '') +
-    (wp.length ? `\n${wp.filter((x) => !state.data.window.from || x.start > state.data.window.from).map((x) => `Patch ${x.label} (${new Date(x.start).toLocaleDateString('fr-FR')}) : ${Object.values(state.data.changes ?? {}).filter((v) => v === x.patch).length} champions modifiés`).join('\n')}` : '');
+  $('patchPill').textContent = `Patch ${patchLabel(state.data.patch)}`;
 }
 
 // ---------- Chargement ----------

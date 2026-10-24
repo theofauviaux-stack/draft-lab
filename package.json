@@ -1,6 +1,6 @@
 {
   "name": "draft-lab",
-  "version": "2.34.0",
+  "version": "2.34.1",
   "description": "Analyseur de draft League of Legends : winrate en direct, pentagone des compos, synergies, mode soloQ / pro, suggestions alternatives. Données du patch actuel (Data Dragon, lolalytics, gol.gg).",
   "main": "boot.js",
   "author": "Draft Lab",
