@@ -1078,3 +1078,14 @@ body.q-flex .sb-p .sbr-flex { font-size: 12.5px; } body.q-flex .sb-p .sbr-flex u
 .tile.fl img { filter: grayscale(1) brightness(.55); }
 .tile.fl::after { content: '🔒'; position: absolute; top: 34%; left: 50%; transform: translate(-50%, -50%); font-size: 22px; }
 .tile.fl .nm { color: var(--muted); text-decoration: line-through; }
+/* Fearless : bouton dans la barre du haut + visuel de série */
+.fl-tog { border-color: color-mix(in srgb, #b0452f 45%, var(--line)) !important; color: #b0452f !important; font-weight: 700; }
+.fl-tog.on { background: #b0452f !important; border-color: #b0452f !important; color: #fff !important; }
+.fl-tog[hidden] { display: none; }
+body.fearless .topbar { box-shadow: inset 0 -3px 0 #b0452f; }
+body.fearless #flowChip { color: #b0452f; }
+body.fearless .sb-center { border-color: color-mix(in srgb, #b0452f 55%, var(--line)) !important; }
+body.fearless .sb-center::before { content: '⚔ FEARLESS'; position: absolute; top: -10px; left: 50%; transform: translateX(-50%); font-size: 10.5px; font-weight: 800; letter-spacing: 1px; color: #fff; background: #b0452f; padding: 2px 10px; border-radius: 999px; }
+body.fearless .sb-center { position: relative; }
+body.fearless .board .grid { box-shadow: inset 0 0 0 2px color-mix(in srgb, #b0452f 30%, transparent); border-radius: 12px; }
+.flbar .fl-acts button.primary { background: #b0452f !important; border-color: #b0452f !important; color: #fff !important; }

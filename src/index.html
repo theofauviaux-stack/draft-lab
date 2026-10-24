@@ -17,6 +17,7 @@
     </div>
     <div class="tb-group tb-draft">
       <span class="tb-mode" id="flowChip" title="Type de draft — « Nouvelle draft » pour changer">Draft de zéro</span>
+      <button id="flToggle" class="tb-btn fl-tog" hidden title="Mode Fearless (série Bo3 / Bo5) : un champion joué ne peut plus être repris dans la série">⚔ Fearless</button>
       <div class="seg" role="group" aria-label="Mon côté">
         <span class="seg-l">Je joue</span>
         <button class="seg-b blue" data-side="blue">Bleu</button>
@@ -186,7 +187,6 @@
           <span class="st-go">Importer une capture →</span>
         </button>
       </div>
-      <label class="st-fl" id="menuFlRow" title="Série en Bo3 / Bo5 : un champion joué dans une game ne peut plus être repris par aucune des deux équipes"><input type="checkbox" id="menuFearless" /> <b>⚔ Mode Fearless</b> <span>pour « Draft de zéro » et « Draft depuis des joueurs » : un champion joué ne peut plus être repris dans la série</span></label>
       <div id="startForm" class="start-form st-form" hidden>
         <label class="blue">Équipe 1 — côté bleu<input id="menuBlue" placeholder="Lien multi op.gg ou Nom#TAG, Nom#TAG…" /></label>
         <label class="red">Équipe 2 — côté rouge<input id="menuRed" placeholder="Lien multi op.gg ou Nom#TAG, Nom#TAG…" /></label>

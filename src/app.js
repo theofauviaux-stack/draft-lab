@@ -92,7 +92,7 @@ function skipBan() {
 const FL_KEY = 'draftlab-fearless';
 state.fearless = (() => { try { return JSON.parse(localStorage.getItem(FL_KEY)) ?? { on: false, games: [] }; } catch { return { on: false, games: [] }; } })();
 const saveFearless = () => { try { localStorage.setItem(FL_KEY, JSON.stringify(state.fearless)); } catch {} };
-const flLocked = () => { const m = new Map(); if (state.fearless?.on) state.fearless.games.forEach((g, k) => [...g.blue, ...g.red].forEach((id) => id && !m.has(id) && m.set(id, k + 1))); return m; };
+const flLocked = () => { const m = new Map(); if (state.fearless?.on && flAllowed()) state.fearless.games.forEach((g, k) => [...g.blue, ...g.red].forEach((id) => id && !m.has(id) && m.set(id, k + 1))); return m; };
 const used = () => new Set([...Object.values(state.slots).flat().filter(Boolean), ...flLocked().keys()]);
 // ---------- Joueurs (multi op.gg) ----------
 // Un champion du pool ne compte que s'il est joué à la lane du joueur
@@ -958,7 +958,6 @@ function startBackground() {
 }
 function openMenu() {
   if (LIVE.on) stopLiveMode();
-  $('menuFearless').checked = !!state.fearless?.on;
   $('startMenu').hidden = false;
   $('startMenu').classList.remove('leaving', 'form');
   startBackground();
@@ -985,8 +984,11 @@ const closeMenu = () => {
 };
 function renderFearless() {
   const f = state.fearless, el = $('flBar');
-  el.hidden = !f?.on || LIVE.on;
-  document.body.classList.toggle('fearless', !!f?.on && !LIVE.on);
+  const ok = flAllowed(), on = !!f?.on && ok;
+  $('flToggle').hidden = !ok; $('flToggle').classList.toggle('on', on);
+  $('flToggle').textContent = on ? `⚔ Fearless · G${f.games.length + 1}` : '⚔ Fearless';
+  el.hidden = !on;
+  document.body.classList.toggle('fearless', on);
   if (el.hidden) return;
   const n = f.games.length + 1;
   el.innerHTML = `<b class="fl-t">⚔ Fearless · Game ${n}</b>
@@ -1005,7 +1007,14 @@ function renderFearless() {
   };
   $('flEnd').onclick = () => { state.fearless = { on: false, games: [] }; saveFearless(); render(); toast('Série terminée : Fearless désactivé'); };
 }
-function startSeries() { const on = !!$('menuFearless').checked; state.fearless = on && state.fearless?.on ? state.fearless : { on, games: [] }; saveFearless(); }
+// Fearless : proposé seulement en « Draft de zéro » et « Draft depuis des joueurs » (bouton dans la barre du haut)
+const flAllowed = () => !LIVE.on && !state.fromShot && (state.flow === 'zero' || state.flow === 'players');
+function startSeries() { state.fromShot = false; }
+function toggleFearless() {
+  if (state.fearless?.on) { state.fearless = { on: false, games: [] }; toast('Fearless désactivé'); }
+  else { state.fearless = { on: true, games: [] }; toast('Fearless activé : série en cours, game 1'); }
+  saveFearless(); render();
+}
 function startFromZero() {
   startSeries();
   state.players = { blue: [], red: [] }; state.teamInput = { blue: '', red: '' }; state.flow = 'zero';
@@ -1316,6 +1325,7 @@ function openShot() {
 function applyShot() {
   state.slots = emptySlots(); state.roles = { blue: [...ROLES], red: [...ROLES] };
   state.lock = { blue: Array(5).fill(null), red: Array(5).fill(null) }; state.history = []; state.selected = null;
+  state.fromShot = true; // une draft importée d'une capture n'entre pas dans une série Fearless
   SHOT.clicks.forEach((c, k) => { const side = k < 5 ? 'blue' : 'red'; state.slots[side][k % 5] = c.id; });
   // Rôles déduits uniquement des champions reconnus sur l'image (jamais des pseudos)
   assignRoles('blue'); assignRoles('red');
@@ -1371,6 +1381,7 @@ async function initWinSize() {
 new ResizeObserver(() => { if (state.list?.length) renderScaling(); }).observe(document.querySelector('.scal-plot'));
 function initLive() {
   initWinSize();
+  $('flToggle').onclick = toggleFearless;
   $('startLive').onclick = startLiveMode;
   $('liveStop').onclick = () => { stopLiveMode(); toast('Direct arrêté'); };
   api.onLive?.(onLive);
