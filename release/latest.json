@@ -1,7 +1,7 @@
 {
-  "version": "2.32.0",
-  "sha256": "2773c8985d39e6908197aa85b330ad20732df033fd384bab66c5443d97b7cbae",
-  "file": "draftlab-2.32.0.json.gz",
-  "notes": "Direct : l'écran se vide à la fin de la partie (ou si la sélection est annulée), résultat victoire/défaite lu dans le client, historique des parties regroupé par session",
-  "date": "2026-10-24T16:57:31.345Z"
+  "version": "2.32.1",
+  "sha256": "35a9567542c38cc35f7067f7082ee3bfd1b2879a84bf99d9f8f87b5d76e837b6",
+  "file": "draftlab-2.32.1.json.gz",
+  "notes": "Direct : mode de la partie lu dans le client même si Draft Lab est ouvert en pleine partie",
+  "date": "2026-10-24T17:13:31.721Z"
 }

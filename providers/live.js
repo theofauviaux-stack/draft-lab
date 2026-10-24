@@ -138,8 +138,12 @@ let timer = null, lcu = null, lastLcuTry = 0;
 async function poll(send) {
   try {
     const g = await inGame();
-    if (g) return send(g);
-    if (!lcu || Date.now() - lastLcuTry > 15000) { lastLcuTry = Date.now(); lcu = await findLcu(); }
+    if (!lcu || Date.now() - lastLcuTry > 15000) { lastLcuTry = Date.now(); lcu = (await findLcu()) ?? (g ? lcu : null); }
+    if (g) {
+      // en jeu : le mode de la partie vient du client (utile si Draft Lab a été ouvert pendant la partie)
+      if (lcu) { const get = (p) => localGet(lcu.port, p, lcu.token); const q = await readQueue(get).catch(() => null); if (q) g.queue = q; g.summoner = g.summoner ?? lcu.summoner ?? null; }
+      return send(g);
+    }
     if (!lcu) return send({ phase: 'NoClient' });
     const cs = await champSelect(lcu).catch((e) => { lcu = null; return { phase: 'NoClient', error: e.message }; });
     send(cs);
