@@ -108,8 +108,8 @@
     // démo de l'équilibrage : les 10 joueurs d'exemple, avec les pseudos entrés s'il y en a
     loadPlayers: async ({ input }) => {
       const txt = String(input || ''), RE = /(?:https?:\/\/)?(?:[a-z]+\.)?op\.gg\/\S+/gi, names = [];
-      for (const u of txt.match(RE) ?? []) { try { names.push(...(new URL(/^https?:/.test(u) ? u : 'https://' + u).searchParams.get('summoners') ?? '').split(',')); } catch {} }
-      names.push(...txt.replace(RE, '\n').split(/[,\n;]+/));
+      for (const u of txt.match(RE) ?? []) { try { const x = new URL(/^https?:/.test(u) ? u : 'https://' + u); const q = x.searchParams.get('summoners'); names.push(...(q ? q.split(',') : [decodeURIComponent(x.pathname.split('/').filter(Boolean).pop()).replace(/-+$/, '').replace(/-([^-]+)$/, '#$1')])); } catch {} }
+      if (!names.length) names.push(...txt.split(/[,\n;]+/));
       names.splice(0, names.length, ...names.map((x) => x.trim()).filter(Boolean).slice(0, 20));
       const all = JSON.parse(JSON.stringify([...DEMO.blue, ...DEMO.red]));
       return { region: 'euw', players: (names.length ? names : all.map((p) => p.riotId)).map((n, i) => ({ ...all[i % 10], riotId: n.includes('#') ? n : `${n}#EUW` })) };

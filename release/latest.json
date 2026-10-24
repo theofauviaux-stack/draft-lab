@@ -1,7 +1,7 @@
 {
-  "version": "2.37.0",
-  "sha256": "bd2183f61bd38833e8ff50e09adeb2fa6813e9b09d4bd0d72db9049fb1e376c9",
-  "file": "draftlab-2.37.0.json.gz",
-  "notes": "Équilibrage : joueurs gardés en mémoire, un nouveau lien op.gg s'ajoute à la liste",
-  "date": "2026-10-24T19:40:06.615Z"
+  "version": "2.37.1",
+  "sha256": "b7826a7c66691c93ca0ad0e7eee8496f242518154586d8d443557861eaec46d7",
+  "file": "draftlab-2.37.1.json.gz",
+  "notes": "Équilibrage : liste gardée seulement pendant la session ; pseudos lus depuis les liens de joueurs (op.gg, u.gg, porofessor…), surnoms autour ignorés",
+  "date": "2026-10-24T19:45:40.665Z"
 }

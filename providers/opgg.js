@@ -14,20 +14,31 @@ async function getJson(url) {
   } finally { clearTimeout(t); }
 }
 
-// Accepte un ou plusieurs liens op.gg (multi-search ou page d'un joueur), une liste collée
-// "Nom#TAG, Nom#TAG" (une ligne ou plusieurs), le chat du salon, ou un mélange de tout ça :
-// on ne garde que les pseudos.
-const URL_RE = /(?:https?:\/\/)?(?:[a-z]+\.)?op\.gg\/\S+/gi;
+// Accepte un ou plusieurs liens (op.gg multi-search ou page d'un joueur, et aussi u.gg, porofessor,
+// leagueofgraphs, deeplol, mobalytics, dpm.lol…), une liste collée "Nom#TAG, Nom#TAG" (une ligne ou
+// plusieurs), le chat du salon, ou un mélange : on ne garde que les pseudos.
+const URL_RE = /(?:https?:\/\/|www\.)\S+|(?:[a-z]+\.)?op\.gg\/\S+/gi;
+// régions écrites à la façon Riot (euw1, na1…) ou des sites
+const REGION_ALIAS = { euw1: 'euw', eun1: 'eune', na1: 'na', kr: 'kr', br1: 'br', jp1: 'jp', la1: 'lan', la2: 'las', oc1: 'oce', tr1: 'tr', ru: 'ru', me1: 'me', sg2: 'sg', tw2: 'tw', vn2: 'vn', ph2: 'ph', th2: 'th' };
+const toRegion = (x) => { const r = String(x || '').toLowerCase(); return REGIONS.includes(r) ? r : REGION_ALIAS[r] ?? null; };
+// "Nom-TAG" (tiret en trop possible à la fin) ou "Nom#TAG" -> "Nom#TAG"
+const segName = (seg) => { const d = decodeURIComponent(seg).replace(/\+/g, ' ').replace(/-+$/, ''); return d.includes('#') ? d : d.replace(/-([^-]+)$/, '#$1'); };
 function namesFromUrl(raw) {
   try {
     const u = new URL(/^https?:/i.test(raw) ? raw : `https://${raw}`);
-    const m = u.pathname.match(/multisearch\/([a-z]+)/i) || u.pathname.match(/summoners\/([a-z]+)\//i);
-    let region = m && REGIONS.includes(m[1].toLowerCase()) ? m[1].toLowerCase() : null;
-    if (u.searchParams.get('region')) region = u.searchParams.get('region').toLowerCase();
+    const parts = u.pathname.split('/').filter(Boolean);
+    // la région suit le mot-clé de la page (/summoners/euw/…) ; sinon le premier segment qui en est une
+    // (attention : /tr/ ou /kr/ en tête de lien peut n'être que la langue du site)
+    const kw = parts.findIndex((p) => /^(summoners?|profile|live|multisearch|multi)$/i.test(p));
+    let ri = kw >= 0 && toRegion(parts[kw + 1]) ? kw + 1 : parts.findIndex((p) => toRegion(p));
+    let region = ri >= 0 ? toRegion(parts[ri]) : null;
+    if (u.searchParams.get('region')) region = toRegion(u.searchParams.get('region')) ?? region;
     const s = u.searchParams.get('summoners');
     if (s) return { region, names: s.split(/[,\n]+/) };
-    const one = u.pathname.match(/summoners\/[a-z]+\/([^/]+)/i);
-    if (one) return { region, names: [decodeURIComponent(one[1]).replace(/-([^-]+)$/, '#$1')] };
+    // page d'un joueur : le segment qui suit la région (/summoners/euw/Nom-TAG, /profile/euw1/nom-tag/overview…)
+    let seg = ri >= 0 ? parts[ri + 1] : null;
+    if (!seg) seg = parts.find((p) => /-|%23|#/.test(p) && !/^(fr|en|lol|summoners?|profile|live|multisearch)$/i.test(p)); // dpm.lol/Nom-TAG
+    if (seg && /[-#]|%23/.test(decodeURIComponent(seg) + seg)) return { region, names: [segName(seg)] };
   } catch {}
   return { region: null, names: [] };
 }
@@ -40,11 +51,12 @@ function parseInput(input, fallbackRegion = 'euw', max = 5) {
     region ??= r.region;
     names.push(...r.names);
   }
-  // le reste du texte (hors liens) : pseudos séparés par des virgules, des lignes ou des points-virgules
-  for (const x of text.replace(URL_RE, '\n').split(/[,\n;]+/)) names.push(x);
+  // Sans lien : pseudos séparés par des virgules, des lignes ou des points-virgules.
+  // Avec des liens, seuls les liens comptent (le texte autour, comme « UCW Koda : », est un surnom).
+  if (!names.length) for (const x of text.split(/[,\n;]+/)) names.push(x);
   const seen = new Set();
   const out = names
-    .map((x) => x.replace(/\s+(joined the lobby|a rejoint le salon).*/i, '').replace(/\s+/g, ' ').trim())
+    .map((x) => x.replace(/\s+(joined the lobby|a rejoint le salon).*/i, '').replace(/\s+/g, ' ').replace(/\s*#\s*/, '#').trim())
     .filter((x) => x && !/^https?:/i.test(x) && !seen.has(x.toLowerCase()) && seen.add(x.toLowerCase()))
     .slice(0, max);
   return { region: region ?? fallbackRegion, names: out };

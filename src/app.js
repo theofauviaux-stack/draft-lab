@@ -1072,8 +1072,11 @@ function startFromZero(mode = 'classic') {
 }
 // ---------- Équilibrer des équipes (in house) ----------
 const BAL_KEY = 'draftlab-balance';
-const BAL = (() => { try { return { players: [], swap: false, ...JSON.parse(localStorage.getItem(BAL_KEY)), sols: [], k: 0 }; } catch { return { players: [], sols: [], k: 0, swap: false }; } })();
-const balSave = () => { try { localStorage.setItem(BAL_KEY, JSON.stringify({ input: $('balInput').value, region: $('balRegion').value, players: BAL.players })); } catch {} };
+// La liste reste en mémoire tant que l'appli est ouverte (on peut quitter l'écran et revenir),
+// mais n'est pas enregistrée : elle repart vide au prochain lancement.
+const BAL = { players: [], sols: [], k: 0, swap: false };
+try { localStorage.removeItem(BAL_KEY); } catch {}
+const balSave = () => {}; // rien sur le disque : mémoire de la session seulement
 const RL = { T: 'Top', J: 'Jungle', M: 'Mid', A: 'ADC', S: 'Support', FILL: 'Fill' };
 // Elo de chaque joueur, toujours déterminé automatiquement : Solo/Duo actuel, sinon saison passée,
 // sinon Flex (un peu décoté, la Flex est plus facile), sinon la moyenne des autres joueurs du groupe.
@@ -1090,8 +1093,7 @@ const balActive = () => BAL.players.filter((p) => p.on !== false);
 const balLabel = (p) => { const e = balElo(p), n = p.rank?.tier || p.rank?.prevTier ? rankName(p.rank) : null; return { ...e, label: n ? n.label : pointsLabel(e.pts), color: n ? rankColor(p.rank) : tierColor(e.pts) }; };
 function openBalance() {
   $('startMenu').classList.add('form'); $('startChoices').hidden = true; $('balanceBox').hidden = false;
-  if (BAL.input != null && !$('balInput').value) $('balInput').value = BAL.input;
-  if (BAL.region) $('balRegion').value = BAL.region; else $('balRegion').value = state.region;
+  if (!BAL.players.length) $('balRegion').value = state.region;
   $('balStep1').hidden = false; $('balStep2').hidden = true;
   renderBalList();
 }
