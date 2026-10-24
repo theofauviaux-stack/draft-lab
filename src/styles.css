@@ -1202,3 +1202,4 @@ body.fearless .board .grid { box-shadow: inset 0 0 0 2px color-mix(in srgb, #b04
 .bal-mid i.b { color: var(--blue); } .bal-mid i.r { color: var(--red); }
 .bal-sum { font-size: 11.5px; margin: 8px 0 0; }
 .bal-actions { flex-wrap: wrap; }
+.bal-rk.est small { font-style: italic; }

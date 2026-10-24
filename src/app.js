@@ -1075,7 +1075,18 @@ const BAL_KEY = 'draftlab-balance';
 const BAL = (() => { try { return { players: [], swap: false, ...JSON.parse(localStorage.getItem(BAL_KEY)), sols: [], k: 0 }; } catch { return { players: [], sols: [], k: 0, swap: false }; } })();
 const balSave = () => { try { localStorage.setItem(BAL_KEY, JSON.stringify({ input: $('balInput').value, region: $('balRegion').value, players: BAL.players })); } catch {} };
 const RL = { T: 'Top', J: 'Jungle', M: 'Mid', A: 'ADC', S: 'Support', FILL: 'Fill' };
-const balPts = (p) => (p.manual != null ? p.manual : rankPoints(p.rank));
+// Elo de chaque joueur, toujours déterminé automatiquement : Solo/Duo actuel, sinon saison passée,
+// sinon Flex (un peu décoté, la Flex est plus facile), sinon la moyenne des autres joueurs du groupe.
+function balElo(p) {
+  const r = p.rank;
+  if (r?.tier) return { pts: rankPoints(r), src: 'Solo/Duo' };
+  if (r?.prevTier) return { pts: rankPoints(r), src: 'Solo/Duo saison passée' };
+  if (r?.flex?.tier) return { pts: Math.max(0, rankPoints(r.flex) - 100), src: 'estimé depuis la Flex' };
+  const others = BAL.players.filter((x) => x !== p && (x.rank?.tier || x.rank?.prevTier || x.rank?.flex?.tier)).map((x) => balElo(x).pts);
+  return { pts: others.length ? others.reduce((a, x) => a + x, 0) / others.length : 1600, src: 'pas classé : moyenne du groupe', guess: true };
+}
+const balPts = (p) => balElo(p).pts;
+const balLabel = (p) => { const e = balElo(p), n = p.rank?.tier || p.rank?.prevTier ? rankName(p.rank) : null; return { ...e, label: n ? n.label : pointsLabel(e.pts), color: n ? rankColor(p.rank) : tierColor(e.pts) }; };
 function openBalance() {
   $('startMenu').classList.add('form'); $('startChoices').hidden = true; $('balanceBox').hidden = false;
   if (BAL.input != null && !$('balInput').value) $('balInput').value = BAL.input;
@@ -1101,12 +1112,10 @@ async function balSearch() {
       return {
         key, riotId: p.riotId, error: p.error ?? null, rank: p.rank ?? null, top: (p.pool ?? []).slice(0, 3).map((c) => c.id),
         auto, main: old?.edited ? old.main : auto?.main ?? 'FILL', second: old?.edited ? old.second : auto?.second ?? 'FILL',
-        edited: old?.edited ?? false, manual: old?.manual ?? null
+        edited: old?.edited ?? false
       };
     });
     balSave(); renderBalList();
-    const miss = BAL.players.filter((p) => balPts(p) == null).length;
-    if (miss) toast(`${miss} joueur${miss > 1 ? 's' : ''} sans elo Solo/Duo : choisis son niveau à la main`);
   } catch (e) { toast(`op.gg : ${e.message}`); }
   btn.disabled = false; btn.textContent = 'Rechercher sur op.gg';
 }
@@ -1118,10 +1127,8 @@ function renderBalList() {
   $('balGo').title = ok ? '' : 'Il faut exactement 10 joueurs';
   const roleSel = (p, f) => `<select data-f="${f}">${[...BAL_ROLES, 'FILL'].map((r) => `<option value="${r}" ${p[f] === r ? 'selected' : ''}>${RL[r]}</option>`).join('')}</select>`;
   L.innerHTML = BAL.players.map((p, i) => {
-    const pts = balPts(p), n = rankName(p.rank);
-    const rk = p.manual != null || pts == null
-      ? `<select data-f="manual" class="bal-man ${pts == null ? 'need' : ''}"><option value="">Elo ?</option>${RANK_OPTIONS.map((o) => `<option value="${o.v}" ${p.manual === o.v ? 'selected' : ''}>${o.label}</option>`).join('')}</select>`
-      : `<span class="bal-rk" style="--c:${rankColor(p.rank)}" title="Solo/Duo${n?.prev ? ' (saison passée)' : ''}">${n ? n.label : '?'}${p.rank?.tier && p.rank.lp != null ? ` <small>${p.rank.lp} LP</small>` : ''}</span>`;
+    const e = balLabel(p);
+    const rk = `<span class="bal-rk ${e.src === 'Solo/Duo' ? '' : 'est'}" style="--c:${e.color}" title="${e.src}">${e.src === 'Solo/Duo' ? '' : '≈ '}${e.label}${p.rank?.tier && p.rank.lp != null ? ` <small>${p.rank.lp} LP</small>` : ` <small>${e.src === 'Solo/Duo' ? '' : e.src.replace('Solo/Duo ', '')}</small>`}</span>`;
     const pc = p.auto?.pct ? Object.entries(p.auto.pct).sort((a, b) => b[1] - a[1]).filter(([, v]) => v >= 5).slice(0, 3).map(([r, v]) => `${RL[r]} ${v} %`).join(' · ') : '';
     return `<div class="bal-row ${p.error ? 'err' : ''}" data-i="${i}">
       <span class="bal-n">${i + 1}</span>
@@ -1136,8 +1143,7 @@ function renderBalList() {
     const p = BAL.players[+row.dataset.i];
     row.querySelectorAll('select').forEach((sel) => (sel.onchange = () => {
       const f = sel.dataset.f;
-      if (f === 'manual') p.manual = sel.value ? +sel.value : null;
-      else { p[f] = sel.value; p.edited = true; }
+      p[f] = sel.value; p.edited = true;
       balSave(); renderBalList();
     }));
     row.querySelector('.bal-x').onclick = () => { BAL.players.splice(+row.dataset.i, 1); balSave(); renderBalList(); };
@@ -1145,9 +1151,7 @@ function renderBalList() {
 }
 function balRun() {
   const ps = BAL.players;
-  const known = ps.map(balPts).filter((x) => x != null);
-  const avg = known.length ? known.reduce((a, x) => a + x, 0) / known.length : 1600;
-  const input = ps.map((p) => ({ value: balValue(balPts(p) ?? avg), main: p.main, second: p.second, wins: p.rank?.wins, losses: p.rank?.losses, hot: p.rank?.hot }));
+  const input = ps.map((p) => ({ value: balValue(balPts(p)), main: p.main, second: p.second, wins: p.rank?.wins, losses: p.rank?.losses, hot: p.rank?.hot }));
   BAL.sols = balanceTeams(input); BAL.k = 0; BAL.swap = false;
   if (!BAL.sols.length) { toast('Il faut exactement 10 joueurs'); return; }
   $('balStep1').hidden = true; $('balStep2').hidden = false;
@@ -1161,8 +1165,8 @@ function renderBalResult() {
   const unval = (v) => (v > 2800 ? 2800 + (v - 2800) * 2 : v); // LP au-dessus de Master : comptés à moitié dans le calcul
   const FIT = { main: ['★', 'rôle principal'], second: ['☆', 'rôle secondaire'], fill: ['☆', 'fill'], off: ['⚠', 'hors de ses rôles'] };
   const cell = (pi, ri, v, side) => {
-    const p = BAL.players[pi], fit = roleFit(p, BAL_ROLES[ri]), pts = balPts(p), n = rankName(p.rank);
-    return `<div class="bal-p ${side} ${fit}"><span class="bal-fit" title="${FIT[fit][1]}">${FIT[fit][0]}</span><b>${p.riotId}</b><span class="bal-rk" style="--c:${p.manual != null || pts == null ? tierColor(pts) : rankColor(p.rank)}">${p.manual != null ? pointsLabel(p.manual) : n ? n.label : 'inconnu'}</span></div>`;
+    const p = BAL.players[pi], fit = roleFit(p, BAL_ROLES[ri]), e = balLabel(p);
+    return `<div class="bal-p ${side} ${fit}"><span class="bal-fit" title="${FIT[fit][1]}">${FIT[fit][0]}</span><b>${p.riotId}</b><span class="bal-rk" style="--c:${e.color}" title="${e.src}">${e.src === 'Solo/Duo' ? '' : '≈ '}${e.label}</span></div>`;
   };
   const rows = BAL_ROLES.map((role, ri) => {
     const d = vb[ri] - vr[ri];

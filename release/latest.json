@@ -1,7 +1,7 @@
 {
-  "version": "2.35.0",
-  "sha256": "f38c88a09d791ba241e0b58b3387610d3fae50bb86a804314224ea518347427d",
-  "file": "draftlab-2.35.0.json.gz",
-  "notes": "Nouveau : Équilibrer des équipes (in house) — elo Solo/Duo et rôles lus sur op.gg",
-  "date": "2026-10-24T19:11:06.903Z"
+  "version": "2.35.1",
+  "sha256": "afb865a5d2330605c14d49592cb8cfeb3c62e28acefd002b61e4e6053670a3bc",
+  "file": "draftlab-2.35.1.json.gz",
+  "notes": "Équilibrage : elo toujours déterminé automatiquement (Solo/Duo, saison passée, Flex, sinon moyenne du groupe)",
+  "date": "2026-10-24T19:17:06.308Z"
 }
