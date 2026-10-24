@@ -16,7 +16,7 @@ async function getJson(url) {
 
 // Accepte un lien multi op.gg (www.op.gg/multisearch/euw?summoners=A%23TAG,B%23TAG)
 // ou une liste collée "Nom#TAG, Nom#TAG" (une ligne ou plusieurs).
-function parseInput(input, fallbackRegion = 'euw') {
+function parseInput(input, fallbackRegion = 'euw', max = 5) {
   let region = fallbackRegion;
   let list = String(input || '').trim();
   try {
@@ -33,7 +33,7 @@ function parseInput(input, fallbackRegion = 'euw') {
       }
     }
   } catch {}
-  const names = list.split(/[,\n;]+/).map((x) => x.replace(/\s+joined the lobby.*/i, '').trim()).filter(Boolean).slice(0, 5);
+  const names = list.split(/[,\n;]+/).map((x) => x.replace(/\s+joined the lobby.*/i, '').trim()).filter(Boolean).slice(0, max);
   return { region, names };
 }
 
@@ -60,7 +60,8 @@ async function fetchPlayer(region, riotId, byKey) {
   const s = await findSummoner(region, riotId);
   if (!s) return { riotId, error: 'joueur introuvable sur op.gg' };
   const [sum, most] = await Promise.all([
-    getJson(`${BASE}/${region}/summoners/${s.summoner_id}/summary?hl=fr_FR`),
+    // le résumé op.gg tombe parfois en erreur pour un compte : on lit alors le rang sur sa page op.gg
+    getJson(`${BASE}/${region}/summoners/${s.summoner_id}/summary?hl=fr_FR`).catch(() => pageSummary(region, s)),
     // tous les champions joués en ranked (solo + flex) sur la saison en cours
     getJson(`${BASE}/${region}/summoners/${s.summoner_id}/most-champions/rank?game_type=RANKED&hl=fr_FR`).catch(() => null)
   ]);
@@ -90,6 +91,29 @@ async function fetchPlayer(region, riotId, byKey) {
   return { riotId: `${d.game_name ?? s.game_name}#${String(d.tagline ?? s.tagline).replace(/\s+/g, '')}`, tier, rank, pool, all, total, level: d.level };
 }
 
+// Secours : rang Solo/Duo lu dans la description de la page op.gg du joueur
+const TIERS = ['IRON', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'EMERALD', 'DIAMOND', 'MASTER', 'GRANDMASTER', 'CHALLENGER'];
+async function pageSummary(region, s) {
+  const url = `https://op.gg/lol/summoners/${region}/${encodeURIComponent(s.game_name)}-${encodeURIComponent(s.tagline)}`;
+  const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 20000);
+  let html;
+  try { const r = await fetch(url, { signal: ctrl.signal, headers: { 'User-Agent': UA, Accept: 'text/html' } }); if (!r.ok) throw new Error(`HTTP ${r.status}`); html = await r.text(); }
+  finally { clearTimeout(t); }
+  const m = html.match(/current SOLORANKED rank is ([a-z]+)(?: Division (\d))? ([\d,]+) LP with (\d+) wins, (\d+) losses/i);
+  const tier = m && TIERS.includes(m[1].toUpperCase()) ? m[1].toUpperCase() : null;
+  const league_stats = tier ? [{ game_type: 'SOLORANKED', tier_info: { tier, division: ['MASTER', 'GRANDMASTER', 'CHALLENGER'].includes(tier) ? null : +m[2] || null, lp: +m[3].replace(/,/g, '') }, win: +m[4], lose: +m[5] }] : [];
+  return { data: { summoner: { game_name: s.game_name, tagline: s.tagline, league_stats, previous_seasons: [] } } };
+}
+
+// Jusqu'à 10 joueurs (équilibrage in house) : rang et champions joués, sans le complément dpm.lol
+async function fetchPlayers(input, champions, fallbackRegion) {
+  const { region, names } = parseInput(input, fallbackRegion, 10);
+  if (!names.length) throw new Error('Aucun joueur trouvé dans la liste');
+  const byKey = new Map(champions.map((c) => [String(c.key), c.id]));
+  const players = await Promise.all(names.map((n) => fetchPlayer(region, n, byKey).catch((e) => ({ riotId: n, error: e.message }))));
+  return { region, players };
+}
+
 async function fetchTeam(input, champions, fallbackRegion) {
   const { region, names } = parseInput(input, fallbackRegion);
   if (!names.length) throw new Error('Aucun joueur trouvé dans le lien ou la liste');
@@ -98,4 +122,4 @@ async function fetchTeam(input, champions, fallbackRegion) {
   return { region, players };
 }
 
-module.exports = { fetchTeam, parseInput };
+module.exports = { fetchTeam, fetchPlayers, parseInput };

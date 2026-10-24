@@ -5,6 +5,7 @@ import {
   buildProfiles, evaluate, setDetailSource, applyProGames, proInfo, recommend, recommendBans, projectPicks, gamePlan, powerCurve,
   comfortPts, proposeDrafts, playerLabel, rankName, analyzeDraft, matchPlan, pentagonView, styleBreakdown, compLabel, playersForecast, combineWr, pointsLabel, rankPoints, RANK_OPTIONS, playerRating, dominant, teamShares, predictPicks, enemyScenarios, predictedBans
 } from './engine.js';
+import { balanceTeams, rolesFromPool, balValue, roleFit, BAL_ROLES, BAL_COST } from './balance.js';
 
 // ---------- Accès aux données (app Electron, ou navigateur en secours) ----------
 const api = window.draftlab ?? {
@@ -981,7 +982,7 @@ function startBackground() {
   tick();
   // survol d'une carte : la carte du fond s'éclaire du côté correspondant
   // survol d'un choix : la carte du fond se remplit de la couleur de ce choix
-  const HOV = { startZero: 'zero', startPlayers: 'players', startLive: 'live', startShot: 'shot' };
+  const HOV = { startZero: 'zero', startPlayers: 'players', startLive: 'live', startShot: 'shot', startBalance: 'players' };
   for (const [id, k] of Object.entries(HOV)) { $(id).onmouseenter = () => { root.dataset.hover = k; }; $(id).onmouseleave = () => delete root.dataset.hover; }
 }
 function openMenu() {
@@ -991,7 +992,7 @@ function openMenu() {
   if ($('startModeBox')) $('startModeBox').hidden = true;
   try { window.scrollTo(0, 0); document.getElementById('appview')?.scrollTo(0, 0); } catch {}
   startBackground();
-  $('startForm').hidden = true; $('startChoices').hidden = false;
+  $('startForm').hidden = true; $('startChoices').hidden = false; $('balanceBox').hidden = true;
   $('menuBlue').value = state.teamInput.blue ?? ''; $('menuRed').value = state.teamInput.red ?? '';
   $('menuSide').value = state.mySide; $('menuRegion').value = state.region;
   renderMenuSaves();
@@ -1069,6 +1070,136 @@ function startFromZero(mode = 'classic') {
   reset(); closeMenu();
   toast(mode === 'classic' ? 'Draft de zéro : winrate et plan de jeu selon la méta des 30 derniers jours' : `Draft de zéro · Fearless Bo${state.fearless.bo} : game 1`);
 }
+// ---------- Équilibrer des équipes (in house) ----------
+const BAL_KEY = 'draftlab-balance';
+const BAL = (() => { try { return { players: [], swap: false, ...JSON.parse(localStorage.getItem(BAL_KEY)), sols: [], k: 0 }; } catch { return { players: [], sols: [], k: 0, swap: false }; } })();
+const balSave = () => { try { localStorage.setItem(BAL_KEY, JSON.stringify({ input: $('balInput').value, region: $('balRegion').value, players: BAL.players })); } catch {} };
+const RL = { T: 'Top', J: 'Jungle', M: 'Mid', A: 'ADC', S: 'Support', FILL: 'Fill' };
+const balPts = (p) => (p.manual != null ? p.manual : rankPoints(p.rank));
+function openBalance() {
+  $('startMenu').classList.add('form'); $('startChoices').hidden = true; $('balanceBox').hidden = false;
+  if (BAL.input != null && !$('balInput').value) $('balInput').value = BAL.input;
+  if (BAL.region) $('balRegion').value = BAL.region; else $('balRegion').value = state.region;
+  $('balStep1').hidden = false; $('balStep2').hidden = true;
+  renderBalList();
+}
+function closeBalance() { $('balanceBox').hidden = true; $('startChoices').hidden = false; $('startMenu').classList.remove('form'); }
+async function balSearch() {
+  const raw = $('balInput').value.trim();
+  if (!raw) { toast('Entre les pseudos des 10 joueurs'); return; }
+  if (!api.loadPlayers) { toast('Disponible uniquement dans l’application'); return; }
+  const btn = $('balSearch'); btn.disabled = true; btn.textContent = 'Recherche sur op.gg…';
+  try {
+    const res = await api.loadPlayers({ input: raw, region: $('balRegion').value });
+    if (res.error) throw new Error(res.error);
+    // on garde les réglages déjà faits à la main pour un joueur déjà présent
+    const prev = new Map(BAL.players.map((p) => [p.key, p]));
+    BAL.players = res.players.map((p) => {
+      const key = (p.riotId ?? '').toLowerCase().replace(/\s+/g, '');
+      const auto = rolesFromPool(p.all ?? p.pool, state.data?.stats);
+      const old = prev.get(key);
+      return {
+        key, riotId: p.riotId, error: p.error ?? null, rank: p.rank ?? null, top: (p.pool ?? []).slice(0, 3).map((c) => c.id),
+        auto, main: old?.edited ? old.main : auto?.main ?? 'FILL', second: old?.edited ? old.second : auto?.second ?? 'FILL',
+        edited: old?.edited ?? false, manual: old?.manual ?? null
+      };
+    });
+    balSave(); renderBalList();
+    const miss = BAL.players.filter((p) => balPts(p) == null).length;
+    if (miss) toast(`${miss} joueur${miss > 1 ? 's' : ''} sans elo Solo/Duo : choisis son niveau à la main`);
+  } catch (e) { toast(`op.gg : ${e.message}`); }
+  btn.disabled = false; btn.textContent = 'Rechercher sur op.gg';
+}
+function renderBalList() {
+  const L = $('balList'), n = BAL.players.length;
+  $('balCount').textContent = n ? `${n}/10 joueurs` : '';
+  const ok = n === 10;
+  $('balGo').disabled = !ok;
+  $('balGo').title = ok ? '' : 'Il faut exactement 10 joueurs';
+  const roleSel = (p, f) => `<select data-f="${f}">${[...BAL_ROLES, 'FILL'].map((r) => `<option value="${r}" ${p[f] === r ? 'selected' : ''}>${RL[r]}</option>`).join('')}</select>`;
+  L.innerHTML = BAL.players.map((p, i) => {
+    const pts = balPts(p), n = rankName(p.rank);
+    const rk = p.manual != null || pts == null
+      ? `<select data-f="manual" class="bal-man ${pts == null ? 'need' : ''}"><option value="">Elo ?</option>${RANK_OPTIONS.map((o) => `<option value="${o.v}" ${p.manual === o.v ? 'selected' : ''}>${o.label}</option>`).join('')}</select>`
+      : `<span class="bal-rk" style="--c:${rankColor(p.rank)}" title="Solo/Duo${n?.prev ? ' (saison passée)' : ''}">${n ? n.label : '?'}${p.rank?.tier && p.rank.lp != null ? ` <small>${p.rank.lp} LP</small>` : ''}</span>`;
+    const pc = p.auto?.pct ? Object.entries(p.auto.pct).sort((a, b) => b[1] - a[1]).filter(([, v]) => v >= 5).slice(0, 3).map(([r, v]) => `${RL[r]} ${v} %`).join(' · ') : '';
+    return `<div class="bal-row ${p.error ? 'err' : ''}" data-i="${i}">
+      <span class="bal-n">${i + 1}</span>
+      <span class="bal-id"><b>${p.riotId ?? '?'}</b><small>${p.error ? `⚠ ${p.error}` : pc ? `op.gg : ${pc}` : 'rôles inconnus'}</small></span>
+      <span class="bal-ch">${p.top.map((id) => `<img src="${img(id)}" alt="">`).join('')}</span>
+      ${rk}
+      <label class="bal-r">Rôle 1 ${roleSel(p, 'main')}</label>
+      <label class="bal-r">Rôle 2 ${roleSel(p, 'second')}</label>
+      <button class="bal-x" title="Retirer ce joueur">✕</button></div>`;
+  }).join('') || '<p class="muted bal-empty">Entre les 10 pseudos puis lance la recherche : l’elo et les rôles de chacun sont récupérés automatiquement.</p>';
+  L.querySelectorAll('.bal-row').forEach((row) => {
+    const p = BAL.players[+row.dataset.i];
+    row.querySelectorAll('select').forEach((sel) => (sel.onchange = () => {
+      const f = sel.dataset.f;
+      if (f === 'manual') p.manual = sel.value ? +sel.value : null;
+      else { p[f] = sel.value; p.edited = true; }
+      balSave(); renderBalList();
+    }));
+    row.querySelector('.bal-x').onclick = () => { BAL.players.splice(+row.dataset.i, 1); balSave(); renderBalList(); };
+  });
+}
+function balRun() {
+  const ps = BAL.players;
+  const known = ps.map(balPts).filter((x) => x != null);
+  const avg = known.length ? known.reduce((a, x) => a + x, 0) / known.length : 1600;
+  const input = ps.map((p) => ({ value: balValue(balPts(p) ?? avg), main: p.main, second: p.second, wins: p.rank?.wins, losses: p.rank?.losses, hot: p.rank?.hot }));
+  BAL.sols = balanceTeams(input); BAL.k = 0; BAL.swap = false;
+  if (!BAL.sols.length) { toast('Il faut exactement 10 joueurs'); return; }
+  $('balStep1').hidden = true; $('balStep2').hidden = false;
+  renderBalResult();
+}
+function renderBalResult() {
+  const sol = BAL.sols[BAL.k]; if (!sol) return;
+  const [b, r, vb, vr] = BAL.swap ? [sol.red, sol.blue, sol.vRed, sol.vBlue] : [sol.blue, sol.red, sol.vBlue, sol.vRed];
+  const wr = BAL.swap ? 100 - sol.wr : sol.wr;
+  const avg = (v) => v.reduce((a, x) => a + x, 0) / 5;
+  const unval = (v) => (v > 2800 ? 2800 + (v - 2800) * 2 : v); // LP au-dessus de Master : comptés à moitié dans le calcul
+  const FIT = { main: ['★', 'rôle principal'], second: ['☆', 'rôle secondaire'], fill: ['☆', 'fill'], off: ['⚠', 'hors de ses rôles'] };
+  const cell = (pi, ri, v, side) => {
+    const p = BAL.players[pi], fit = roleFit(p, BAL_ROLES[ri]), pts = balPts(p), n = rankName(p.rank);
+    return `<div class="bal-p ${side} ${fit}"><span class="bal-fit" title="${FIT[fit][1]}">${FIT[fit][0]}</span><b>${p.riotId}</b><span class="bal-rk" style="--c:${p.manual != null || pts == null ? tierColor(pts) : rankColor(p.rank)}">${p.manual != null ? pointsLabel(p.manual) : n ? n.label : 'inconnu'}</span></div>`;
+  };
+  const rows = BAL_ROLES.map((role, ri) => {
+    const d = vb[ri] - vr[ri];
+    return `<div class="bal-lane">${cell(b[ri], ri, vb[ri], 'blue')}<div class="bal-mid"><span>${RL[role]}</span><i class="${Math.abs(d) < 150 ? 'eq' : d > 0 ? 'b' : 'r'}" title="Écart de niveau à cette lane (rôle compris)">${Math.abs(d) < 150 ? '≈' : `${d > 0 ? '◀' : ''} ${(Math.round(Math.abs(d) / 10) / 10).toLocaleString('fr-FR')} div. ${d < 0 ? '▶' : ''}`}</i></div>${cell(r[ri], ri, vr[ri], 'red')}</div>`;
+  }).join('');
+  const fits = [...b, ...r].map((pi, k) => roleFit(BAL.players[pi], BAL_ROLES[k % 5]));
+  const nMain = fits.filter((f) => f === 'main').length, nOff = fits.filter((f) => f === 'off').length;
+  $('balResult').innerHTML = `
+    <div class="bal-top">
+      <div class="bal-t blue"><span>Équipe 1 · bleu</span><b>${pointsLabel(unval(avg(vb)))}</b></div>
+      <div class="bal-wr"><b>${wr.toFixed(0)} %</b><div class="bal-bar"><i style="width:${wr}%"></i></div><small>${Math.abs(wr - 50) < 1.5 ? 'Équipes équilibrées' : wr > 50 ? 'Léger avantage équipe 1' : 'Léger avantage équipe 2'}</small></div>
+      <div class="bal-t red"><span>Équipe 2 · rouge</span><b>${pointsLabel(unval(avg(vr)))}</b></div>
+    </div>
+    <div class="bal-lanes">${rows}</div>
+    <p class="muted bal-sum">Répartition ${BAL.k + 1}/${BAL.sols.length} · ${nMain}/10 à leur rôle principal${nOff ? ` · ${nOff} hors de ses rôles` : ''} · ★ principal, ☆ secondaire, ⚠ hors rôle. Niveau moyen rôle compris ; la forme (winrate de saison, série de victoires) ne sert qu’à départager.</p>`;
+  $('balNext').textContent = BAL.sols.length > 1 ? `Autre répartition (${(BAL.k + 1) % BAL.sols.length + 1}/${BAL.sols.length})` : 'Autre répartition';
+}
+function balDraft() {
+  const sol = BAL.sols[BAL.k]; if (!sol) return;
+  const [b, r] = BAL.swap ? [sol.red, sol.blue] : [sol.blue, sol.red];
+  const ids = (t) => t.map((pi) => BAL.players[pi].riotId).join(', ');
+  $('menuBlue').value = ids(b); $('menuRed').value = ids(r); $('menuRegion').value = $('balRegion').value;
+  $('balanceBox').hidden = true; $('startForm').hidden = false;
+  toast('Équipes prêtes : choisis ton côté puis lance la draft');
+}
+function initBalance() {
+  $('startBalance').onclick = openBalance;
+  $('balBack').onclick = closeBalance;
+  $('balSearch').onclick = balSearch;
+  $('balInput').onchange = balSave;
+  $('balGo').onclick = balRun;
+  $('balEdit').onclick = () => { $('balStep1').hidden = false; $('balStep2').hidden = true; };
+  $('balNext').onclick = () => { BAL.k = (BAL.k + 1) % BAL.sols.length; renderBalResult(); };
+  $('balSwap').onclick = () => { BAL.swap = !BAL.swap; renderBalResult(); };
+  $('balDraft').onclick = balDraft;
+}
+
 async function startFromPlayers() {
   const blue = $('menuBlue').value.trim(), red = $('menuRed').value.trim();
   if (!blue && !red) { toast('Colle au moins un lien multi op.gg'); return; }
@@ -1770,6 +1901,7 @@ function initControls() {
   $('modeBack').onclick = () => { $('startMenu').classList.remove('form'); $('startModeBox').hidden = true; $('startChoices').hidden = false; };
   document.querySelectorAll('#startModeBox .sm-o').forEach((b) => (b.onclick = () => { $('startModeBox').hidden = true; $('startChoices').hidden = false; $('startMenu').classList.remove('form'); startFromZero(b.dataset.mode); }));
   document.querySelectorAll('#menuMode button').forEach((b) => (b.onclick = () => { document.querySelectorAll('#menuMode button').forEach((x) => x.classList.toggle('on', x === b)); }));
+  initBalance();
   $('startPlayers').onclick = () => { $('startMenu').classList.add('form'); $('startChoices').hidden = true; $('startForm').hidden = false; $('menuBlue').focus(); };
   $('menuBack').onclick = () => { $('startMenu').classList.remove('form'); $('startForm').hidden = true; $('startChoices').hidden = false; };
   $('menuGo').onclick = startFromPlayers;

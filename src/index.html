@@ -190,6 +190,11 @@
           <span class="st-desc">Tableau de fin de game ou écran d’un drafter : les 10 champions (et les bans) sont repérés et reconnus automatiquement.</span>
           <span class="st-go">Importer une capture →</span>
         </button>
+        <button id="startBalance" class="st-bar">
+          <span class="st-ic">⚖</span>
+          <span class="sb-txt"><b>Équilibrer des équipes</b><span class="st-desc">In house : entre 10 pseudos, l’app répartit les deux équipes selon l’elo Solo/Duo et les rôles de chacun.</span></span>
+          <span class="st-go">Équilibrer →</span>
+        </button>
       </div>
       <div id="startModeBox" class="start-form st-form st-mode" hidden>
         <b class="sm-t">Draft de zéro : quel format ?</b>
@@ -199,6 +204,23 @@
           <button class="sm-o fl" data-mode="fl5"><span class="sm-ic">⚔</span><b>Draft Fearless · Bo5</b><small>Série en 5 games : un champion joué ne peut plus être repris.</small></button>
         </div>
         <div class="form-row"><button id="modeBack">Retour</button></div>
+      </div>
+      <div id="balanceBox" class="start-form st-form bal" hidden>
+        <div class="bal-head"><b>⚖ Équilibrer des équipes</b><span class="muted" id="balCount"></span></div>
+        <div id="balStep1">
+          <label class="bal-in">Les 10 joueurs<textarea id="balInput" rows="3" placeholder="Nom#TAG, Nom#TAG… (une ligne par joueur, un lien multi op.gg ou le chat du salon collé tel quel)"></textarea></label>
+          <div class="form-row">
+            <label>Région <select id="balRegion"><option value="euw">EUW</option><option value="eune">EUNE</option><option value="na">NA</option><option value="kr">KR</option><option value="br">BR</option><option value="tr">TR</option><option value="lan">LAN</option><option value="las">LAS</option><option value="oce">OCE</option><option value="jp">JP</option><option value="me">ME</option></select></label>
+            <button id="balSearch" class="primary">Rechercher sur op.gg</button>
+          </div>
+          <div id="balList" class="bal-list"></div>
+          <p class="muted bal-help">Elo Solo/Duo et rôles lus sur op.gg (rôles estimés d’après les champions joués en ranked cette saison) : tout reste modifiable. Rôle secondaire : − 50 pts ; hors de ses rôles : − 300 pts.</p>
+          <div class="form-row"><button id="balBack">Retour</button><button id="balGo" class="primary" disabled>Équilibrer</button></div>
+        </div>
+        <div id="balStep2" hidden>
+          <div id="balResult"></div>
+          <div class="form-row bal-actions"><button id="balEdit">← Joueurs</button><button id="balNext">Autre répartition</button><button id="balSwap">Inverser les côtés</button><button id="balDraft" class="primary">Drafter avec ces équipes →</button></div>
+        </div>
       </div>
       <div id="startForm" class="start-form st-form" hidden>
         <label class="blue">Équipe 1 — côté bleu<input id="menuBlue" placeholder="Lien multi op.gg ou Nom#TAG, Nom#TAG…" /></label>

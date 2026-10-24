@@ -5,7 +5,7 @@ const fs = require('fs');
 const { fetchDDragon } = require('./providers/ddragon');
 const { fetchLolalytics, fetchDetail } = require('./providers/lolalytics');
 const { fetchGolgg } = require('./providers/golgg');
-const { fetchTeam } = require('./providers/opgg');
+const { fetchTeam, fetchPlayers } = require('./providers/opgg');
 const { fetchDpm, mergePool } = require('./providers/dpm');
 const { autoUpdate } = require('./providers/updater');
 const { fetchProGames } = require('./providers/progames');
@@ -287,6 +287,13 @@ app.whenReady().then(() => {
       }));
       res.players = res.players.map((p) => (p.error && p.pool?.length ? { ...p, error: null, tier: p.tier ?? 'rang inconnu (données dpm.lol)' } : p));
       return res;
+    } catch (e) { return { error: e.message }; }
+  });
+  // Équilibrage in house : jusqu'à 10 joueurs (rang Solo/Duo + champions joués)
+  ipcMain.handle('opgg:players', async (_e, opts) => {
+    try {
+      if (!cache.ddragon) return { error: 'liste des champions pas encore chargée' };
+      return await fetchPlayers(opts?.input, cache.ddragon.champions, opts?.region || 'euw');
     } catch (e) { return { error: e.message }; }
   });
   // Matchups et duos Master+ d'un champion à sa lane (mis en cache 24 h)

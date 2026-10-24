@@ -105,6 +105,12 @@
     refresh: async () => snapshot(),
     onUpdated: () => {},
     open: () => {},
+    // démo de l'équilibrage : les 10 joueurs d'exemple, avec les pseudos entrés s'il y en a
+    loadPlayers: async ({ input }) => {
+      const names = String(input || '').split(/[,\n;]+/).map((x) => x.trim()).filter(Boolean).slice(0, 10);
+      const all = JSON.parse(JSON.stringify([...DEMO.blue, ...DEMO.red]));
+      return { region: 'euw', players: (names.length ? names : all.map((p) => p.riotId)).map((n, i) => ({ ...all[i % 10], riotId: n.includes('#') ? n : `${n}#EUW` })) };
+    },
     loadTeam: async ({ input }) => {
       // démo du direct : on renvoie les joueurs demandés avec leur pool
       const asked = String(input).split(',').map((x) => x.trim()).filter((x) => LIVE_POOLS[x]);

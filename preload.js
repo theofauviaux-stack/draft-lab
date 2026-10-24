@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('draftlab', {
   onUpdated: (cb) => ipcRenderer.on('data:updated', (_e, data) => cb(data)),
   open: (url) => ipcRenderer.invoke('open:external', url),
   loadTeam: (opts) => ipcRenderer.invoke('opgg:team', opts),
+  loadPlayers: (opts) => ipcRenderer.invoke('opgg:players', opts),
   version: () => ipcRenderer.invoke('app:version'),
   lastUpdate: () => ipcRenderer.invoke('update:last'),
   checkUpdate: () => ipcRenderer.invoke('update:check'),
