@@ -140,6 +140,10 @@ function ensureDetails() {
     api.detail(c.id, lane).then((d) => { DET.set(k, { data: d && !d.error ? d : null }); render(); }).catch(() => DET.set(k, { data: null }));
   });
 }
+// Data Dragon 16.21 = patch 26.21 dans le jeu et les notes de patch
+const patchLabel = (p) => { if (!p) return ''; const [M, m] = String(p).split('.').map(Number); return M < 20 ? `${M + 10}.${m}` : `${M}.${m}`; };
+// fenêtre de données d'un champion : 30 derniers jours, ou depuis son dernier changement
+const dataWin = (c) => (c?.changed ? `depuis le patch ${patchLabel(c.changed)}` : '30 derniers jours');
 const nextStep = () => seq().find(([t, i]) => !state.slots[t][i]) ?? null;
 const target = () => state.selected ?? nextStep();
 const pool = () => { const u = used(); return state.list.filter((c) => !u.has(c.id)); };
@@ -326,7 +330,7 @@ function showMatchups(side, i, anchor) {
   const lane = me.lane, c = me;
   const pct = (v) => `${v > 0 ? '+' : ''}${v.toFixed(1)}`;
   const opps = them.filter((o) => LANE_OPP[lane]?.includes(o.lane));
-  // face-à-face : Master+ (lolalytics) et games pro du patch (gol.gg)
+  // face-à-face : Master+ (lolalytics) et games pro (gol.gg), sur 30 jours ou depuis le dernier changement
   const rows = opps.map((o) => ({ o, le: laneEdge(c, lane, o, o.lane), pe: proEdge(c, o) }));
   const champArch = ORDER.reduce((a, b) => (c[b] > c[a] ? b : a));
   const enemyDom = them.length ? dominant(teamShares(them)) : null;
@@ -364,10 +368,11 @@ function showMatchups(side, i, anchor) {
   if (bad.length) minus.push(`Hors lane, ${bad.slice(0, 2).map((o) => `<b>${o.name}</b>`).join(' et ')} ${bad.length > 1 ? 'ont' : 'a'} un profil qui contre le sien.`);
   const rowHtml = rows.length ? rows.map(({ o, le, pe }) => `<div class="mu-row"><img src="${img(o.id)}" alt=""><b>${o.name}</b><small>${ROLE_LABEL[o.lane]}</small>
       <span class="mu-v ${le ? (le.raw >= 0 ? 'up' : 'down') : 'na'}" title="Master+ (lolalytics)">${le ? `${pct(le.raw)} <i>${le.n} g</i>` : 'Master+ —'}</span>
-      <span class="mu-v ${pe ? (pe.edge >= 0 ? 'up' : 'down') : 'na'}" title="Games pro du patch (gol.gg)">${pe ? `pro ${pe.w}/${pe.n}` : 'pro —'}</span></div>`).join('')
+      <span class="mu-v ${pe ? (pe.edge >= 0 ? 'up' : 'down') : 'na'}" title="Games pro des 30 derniers jours (gol.gg)">${pe ? `pro ${pe.w}/${pe.n}` : 'pro —'}</span></div>`).join('')
     : `<div class="muted mu-empty">Son adversaire de lane n'est pas encore choisi.</div>`;
   box.innerHTML = `<div class="mu-card ${side}">
     <div class="mu-h"><img src="${img(id)}" alt=""><div><b>${c.name}</b><span>${ROLE_LABEL[lane]} · ${side === 'blue' ? 'Équipe 1' : 'Équipe 2'}${c.wr != null ? ` · ${c.wr.toFixed(1)} % WR` : ''}</span></div><button class="mu-x" title="Fermer">×</button></div>
+    ${(() => { const ch = [c, ...opps].filter((x) => x.changed); return ch.length ? `<p class="mu-win">🔧 ${ch.map((x) => `${x.name} modifié au patch ${patchLabel(x.changed)}`).join(' · ')} : ${ch.length > 1 ? 'seules les games depuis le changement le plus récent comptent' : 'seules les games depuis ce patch comptent'}.</p>` : ''; })()}
     <h6>Face-à-face</h6>${rowHtml}
     <div class="mu-cols"><div><h6 class="g">Forces</h6>${plus.length ? `<ul>${plus.map((t) => `<li>${t}</li>`).join('')}</ul>` : '<p class="muted">Rien de marquant pour l’instant.</p>'}</div>
       <div><h6 class="r">Faiblesses</h6>${minus.length ? `<ul>${minus.map((t) => `<li>${t}</li>`).join('')}</ul>` : '<p class="muted">Pas de faiblesse nette dans cette draft.</p>'}</div></div>
@@ -441,9 +446,9 @@ function renderCalc(ev) {
   const tB = team('blue'), tR = team('red');
   if (!tB.length && !tR.length) { el.innerHTML = '<p class="muted">50 % tant qu’aucun champion n’est pické. Chaque pick ajoute ou retire des points selon les facteurs ci-dessous.</p>'; return; }
   const sum = ev.factors.reduce((a, f) => a + f.value, 0);
-  const champ = (c) => `<div class="cc-r"><img src="${img(c.id)}"><b>${c.name}</b>
+  const champ = (c) => `<div class="cc-r"><img src="${img(c.id)}"><b>${c.name}${c.changed ? ` <i class="cc-chg" title="Modifié au patch ${patchLabel(c.changed)} : données depuis ce patch">${patchLabel(c.changed)}</i>` : ''}</b>
     <span>${c.soloWr != null ? c.soloWr.toFixed(1) + ' %' : '—'}</span>
-    <span>${c.proPatch ? `${c.proPatch.wr} % (${c.proPatch.n} g, patch)` : c.proWr != null ? `${c.proWr.toFixed(1)} % (${c.proPicks} g, saison)` : '—'}</span>
+    <span>${c.proPatch ? `${c.proPatch.wr} % (${c.proPatch.n} g, ${c.changed ? 'depuis ' + patchLabel(c.changed) : '30 j'})` : c.proWr != null && !c.changed ? `${c.proWr.toFixed(1)} % (${c.proPicks} g, saison)` : '—'}</span>
     <span class="cc-w">${Math.round((c.wPro ?? 0) * 100)} % pro</span>
     <em>${c.wr != null ? c.wr.toFixed(1) + ' %' : '—'}</em></div>`;
   el.innerHTML = `
@@ -454,8 +459,9 @@ function renderCalc(ev) {
       ${tB.map(champ).join('')}${tR.length ? '<div class="cc-sep">Équipe 2</div>' + tR.map(champ).join('') : ''}</div>
     <h5>Comment je calcule</h5>
     <ol class="calc-m">
-      <li><b>Force des champions.</b> Winrate Master+ (lolalytics) ramené à la moyenne de sa lane. Pour limiter l’effet des one-tricks (aucun site ne permet de les exclure), l’écart d’un champion peu joué est atténué : pickrate ÷ (pickrate + 1,2). Ce chiffre est mélangé au winrate pro <i>du patch joué en compétition</i> (lissé vers 50 % quand il y a peu de games, poids jusqu’à 50 % selon le nombre de games) et, un peu, à celui de la saison. Facteur = écart moyen entre les deux équipes × 0,6.</li>
-      <li><b>Réponses en pro</b> (gol.gg, games du dernier patch joué en compétition, plus le précédent s’il y a moins de 150 games) : pour deux champions face à face en lane, je regarde d’abord les games où ils ont été pickés <i>dans le même ordre</i> que dans ta draft (qui a répondu à qui), sinon toutes leurs games l’un contre l’autre. Écart à 50 % pondéré n ÷ (n + 6), × 0,35, plafonné à ±6.</li>
+      <li><b>Force des champions.</b> Winrate Master+ (lolalytics) ramené à la moyenne de sa lane. Pour limiter l’effet des one-tricks (aucun site ne permet de les exclure), l’écart d’un champion peu joué est atténué : pickrate ÷ (pickrate + 1,2). Ce chiffre est mélangé au winrate pro des 30 derniers jours (lissé vers 50 % quand il y a peu de games, poids jusqu’à 50 % selon le nombre de games) et, un peu, à celui de la saison. Facteur = écart moyen entre les deux équipes × 0,6.</li>
+      <li><b>Fenêtre des données.</b> Tout est calculé sur les 30 derniers jours (soloQ Master+ et games pro). Exception : un champion modifié directement par un patch sorti pendant ces 30 jours (notes de patch Riot, mises à jour en cours de patch comprises) ne garde que ses games depuis ce patch, et sa saison pro n’est plus utilisée. Peu de games depuis le changement = écart ramené vers la moyenne. Pour un matchup ou un duo, la fenêtre suit le champion modifié le plus récemment.</li>
+      <li><b>Réponses en pro</b> (gol.gg, games des 30 derniers jours) : pour deux champions face à face en lane, je regarde d’abord les games où ils ont été pickés <i>dans le même ordre</i> que dans ta draft (qui a répondu à qui), sinon toutes leurs games l’un contre l’autre. Écart à 50 % pondéré n ÷ (n + 6), × 0,35, plafonné à ±6.</li>
       <li><b>Face-à-face des lanes</b> (Master+, 30 derniers jours) : winrate du matchup − 50, pondéré par le nombre de games (n ÷ (n + 250)), × 0,55, plafonné à ±7. Au bot, ADC et support comptent contre l’ADC et le support adverses.</li>
       <li><b>Duos mesurés</b> (Master+) : écart du duo à son winrate attendu, pondéré n ÷ (n + 300), × 0,5, plafonné à ±4. Quand un duo est mesuré, la table de synergies théoriques pèse moitié moins.</li>
       <li><b>Pentagone des compos</b> (Engage › Split › Poke › Peeling › Catch) : avantage du style de chaque équipe sur l’autre, × 8, proportionnel au nombre de picks.</li>
@@ -534,12 +540,14 @@ function renderGrid(info) {
       ${pj?.wr != null ? `<span class="proj ${pj.delta >= 0 ? 'up' : 'down'}" title="Winrate projeté de ton côté avec ce pick">${pj.wr.toFixed(1)}%</span>` : ''}
       ${pj?.inPool ? '<span class="star" title="Dans le pool du joueur">★</span>' : ''}
       <div class="dots">${ORDER.filter((k) => c[k] >= 2).map((k) => `<i style="background:${ARCH[k].color}"></i>`).join('')}</div>
+      ${c.changed ? `<span class="chg">${patchLabel(c.changed)}</span>` : ''}
       <div class="nm">${c.name}</div>`;
     t.title = `${c.name} — ${(c.roles.length ? c.roles : c.soloRoles).map((r) => ROLE_LABEL[r]).join('/')}` +
       (c.soloWr != null ? ` · soloQ ${c.soloWr.toFixed(1)} %` : '') +
       (c.proPicks ? ` · pro ${c.proPicks} games, ${c.presence} % présence` : ' · jamais joué en pro cette saison') +
       (c.proRoleStats ? `\nRôles en pro : ${Object.entries(c.proRoleStats).sort((a, b) => b[1].picks - a[1].picks).map(([r, v]) => `${ROLE_LABEL[r]} ${v.picks}`).join(', ')}` : '') +
       (c.offmeta ? '\n⚠ Pas un pick pro à ce rôle' : '') +
+      (c.changed ? `\n🔧 Modifié au patch ${patchLabel(c.changed)} : stats depuis ce patch uniquement` : '') +
       `\n${ORDER.map((k) => `${ARCH[k].label} ${c[k]}/3`).join(' · ')} · Scaling ${['', 'early', 'mid', 'late'][c.scale]}${c.guessed ? ' (profil estimé)' : ''}`;
     if (flg && t.className.includes(' fl')) t.title = `🔒 Fearless : ${c.name} a été joué en game ${flg}, il ne peut plus être repris dans la série`;
     t.onclick = () => place(c.id);
@@ -1062,7 +1070,7 @@ function startFromZero(mode = 'classic') {
   state.players = { blue: [], red: [] }; state.teamInput = { blue: '', red: '' }; state.flow = 'zero';
   $('opggBlue').value = ''; $('opggRed').value = '';
   reset(); closeMenu();
-  toast(mode === 'classic' ? 'Draft de zéro : winrate et plan de jeu selon la méta du patch' : `Draft de zéro · Fearless Bo${state.fearless.bo} : game 1`);
+  toast(mode === 'classic' ? 'Draft de zéro : winrate et plan de jeu selon la méta des 30 derniers jours' : `Draft de zéro · Fearless Bo${state.fearless.bo} : game 1`);
 }
 async function startFromPlayers() {
   const blue = $('menuBlue').value.trim(), red = $('menuRed').value.trim();
@@ -1715,7 +1723,11 @@ function renderSources() {
     el.title = bad.map(([n, st]) => `${n} : ${st.ok ? `dernière mise à jour le ${new Date(st.at).toLocaleDateString('fr-FR')}` : st.cached ? `hors ligne, on utilise les données du ${st.at ? new Date(st.at).toLocaleDateString('fr-FR') : '?'}` : `indisponible (${st.error ?? 'erreur'})`}`).join('\n') + '\nClique pour réessayer.';
     el.onclick = () => load(true);
   }
-  $('patchPill').textContent = `Patch ${state.data.patch}`;
+  const nch = Object.keys(state.data.changes ?? {}).length, wp = state.data.window?.patches ?? [];
+  $('patchPill').textContent = `Patch ${patchLabel(state.data.patch)} · 30 j`;
+  $('patchPill').title = `Données des 30 derniers jours (soloQ Master+ et games pro).` +
+    (nch ? `\n${nch} champion${nch > 1 ? 's' : ''} modifié${nch > 1 ? 's' : ''} directement pendant cette période : pour eux, seulement les games depuis leur changement.` : '') +
+    (wp.length ? `\n${wp.filter((x) => !state.data.window.from || x.start > state.data.window.from).map((x) => `Patch ${x.label} (${new Date(x.start).toLocaleDateString('fr-FR')}) : ${Object.values(state.data.changes ?? {}).filter((v) => v === x.patch).length} champions modifiés`).join('\n')}` : '');
 }
 
 // ---------- Chargement ----------
@@ -1724,12 +1736,12 @@ function ingest(data) {
   const prevPatch = state.data?.patch;
   state.data = data;
   state.P = buildProfiles(data.champions, data.stats, data.pro, state.mode);
-  applyProGames(state.P, data.progames);
+  applyProGames(state.P, data.progames, data.changes ?? {});
   state.list = Object.values(state.P).sort((a, b) => a.name.localeCompare(b.name, 'fr'));
   renderSources();
   fillPortraits();
   $('champList').innerHTML = state.list.map((c) => `<option value="${c.name}"></option>`).join('');
-  if (prevPatch && prevPatch !== data.patch) toast(`Nouveau patch ${data.patch} détecté — données mises à jour`);
+  if (prevPatch && prevPatch !== data.patch) toast(`Nouveau patch ${patchLabel(data.patch)} détecté — données mises à jour`);
   render();
   if (!$('startMenu').hidden) renderMenuSaves();
   resumeAfterUpdate();

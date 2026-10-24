@@ -129,11 +129,16 @@ export const setDetailSource = (fn) => { DETAIL = fn; };
 export const LANE_OPP = { T: ['T'], J: ['J'], M: ['M'], A: ['A', 'S'], S: ['S', 'A'] };
 const shrink = (n, k) => n / (n + k);
 // Avantage (en points de winrate) de a (à sa lane) contre b (à la sienne), vu des deux côtés quand c'est possible.
+// La fiche d'un champion couvre 30 jours, ou seulement depuis son dernier changement. Pour une paire,
+// on ne garde que les fiches dont la fenêtre commence après le changement le plus récent des deux.
+const vn = (p) => (p ? p.split('.').map(Number).reduce((a, x) => a * 100 + x, 0) : 0);
+const fresh = (det, other) => det && (!other?.changed || vn(det.since) >= vn(other.changed));
+const DET = (c, l, other) => { const d = DETAIL(c.key, l); return fresh(d, other) ? d : null; };
 export function laneEdge(a, la, b, lb) {
   const vals = [];
-  const da = DETAIL(a.key, la)?.vs?.[lb]?.[b.key];
+  const da = DET(a, la, b)?.vs?.[lb]?.[b.key];
   if (da) vals.push([da[0] - 50, da[1]]);
-  const db = DETAIL(b.key, lb)?.vs?.[la]?.[a.key];
+  const db = DET(b, lb, a)?.vs?.[la]?.[a.key];
   if (db) vals.push([50 - db[0], db[1]]);
   if (!vals.length) return null;
   const n = vals.reduce((x, v) => x + v[1], 0);
@@ -143,9 +148,9 @@ export function laneEdge(a, la, b, lb) {
 // Synergie mesurée d'un duo (écart au winrate attendu des deux champions)
 export function duoEdge(a, la, b, lb) {
   const vals = [];
-  const da = DETAIL(a.key, la)?.team?.[lb]?.[b.key];
+  const da = DET(a, la, b)?.team?.[lb]?.[b.key];
   if (da) vals.push([da[1], da[2], da[0]]);
-  const db = DETAIL(b.key, lb)?.team?.[la]?.[a.key];
+  const db = DET(b, lb, a)?.team?.[la]?.[a.key];
   if (db) vals.push([db[1], db[2], db[0]]);
   if (!vals.length) return null;
   const n = Math.max(...vals.map((v) => v[1]));
@@ -153,31 +158,31 @@ export function duoEdge(a, la, b, lb) {
   return { edge: d * shrink(n, 300), raw: +d.toFixed(1), n, wr: vals[0][2] };
 }
 const LN_FR = { T: 'Top', J: 'Jungle', M: 'Mid', A: 'ADC', S: 'Support' };
-// ---------- Games pro du patch (gol.gg) ----------
+// ---------- Games pro des 30 derniers jours (gol.gg) ----------
 // Ordre officiel : B1 R1 R2 B2 B3 R3 R4 B4 B5 R5
 const ORDER_POS = { b: [0, 3, 4, 7, 8], r: [1, 2, 5, 6, 9] };
 const ROLE_AT = ['T', 'J', 'M', 'A', 'S'];
 let PRO = { patches: [], games: 0, champ: {}, h2h: {}, resp: {} };
 const vnum = (p) => p.split('.').map(Number).reduce((a, x) => a * 100 + x, 0);
-// Choisit le patch joué en compétition (le plus récent), plus le précédent s'il y a trop peu de games,
-// puis calcule winrate pro par champion, face-à-face par lane et réponses (pick pris après, en face).
-export function applyProGames(P, games) {
-  const list = Object.values(games ?? {});
-  const byPatch = {};
-  for (const g of list) (byPatch[g.patch] ??= []).push(g);
-  const patches = Object.keys(byPatch).sort((a, b) => vnum(b) - vnum(a));
-  const use = [];
-  let n = 0;
-  for (const p of patches) { use.push(p); n += byPatch[p].length; if (n >= 150) break; }
+// Games pro des 30 derniers jours ; pour un champion modifié pendant cette période (changes = { id: '16.20' }),
+// seules ses games jouées depuis ce patch comptent (une paire de champions : depuis le plus récent des deux).
+// Calcule winrate pro par champion, face-à-face par lane et réponses (pick pris après, en face).
+export function applyProGames(P, games, changes = {}, now = Date.now()) {
+  const from = new Date(now - 30 * 864e5).toISOString().slice(0, 10);
+  const list = Object.values(games ?? {}).filter((g) => !g.d || g.d >= from);
+  const ok = (c, g) => !changes[c] || vnum(g.patch) >= vnum(changes[c]);
+  const use = [...new Set(list.map((g) => g.patch))].sort((a, b) => vnum(b) - vnum(a));
+  const n = list.length;
   const champ = {}, h2h = {}, resp = {};
   const add = (o, a, b, win) => { const x = ((o[a] ??= {})[b] ??= { n: 0, w: 0 }); x.n++; if (win) x.w++; };
-  for (const p of use) for (const g of byPatch[p]) {
+  for (const g of list) {
     const pos = {}, role = {}, side = {};
     g.bp.forEach((c, i) => { pos[c] = ORDER_POS.b[i]; side[c] = 'blue'; });
     g.rp.forEach((c, i) => { pos[c] = ORDER_POS.r[i]; side[c] = 'red'; });
     g.br.forEach((c, i) => { role[c] = ROLE_AT[i]; }); g.rr.forEach((c, i) => { role[c] = ROLE_AT[i]; });
-    for (const c of [...g.bp, ...g.rp]) { const x = (champ[c] ??= { n: 0, w: 0 }); x.n++; if (g.win === side[c]) x.w++; }
+    for (const c of [...g.bp, ...g.rp]) { if (!ok(c, g)) continue; const x = (champ[c] ??= { n: 0, w: 0 }); x.n++; if (g.win === side[c]) x.w++; }
     for (const a of g.bp) for (const b of g.rp) {
+      if (!ok(a, g) || !ok(b, g)) continue;
       if (!role[a] || !role[b] || !LANE_OPP[role[a]].includes(role[b])) continue;
       const aWin = g.win === 'blue';
       add(h2h, a, b, aWin); add(h2h, b, a, !aWin);
@@ -186,14 +191,16 @@ export function applyProGames(P, games) {
     }
   }
   PRO = { patches: use, games: n, champ, h2h, resp };
-  // Winrate pro du patch : remplace celui de la saison quand il y a assez de games
+  // Winrate pro des 30 jours : remplace celui de la saison quand il y a assez de games
   for (const c of Object.values(P)) {
     const x = champ[c.id];
+    c.changed = changes[c.id] ?? null; // patch du dernier changement direct, s'il date de moins de 30 jours
     c.proPatch = x ? { n: x.n, wr: +((x.w / x.n) * 100).toFixed(1) } : null;
     if (c.soloWr == null) continue;
     const season = c.proWr, pw = x ? ((x.w + 0.5 * 8) / (x.n + 8)) * 100 : null;
     const wPatch = x ? 0.5 * x.n / (x.n + 15) : 0;
-    const wSeason = season != null ? 0.15 * (c.proPicks / (c.proPicks + 200)) : 0;
+    // la saison pro mélange l'ancienne version d'un champion modifié : on ne l'utilise pas pour lui
+    const wSeason = season != null && !c.changed ? 0.15 * (c.proPicks / (c.proPicks + 200)) : 0;
     let wr = c.soloWr * (1 - wPatch - wSeason) + (pw ?? 50) * wPatch + (season ?? 50) * wSeason;
     c.wr = 50 + Math.max(-4, Math.min(4, wr - 50));
     c.wPro = wPatch + wSeason;
@@ -269,8 +276,8 @@ export function evaluate(blue, red) {
   // quand les duos sont mesurés en Master+, la table de synergies théoriques pèse moins
   const synW = gm.dt.length || Math.abs(gm.duo) > 0.2 ? W.synergy * 0.55 : W.synergy;
   const synV = Math.max(-6, Math.min(6, (synB.total - synR.total) * synW));
-  add('lanes', 'Face-à-face des lanes (Master+)', gm.lane, gm.lt.length ? gm.lt.slice(0, 4).join(' · ') : 'Winrates des matchups en Master+ (lolalytics), lissés selon le nombre de games');
-  if (PRO.games) add('pro', `Réponses en pro (patch ${PRO.patches.join(' / ')})`, gm.pro, gm.pt.length ? gm.pt.slice(0, 4).join(' · ') : `Face-à-face des lanes dans les ${PRO.games} games pro du patch, selon l’ordre de pick`);
+  add('lanes', 'Face-à-face des lanes (Master+)', gm.lane, gm.lt.length ? gm.lt.slice(0, 4).join(' · ') : 'Winrates des matchups en Master+ (lolalytics, 30 derniers jours), lissés selon le nombre de games');
+  if (PRO.games) add('pro', 'Réponses en pro (30 derniers jours)', gm.pro, gm.pt.length ? gm.pt.slice(0, 4).join(' · ') : `Face-à-face des lanes dans les ${PRO.games} games pro des 30 derniers jours, selon l’ordre de pick`);
   add('duos', 'Duos mesurés (Master+)', gm.duo, gm.dt.length ? gm.dt.slice(0, 4).join(' · ') : 'Synergie réelle des duos en Master+');
   const pairTxt = (pp) => pp.slice(0, 2).map((x) => `${x.a.name} + ${x.b.name} (${x.title})`).join(', ');
   add('synergy', 'Synergies entre champions', synV,
@@ -382,7 +389,7 @@ export function recommendBans(blue, red, side, pool, enemyPlayers = []) {
   const targeted = targetBans(pool, enemyPlayers).slice(0, 6);
   return {
     groups: [
-      ...(targeted.length ? [{ key: 'target', title: 'Bans ciblés (joueurs adverses)', hint: 'Leurs champions de confort qui sont aussi forts ce patch', list: targeted }] : []),
+      ...(targeted.length ? [{ key: 'target', title: 'Bans ciblés (joueurs adverses)', hint: 'Leurs champions de confort qui sont aussi forts en ce moment', list: targeted }] : []),
       { key: 'threat', title: 'Plus grosse menace pour ta compo', hint: 'Ce qu’ils gagneraient le plus à prendre', list: threats },
       { key: 'meta', title: 'Bans méta', hint: 'Présence pro (gol.gg) et winrate soloQ', list: meta.map((c) => ({ c, wr: c.wr ?? 50, delta: 0 })) }
     ]

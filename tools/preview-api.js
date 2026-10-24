@@ -10,6 +10,8 @@
     stats: SEED.lolalytics.stats,
     pro: SEED.golgg.pro,
     progames: SEED.progames?.games ?? {},
+    changes: SEED.patches?.changed ?? {},
+    window: { days: 30, from: SEED.patches?.from ?? null, patches: (SEED.patches?.patches ?? []).map(({ patch, label, start }) => ({ patch, label, start })) },
     sources: {
       ddragon: { ok: true, at: T },
       lolalytics: { ok: true, at: T, patch: SEED.lolalytics.patch },

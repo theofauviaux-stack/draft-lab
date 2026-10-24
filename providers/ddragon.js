@@ -16,7 +16,7 @@ async function fetchDDragon() {
     tags: c.tags,
     info: c.info
   }));
-  return { version, patch: version.split('.').slice(0, 2).join('.'), champions };
+  return { version, versions: versions.slice(0, 6), patch: version.split('.').slice(0, 2).join('.'), champions };
 }
 
 module.exports = { fetchDDragon };

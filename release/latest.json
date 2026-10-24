@@ -1,7 +1,7 @@
 {
-  "version": "2.33.0",
-  "sha256": "99a9191747bedc7f6f8b83014109fc55add2ca5907019ebd67cf9482caca0806",
-  "file": "draftlab-2.33.0.json.gz",
-  "notes": "Historique : résultats inconnus comptés (« 1 ? ») et retrouvés automatiquement dans l'historique de matchs du client",
-  "date": "2026-10-24T17:38:27.578Z"
+  "version": "2.34.0",
+  "sha256": "31ba5e171de14497734c927d46b651adc30e278bcef63a626eac5603754230bd",
+  "file": "draftlab-2.34.0.json.gz",
+  "notes": "Données sur les 30 derniers jours ; un champion modifié par un patch pendant cette période ne garde que ses games depuis ce patch (notes de patch Riot)",
+  "date": "2026-10-24T18:19:05.021Z"
 }

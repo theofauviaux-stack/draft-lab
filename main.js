@@ -9,10 +9,11 @@ const { fetchTeam } = require('./providers/opgg');
 const { fetchDpm, mergePool } = require('./providers/dpm');
 const { autoUpdate } = require('./providers/updater');
 const { fetchProGames } = require('./providers/progames');
+const { fetchPatchChanges } = require('./providers/patches');
 const { startLive, stopLive, matchResults } = require('./providers/live');
 
 const HOUR = 3600 * 1000;
-const STALE = { lolalytics: 6 * HOUR, golgg: 12 * HOUR, progames: 4 * HOUR };
+const STALE = { patches: 6 * HOUR, lolalytics: 6 * HOUR, golgg: 12 * HOUR, progames: 4 * HOUR };
 const CHECK_EVERY = 2 * HOUR; // vérification automatique d'un nouveau patch
 
 let win;
@@ -25,10 +26,10 @@ function loadCache() {
   try { cache = JSON.parse(fs.readFileSync(cacheFile(), 'utf8')); } catch { cache = {}; }
   // Premier lancement : données livrées avec l'app, pour que tout marche tout de suite.
   // Elles sont remplacées dès que la synchronisation en fond a réussi.
-  if (!cache.ddragon || !cache.golgg || !cache.lolalytics || !cache.progames) {
+  if (!cache.ddragon || !cache.golgg || !cache.lolalytics || !cache.progames || !cache.patches) {
     try {
       const seed = JSON.parse(fs.readFileSync(path.join(__dirname, 'seed', 'seed.json'), 'utf8'));
-      for (const k of ['ddragon', 'lolalytics', 'golgg', 'progames']) {
+      for (const k of ['ddragon', 'lolalytics', 'golgg', 'progames', 'patches']) {
         if (!cache[k]) cache[k] = { ...seed[k], at: 0 }; // at: 0 => considéré comme à rafraîchir
       }
     } catch {}
@@ -60,8 +61,21 @@ async function sync({ force = false, tier = lastTier } = {}) {
     }
     const { patch, champions } = cache.ddragon;
 
+    // 1 bis) notes de patch : champions modifiés pendant les 30 derniers jours (et à quel patch)
+    const patchFresh = cache.patches?.v === 1 && cache.patches.patch === patch && now - cache.patches.at < STALE.patches;
+    if (force || patchChanged || !patchFresh) {
+      try {
+        const r = await fetchPatchChanges(cache.ddragon.versions ?? [cache.ddragon.version], champions, now);
+        cache.patches = { v: 1, at: now, patch, ...r };
+        sources.patches = { ok: true, at: now };
+      } catch (e) {
+        sources.patches = { ok: !!cache.patches?.changed, error: e.message, at: cache.patches?.at, cached: !!cache.patches };
+      }
+    }
+    const changed = cache.patches?.changed ?? {};
+
     // 2) lolalytics (winrates soloQ par rôle) et 3) gol.gg (méta pro), en parallèle
-    const lk = `${patch}|${tier}`;
+    const lk = lolaKey(patch, tier);
     const lolaFresh = cache.lolalytics?.key === lk && now - cache.lolalytics.at < STALE.lolalytics;
     const golFresh = cache.golgg?.v === 2 && now - cache.golgg.at < STALE.golgg;
     await Promise.all([
@@ -71,8 +85,8 @@ async function sync({ force = false, tier = lastTier } = {}) {
           return;
         }
         try {
-          const r = await fetchLolalytics(patch, tier, champions);
-          cache.lolalytics = { key: lk, at: now, stats: r.stats, patch: r.patch };
+          const r = await fetchLolalytics(patch, tier, champions, changed);
+          cache.lolalytics = { key: lk, tier, at: now, stats: r.stats, patch: r.patch };
           sources.lolalytics = { ok: true, at: now, patch: r.patch };
           partial(tier, sources);
         } catch (e) {
@@ -81,11 +95,11 @@ async function sync({ force = false, tier = lastTier } = {}) {
       })(),
       (async () => {
         // 4) games pro récentes : ordre des picks, patch et vainqueur (seules les nouvelles sont lues)
-        const fresh = cache.progames?.at && now - cache.progames.at < STALE.progames;
+        const fresh = cache.progames?.v === 2 && cache.progames?.at && now - cache.progames.at < STALE.progames;
         if (!force && fresh) { sources.progames = { ok: true, at: cache.progames.at }; return; }
         try {
           const r = await fetchProGames(champions, cache.progames ?? {});
-          cache.progames = { at: now, games: r.games, matches: r.matches };
+          cache.progames = { v: r.v, at: now, games: r.games, matches: r.matches };
           sources.progames = { ok: true, at: now };
           partial(tier, sources);
         } catch (e) {
@@ -120,12 +134,20 @@ function partial(tier, sources) {
 }
 
 // Données disponibles tout de suite (cache), pendant que la synchro tourne en fond.
+// Clé du cache lolalytics : patch, niveau et liste des champions modifiés (la fenêtre de chacun en dépend)
+function lolaKey(patch, tier) {
+  const ch = cache.patches?.changed ?? {};
+  return `${patch}|${tier}|30j|` + Object.keys(ch).sort().map((k) => `${k}:${ch[k]}`).join(',');
+}
 function snapshot(tier, sources) {
   const { version, patch, champions } = cache.ddragon;
-  const lk = `${patch}|${tier}`;
+  const L = cache.lolalytics;
   return {
     version, patch, champions, tier,
-    stats: cache.lolalytics?.key === lk ? cache.lolalytics.stats : {},
+    // données en cache du même niveau, même un peu anciennes, en attendant la synchro
+    stats: L && (L.tier ?? L.key?.split('|')[1]) === tier ? L.stats : {},
+    changes: cache.patches?.changed ?? {},
+    window: { days: 30, from: cache.patches?.from ?? null, patches: (cache.patches?.patches ?? []).map(({ patch: p, label, start }) => ({ patch: p, label, start })) },
     pro: cache.golgg?.pro ?? {},
     progames: cache.progames?.games ?? {},
     sources
@@ -140,7 +162,7 @@ async function quickLoad(tier) {
     try { cache.ddragon = { ...(await fetchDDragon()), at: Date.now() }; }
     catch (e) { return { error: 'Impossible de récupérer la liste des champions (Data Dragon). Vérifie ta connexion.' }; }
   }
-  const lk = `${cache.ddragon.patch}|${tier}`;
+  const lk = lolaKey(cache.ddragon.patch, tier);
   const loading = { loading: true };
   const snap = snapshot(tier, {
     ddragon: { ok: true, at: cache.ddragon.at },
@@ -270,9 +292,10 @@ app.whenReady().then(() => {
   // Matchups et duos Master+ d'un champion à sa lane (mis en cache 24 h)
   const details = new Map();
   ipcMain.handle('lola:detail', async (_e, { cid, lane }) => {
-    const k = `${cid}|${lane}`, c = details.get(k);
+    const k = `${cid}|${lane}|${cache.patches?.changed?.[cid] ?? '30'}`, c = details.get(k);
     if (c && Date.now() - c.at < 24 * HOUR) return c.data;
-    try { const data = await fetchDetail(cid, lane); details.set(k, { at: Date.now(), data }); return data; }
+    const since = cache.patches?.changed?.[cid] ?? null, patch = cache.ddragon?.patch;
+    try { const data = await fetchDetail(cid, lane, 'master_plus', { since, patch }); details.set(k, { at: Date.now(), data }); return data; }
     catch (e) { return c?.data ?? { error: e.message }; }
   });
   // Partie en direct (client League / jeu sur cet ordinateur)

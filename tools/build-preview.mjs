@@ -34,7 +34,7 @@ const js = res.outputFiles[0].text;
 if (!js.includes('__IMG')) throw new Error('remplacement des images non appliqué');
 
 const body = html.slice(html.indexOf('<body>') + 6, html.indexOf('<script type="module"'));
-const note = `Aperçu web · données du patch ${seed.ddragon.patch} figées au ${new Date().toLocaleDateString('fr-FR')} · « Charger » (multi op.gg) remplit des joueurs d’exemple`;
+const note = `Aperçu web · données des 30 derniers jours (patch ${(([M, m]) => `${+M + 10}.${m}`)(seed.ddragon.patch.split('.'))}) figées au ${new Date().toLocaleDateString('fr-FR')} · « Charger » (multi op.gg) remplit des joueurs d’exemple`;
 
 const page = `<title>Draft Lab</title>
 <meta name="description" content="Aperçu web de Draft Lab">
