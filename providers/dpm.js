@@ -32,7 +32,8 @@ async function fetchDpm(riotId) {
     const get = async (q) => { const r = await fetch('/v1/players/' + p.puuid + '/champions?queue=' + q + '&currentSplit=true'); return r.ok ? r.json() : []; };
     const [solo, flex] = await Promise.all([get('solo'), get('flex')]);
     const slim = (arr) => (Array.isArray(arr) ? arr : []).map((c) => ({ id: c.championId, games: c.gamesPlayed, wins: c.win }));
-    return { solo: slim(solo), flex: slim(flex) };
+    const gn = p.gameName ?? p.riotIdGameName ?? p.game_name ?? null, tl = p.tagLine ?? p.riotIdTagline ?? p.tag_line ?? null;
+    return { solo: slim(solo), flex: slim(flex), riotId: gn && tl ? gn + '#' + tl : null };
   })()`;
   const res = await Promise.race([
     win.webContents.executeJavaScript(code),

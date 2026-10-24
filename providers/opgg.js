@@ -70,7 +70,11 @@ async function findSummoner(region, riotId) {
   const pick = (list) => {
     if (!list?.length) return null;
     const exact = list.find((x) => normName(x.game_name) === normName(name) && (!tag || normTag(x.tagline) === normTag(tag)));
-    return exact || (tag ? null : list.find((x) => normName(x.game_name) === normName(name)) || list[0]);
+    if (exact) return exact;
+    const same = list.filter((x) => normName(x.game_name) === normName(name));
+    // tag changé (ex. « UC akirielle#YOLO » devenu « UC akirielle#PANDA ») : un seul compte à ce nom, c'est lui
+    if (tag) return same.length === 1 ? same[0] : null;
+    return same[0] || list[0];
   };
   const q1 = await getJson(`${BASE}/v3/${region}/summoners?riot_id=${encodeURIComponent(riotId)}&hl=fr_FR`).catch(() => null);
   let s = pick(q1?.data?.filter((x) => x.summoner_id));
@@ -147,4 +151,4 @@ async function fetchTeam(input, champions, fallbackRegion) {
   return { region, players };
 }
 
-module.exports = { fetchTeam, fetchPlayers, parseInput };
+module.exports = { fetchTeam, fetchPlayers, fetchPlayer, parseInput };

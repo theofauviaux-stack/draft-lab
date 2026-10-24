@@ -1,7 +1,7 @@
 {
-  "version": "2.37.1",
-  "sha256": "b7826a7c66691c93ca0ad0e7eee8496f242518154586d8d443557861eaec46d7",
-  "file": "draftlab-2.37.1.json.gz",
-  "notes": "Équilibrage : liste gardée seulement pendant la session ; pseudos lus depuis les liens de joueurs (op.gg, u.gg, porofessor…), surnoms autour ignorés",
-  "date": "2026-10-24T19:45:40.665Z"
+  "version": "2.37.2",
+  "sha256": "6c2fa19820522751ebb61d62dc395e5bf5411b42350c8e165e83a35e262399db",
+  "file": "draftlab-2.37.2.json.gz",
+  "notes": "Joueur retrouvé après un changement de tag (ex. UC akirielle#YOLO → #PANDA)",
+  "date": "2026-10-24T20:09:52.080Z"
 }

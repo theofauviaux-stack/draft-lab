@@ -5,7 +5,7 @@ const fs = require('fs');
 const { fetchDDragon } = require('./providers/ddragon');
 const { fetchLolalytics, fetchDetail } = require('./providers/lolalytics');
 const { fetchGolgg } = require('./providers/golgg');
-const { fetchTeam, fetchPlayers } = require('./providers/opgg');
+const { fetchTeam, fetchPlayers, fetchPlayer } = require('./providers/opgg');
 const { fetchDpm, mergePool } = require('./providers/dpm');
 const { autoUpdate } = require('./providers/updater');
 const { fetchProGames } = require('./providers/progames');
@@ -282,7 +282,15 @@ app.whenReady().then(() => {
       // Complément dpm.lol : toutes les games Ranked Solo + Flex de la saison
       const byKey = new Map(cache.ddragon.champions.map((c) => [String(c.key), c.id]));
       res.players = await Promise.all(res.players.map(async (p) => {
-        try { return mergePool(p, await fetchDpm(p.riotId), byKey); }
+        try {
+          const dpm = await fetchDpm(p.riotId);
+          // introuvable sur op.gg mais connu de dpm.lol sous son pseudo actuel (pseudo ou tag changé) : on relit op.gg
+          if (p.error && dpm?.riotId && dpm.riotId.toLowerCase() !== String(p.riotId).toLowerCase()) {
+            const again = await fetchPlayer(res.region, dpm.riotId, byKey).catch(() => null);
+            if (again && !again.error) return mergePool(again, dpm, byKey);
+          }
+          return mergePool(p, dpm, byKey);
+        }
         catch (e) { return { ...p, dpm: `dpm.lol indisponible (${e.message})` }; }
       }));
       res.players = res.players.map((p) => (p.error && p.pool?.length ? { ...p, error: null, tier: p.tier ?? 'rang inconnu (données dpm.lol)' } : p));
