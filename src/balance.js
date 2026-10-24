@@ -3,17 +3,18 @@
 // On teste toutes les répartitions (126 façons de faire deux équipes de 5, puis tous les placements
 // de rôles dans chaque équipe) et on garde les plus équilibrées.
 export const BAL_ROLES = ['T', 'J', 'M', 'A', 'S'];
-export const BAL_COST = { main: 0, second: 50, fill: 50, off: 300 };
+export const BAL_COST = { main: 0, second: 50, third: 150, fill: 50, off: 300 };
 
 // Valeur d'un joueur : 100 pts par division, 400 par tier ; au-dessus de Master, les LP comptent à moitié
 // (un Master à 1200 LP ne vaut pas trois tiers de plus qu'un Master à 0 LP).
 export const balValue = (pts) => (pts == null ? null : pts > 2800 ? 2800 + (pts - 2800) / 2 : pts);
 
-// Rôle joué par rapport aux préférences : 'main', 'second', 'fill' ou 'off'
+// Rôle joué par rapport aux préférences (3 rôles) : 'main', 'second', 'third', 'fill' ou 'off'
 export function roleFit(p, r) {
   if (p.main === 'FILL') return 'fill';
   if (r === p.main) return 'main';
   if (r === p.second || p.second === 'FILL') return 'second';
+  if (r === p.third || p.third === 'FILL') return 'third';
   return 'off';
 }
 
@@ -35,7 +36,7 @@ const PERMS = (() => {
   rec(0); return out;
 })();
 
-// players : [{ value, main, second, form }] (10). Renvoie les meilleures répartitions, une par composition
+// players : [{ value, main, second, third, form }] (10). Renvoie les meilleures répartitions, une par composition
 // d'équipes : { blue: [idx par rôle T J M A S], red: [...], score, gap, laneGap, cost, formGap, wr }
 export function balanceTeams(players, { keep = 6 } = {}) {
   if (players.length !== 10) return [];
@@ -94,5 +95,5 @@ export function rolesFromPool(pool, stats) {
   if (!tot) return null;
   const pct = Object.fromEntries(BAL_ROLES.map((r) => [r, Math.round((share[r] / tot) * 100)]));
   const order = [...BAL_ROLES].sort((a, b) => pct[b] - pct[a]);
-  return { main: order[0], second: order[1], pct, games: tot };
+  return { main: order[0], second: order[1], third: order[2], pct, games: tot };
 }

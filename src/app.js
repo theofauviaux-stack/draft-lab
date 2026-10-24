@@ -1111,7 +1111,7 @@ async function balSearch() {
       const old = prev.get(key);
       return {
         key, riotId: p.riotId, error: p.error ?? null, rank: p.rank ?? null, top: (p.pool ?? []).slice(0, 3).map((c) => c.id),
-        auto, main: old?.edited ? old.main : auto?.main ?? 'FILL', second: old?.edited ? old.second : auto?.second ?? 'FILL',
+        auto, main: old?.edited ? old.main : auto?.main ?? 'FILL', second: old?.edited ? old.second : auto?.second ?? 'FILL', third: old?.edited ? old.third ?? auto?.third ?? 'FILL' : auto?.third ?? 'FILL',
         edited: old?.edited ?? false
       };
     });
@@ -1125,7 +1125,7 @@ function renderBalList() {
   const ok = n === 10;
   $('balGo').disabled = !ok;
   $('balGo').title = ok ? '' : 'Il faut exactement 10 joueurs';
-  const roleSel = (p, f) => `<select data-f="${f}">${[...BAL_ROLES, 'FILL'].map((r) => `<option value="${r}" ${p[f] === r ? 'selected' : ''}>${RL[r]}</option>`).join('')}</select>`;
+  const roleSel = (p, f) => `<select data-f="${f}">${[...BAL_ROLES, 'FILL'].map((r) => `<option value="${r}" ${(p[f] ?? p.auto?.[f] ?? 'FILL') === r ? 'selected' : ''}>${RL[r]}</option>`).join('')}</select>`;
   L.innerHTML = BAL.players.map((p, i) => {
     const e = balLabel(p);
     const rk = `<span class="bal-rk ${e.src === 'Solo/Duo' ? '' : 'est'}" style="--c:${e.color}" title="${e.src}">${e.src === 'Solo/Duo' ? '' : '≈ '}${e.label}${p.rank?.tier && p.rank.lp != null ? ` <small>${p.rank.lp} LP</small>` : ` <small>${e.src === 'Solo/Duo' ? '' : e.src.replace('Solo/Duo ', '')}</small>`}</span>`;
@@ -1137,6 +1137,7 @@ function renderBalList() {
       ${rk}
       <label class="bal-r">Rôle 1 ${roleSel(p, 'main')}</label>
       <label class="bal-r">Rôle 2 ${roleSel(p, 'second')}</label>
+      <label class="bal-r">Rôle 3 ${roleSel(p, 'third')}</label>
       <button class="bal-x" title="Retirer ce joueur">✕</button></div>`;
   }).join('') || '<p class="muted bal-empty">Entre les 10 pseudos puis lance la recherche : l’elo et les rôles de chacun sont récupérés automatiquement.</p>';
   L.querySelectorAll('.bal-row').forEach((row) => {
@@ -1151,7 +1152,7 @@ function renderBalList() {
 }
 function balRun() {
   const ps = BAL.players;
-  const input = ps.map((p) => ({ value: balValue(balPts(p)), main: p.main, second: p.second, wins: p.rank?.wins, losses: p.rank?.losses, hot: p.rank?.hot }));
+  const input = ps.map((p) => ({ value: balValue(balPts(p)), main: p.main, second: p.second, third: p.third ?? p.auto?.third ?? 'FILL', wins: p.rank?.wins, losses: p.rank?.losses, hot: p.rank?.hot }));
   BAL.sols = balanceTeams(input); BAL.k = 0; BAL.swap = false;
   if (!BAL.sols.length) { toast('Il faut exactement 10 joueurs'); return; }
   $('balStep1').hidden = true; $('balStep2').hidden = false;
@@ -1163,16 +1164,16 @@ function renderBalResult() {
   const wr = BAL.swap ? 100 - sol.wr : sol.wr;
   const avg = (v) => v.reduce((a, x) => a + x, 0) / 5;
   const unval = (v) => (v > 2800 ? 2800 + (v - 2800) * 2 : v); // LP au-dessus de Master : comptés à moitié dans le calcul
-  const FIT = { main: ['★', 'rôle principal'], second: ['☆', 'rôle secondaire'], fill: ['☆', 'fill'], off: ['⚠', 'hors de ses rôles'] };
+  const FIT = { main: ['①', 'rôle 1'], second: ['②', 'rôle 2'], third: ['③', 'rôle 3'], fill: ['②', 'fill'], off: ['⚠', 'hors de ses 3 rôles'] };
   const cell = (pi, ri, v, side) => {
-    const p = BAL.players[pi], fit = roleFit(p, BAL_ROLES[ri]), e = balLabel(p);
+    const p = BAL.players[pi], fit = roleFit({ ...p, third: p.third ?? p.auto?.third ?? 'FILL' }, BAL_ROLES[ri]), e = balLabel(p);
     return `<div class="bal-p ${side} ${fit}"><span class="bal-fit" title="${FIT[fit][1]}">${FIT[fit][0]}</span><b>${p.riotId}</b><span class="bal-rk" style="--c:${e.color}" title="${e.src}">${e.src === 'Solo/Duo' ? '' : '≈ '}${e.label}</span></div>`;
   };
   const rows = BAL_ROLES.map((role, ri) => {
     const d = vb[ri] - vr[ri];
     return `<div class="bal-lane">${cell(b[ri], ri, vb[ri], 'blue')}<div class="bal-mid"><span>${RL[role]}</span><i class="${Math.abs(d) < 150 ? 'eq' : d > 0 ? 'b' : 'r'}" title="Écart de niveau à cette lane (rôle compris)">${Math.abs(d) < 150 ? '≈' : `${d > 0 ? '◀' : ''} ${(Math.round(Math.abs(d) / 10) / 10).toLocaleString('fr-FR')} div. ${d < 0 ? '▶' : ''}`}</i></div>${cell(r[ri], ri, vr[ri], 'red')}</div>`;
   }).join('');
-  const fits = [...b, ...r].map((pi, k) => roleFit(BAL.players[pi], BAL_ROLES[k % 5]));
+  const fits = [...b, ...r].map((pi, k) => { const p = BAL.players[pi]; return roleFit({ ...p, third: p.third ?? p.auto?.third ?? 'FILL' }, BAL_ROLES[k % 5]); });
   const nMain = fits.filter((f) => f === 'main').length, nOff = fits.filter((f) => f === 'off').length;
   $('balResult').innerHTML = `
     <div class="bal-top">
@@ -1181,7 +1182,7 @@ function renderBalResult() {
       <div class="bal-t red"><span>Équipe 2 · rouge</span><b>${pointsLabel(unval(avg(vr)))}</b></div>
     </div>
     <div class="bal-lanes">${rows}</div>
-    <p class="muted bal-sum">Répartition ${BAL.k + 1}/${BAL.sols.length} · ${nMain}/10 à leur rôle principal${nOff ? ` · ${nOff} hors de ses rôles` : ''} · ★ principal, ☆ secondaire, ⚠ hors rôle. Niveau moyen rôle compris ; la forme (winrate de saison, série de victoires) ne sert qu’à départager.</p>`;
+    <p class="muted bal-sum">Répartition ${BAL.k + 1}/${BAL.sols.length} · ${nMain}/10 à leur rôle 1${nOff ? ` · ${nOff} hors de ses 3 rôles` : ''}</p>`;
   $('balNext').textContent = BAL.sols.length > 1 ? `Autre répartition (${(BAL.k + 1) % BAL.sols.length + 1}/${BAL.sols.length})` : 'Autre répartition';
 }
 function balDraft() {

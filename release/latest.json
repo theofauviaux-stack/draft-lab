@@ -1,7 +1,7 @@
 {
-  "version": "2.35.2",
-  "sha256": "a08086733af70de6605ebd56eaafb8216d7fa41f4190e3cb3d098cb3643689a2",
-  "file": "draftlab-2.35.2.json.gz",
-  "notes": "Pseudos lus dans n'importe quel collage : plusieurs liens op.gg, listes, chat du salon",
-  "date": "2026-10-24T19:21:31.592Z"
+  "version": "2.36.0",
+  "sha256": "ddc289b5afeac7fcef84dddca12f5068b5a0ad28d5de5d04d90f4db487d65018",
+  "file": "draftlab-2.36.0.json.gz",
+  "notes": "Équilibrage : 3 rôles par joueur, explication du calcul retirée",
+  "date": "2026-10-24T19:30:31.067Z"
 }
