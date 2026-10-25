@@ -1,7 +1,7 @@
 {
-  "version": "2.38.0",
-  "sha256": "809e38348564da31819a403e7c8a53c657b7ff8f8992c77e9c60e9bd30f4ca6b",
-  "file": "draftlab-2.38.0.json.gz",
-  "notes": "Winrates à l'elo de la partie, patchs récents comptés plus, face-à-face seul (force générale avant le vis-à-vis), bot en 2v2",
-  "date": "2026-10-24T20:29:20.754Z"
+  "version": "2.39.0",
+  "sha256": "10f7bb1cd2725d91b054fe52358c39d7ce0875516b568d73bb3f4fc9ff534973",
+  "file": "draftlab-2.39.0.json.gz",
+  "notes": "Fiche : sûr ou risqué en blind, pires et meilleurs face-à-face ; plan de match : bot en 2v2 et quêtes de rôle 2026",
+  "date": "2026-10-25T03:33:07.477Z"
 }

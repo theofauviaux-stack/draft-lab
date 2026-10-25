@@ -1211,3 +1211,12 @@ body.fearless .board .grid { box-shadow: inset 0 0 0 2px color-mix(in srgb, #b04
 .tier-sel:hover, .tier-sel:focus { border-color: var(--line); background: var(--panel-2); }
 .mu-row.mu-2v2 { background: color-mix(in srgb, var(--gold) 8%, transparent); border-radius: 8px; }
 .mu-row.mu-2v2 small { flex: 1; }
+/* fiche : vis-à-vis pas encore choisi */
+.mu-blind { display: flex; flex-direction: column; gap: 6px; margin: 2px 0 6px; }
+.mu-bv { font-size: 12px; padding: 5px 8px; border-radius: 7px; background: var(--panel-2); }
+.mu-bv.up b { color: var(--good); } .mu-bv.down b { color: var(--bad); }
+.mu-bl { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; font-size: 11.5px; }
+.mu-bl > span { color: var(--muted); min-width: 120px; }
+.mu-ch { display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px 2px 2px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--line); }
+.mu-ch img { width: 18px; height: 18px; border-radius: 50%; }
+.mu-ch small { color: var(--muted); } .mu-ch.up b { color: var(--good); } .mu-ch.down b { color: var(--bad); }

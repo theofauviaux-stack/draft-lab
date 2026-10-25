@@ -345,6 +345,24 @@ function renderTeams() {
   }
 }
 
+// Vis-à-vis pas encore choisi : ses pires et meilleurs face-à-face mesurés (à l'elo de la partie),
+// et s'il est sûr en blind (peu de games dans des face-à-face nettement perdants).
+function blindHtml(c, lane) {
+  const d = DET.get(`${c.key}|${lane}|${state.tier}`)?.data;
+  const lanes = lane === 'A' ? ['A', 'S'] : lane === 'S' ? ['S', 'A'] : [lane];
+  const byKey = new Map(Object.values(state.P).map((x) => [String(x.key), x]));
+  const rows = [];
+  for (const L of lanes) for (const [k, [wr, n]] of Object.entries(d?.vs?.[L] ?? {})) { const o = byKey.get(String(k)); if (o && n >= 150 && o.roles.includes(L)) rows.push({ o, L, wr, n }); } // seulement les vrais joueurs de cette lane
+  if (!d) return `<div class="muted mu-empty">Son adversaire de lane n'est pas encore choisi${api.detail ? ' (face-à-face en chargement…)' : ''}.</div>`;
+  if (rows.length < 5) return `<div class="muted mu-empty">Son adversaire de lane n'est pas encore choisi.</div>`;
+  const tot = rows.reduce((a, r) => a + r.n, 0), bad = rows.filter((r) => r.wr <= 47).reduce((a, r) => a + r.n, 0) / tot;
+  const worst = [...rows].sort((a, b) => a.wr - b.wr).slice(0, 3), best = [...rows].sort((a, b) => b.wr - a.wr).slice(0, 3);
+  const chip = (r) => `<span class="mu-ch ${r.wr >= 50 ? 'up' : 'down'}" title="${r.n} games ${dataTierLabel()}"><img src="${img(r.o.id)}" alt="">${r.o.name}${lanes.length > 1 ? ` <small>${ROLE_LABEL[r.L]}</small>` : ''} <b>${r.wr.toFixed(1).replace('.', ',')} %</b></span>`;
+  const verdict = bad < 0.12 ? ['up', 'Sûr en blind', 'peu de face-à-face nettement perdants'] : bad > 0.28 ? ['down', 'Risqué en blind', 'à garder pour le counterpick si possible'] : ['', 'Correct en blind', 'quelques mauvais face-à-face à surveiller'];
+  return `<div class="mu-blind"><div class="mu-bv ${verdict[0]}"><b>${verdict[1]}</b> · ${verdict[2]} (${Math.round(bad * 100)} % de ses games contre des champions qui le battent nettement)</div>
+    <div class="mu-bl"><span>Ses pires face-à-face</span>${worst.map(chip).join('')}</div>
+    <div class="mu-bl"><span>Ses meilleurs</span>${best.map(chip).join('')}</div></div>`;
+}
 // ---------- Fiche matchup d'un champion choisi : forces, faiblesses, comment le jouer ----------
 function showMatchups(side, i, anchor) {
   const box = $('mupBox');
@@ -402,7 +420,7 @@ function showMatchups(side, i, anchor) {
   const rowHtml = rows.length ? rows.map(({ o, le, pe }) => `<div class="mu-row"><img src="${img(o.id)}" alt=""><b>${o.name}</b><small>${ROLE_LABEL[o.lane]}</small>
       <span class="mu-v ${le ? (le.raw >= 0 ? 'up' : 'down') : 'na'}" title="${dataTierLabel()} (lolalytics)">${le ? `${pct(le.raw)} <i>${le.n} g</i>` : `${dataTierLabel()} —`}</span>
       <span class="mu-v ${pe ? (pe.edge >= 0 ? 'up' : 'down') : 'na'}" title="Games pro des 30 derniers jours (gol.gg)">${pe ? `pro ${pe.w}/${pe.n}` : 'pro —'}</span></div>`).join('')
-    : `<div class="muted mu-empty">Son adversaire de lane n'est pas encore choisi.</div>`;
+    : blindHtml(c, lane);
   box.innerHTML = `<div class="mu-card ${side}">
     <div class="mu-h"><img src="${img(id)}" alt=""><div><b>${c.name}</b><span>${ROLE_LABEL[lane]} · ${side === 'blue' ? 'Équipe 1' : 'Équipe 2'}${c.wr != null ? ` · ${c.wr.toFixed(1)} % WR` : ''}</span></div><button class="mu-x" title="Fermer">×</button></div>
     <h6>Face-à-face</h6>${bd ? `<div class="mu-row mu-2v2"><b>Bot 2v2</b><small>${bd.blue.map((x) => x.name).join(' + ')} vs ${bd.red.map((x) => x.name).join(' + ')}</small><span class="mu-v ${bd.raw >= 0 ? 'up' : 'down'}" title="4 face-à-face croisés moyennés + synergie des deux duos (${dataTierLabel()})">${(50 + bd.raw).toFixed(1).replace('.', ',')} % <i>${bd.n} g</i></span></div>` : ''}${rowHtml}

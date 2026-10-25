@@ -1010,7 +1010,13 @@ export function matchPlan(mine, theirs) {
   const lanes = {};
   // Face-à-face mesurés (lolalytics, elo de la partie) : ils corrigent l'estimation théorique de la lane
   const measured = (L) => {
-    const roles = L === 'B' ? ['A', 'S'] : [L];
+    // bot : le 2v2 (face-à-face croisés moyennés + synergie des duos), comme dans le pourcentage
+    if (L === 'B') {
+      const side = (r) => r.filter((x) => x.role === 'A' || x.role === 'S').map((x) => ({ ...x.c, lane: x.role }));
+      const bd = botDuel(side(mine), side(theirs));
+      return bd ? { sum: bd.edge, best: { raw: bd.raw, n: bd.n, a: { name: bd.blue.map((c) => c.name).join(' + ') }, b: { name: bd.red.map((c) => c.name).join(' + ') } } } : null;
+    }
+    const roles = [L];
     let sum = 0, any = false, best = null;
     for (const ra of roles) for (const rb of roles) {
       const a = at(mine, ra), b = at(theirs, rb);
@@ -1196,8 +1202,15 @@ export function matchPlan(mine, theirs) {
     alts.push(`Lane swap : ${myA.name} est un hyper-carry en lane faible et ton top est un tank : envisage un swap vers le top / les Larves à 8:00 pour éviter de perdre la lane.`);
   if (jEdge != null && jEdge < -0.08) alts.push('Si ton jungler perd son early : full clear, couvre le côté faible et vise un drake ou des Larves gratuits plutôt que les fights.');
   if (early > 0.06) alts.push('Ta compo est plus forte en early : dive ou invade tôt pour transformer l’avance en drakes et en plaques avant que leur scaling n’arrive.');
+  // Quêtes de rôle (saison 2026) : top = Téléport gratuit ou amélioré et niveau 20, ADC = or en plus et 7e objet
+  const quest = [];
+  if (myT && splitter === myT) quest.push(`Quête de rôle du top : une fois accomplie, Téléport amélioré et niveau max 20 pour ${myT.name}. Joue la side lane et reviens en TP sur l’objectif.`);
+  const thA = at(theirs, 'A');
   const midItems = [herald.items[0], `Regroupe-toi sur le côté de l’objectif suivant 1 min avant son apparition, avec la vision. ${splitter ? `${splitter.name} peut tenir une side lane, mais dans la méta actuelle le 5v5 autour des objectifs rapporte plus que le split.` : 'Pas de vrai splitpusher : jouez groupés autour des objectifs.'}`];
-  const lateItems = [baron.items[0], baron.items[1]];
+  if (myA?.scale === 3) quest.push(`Quête de rôle ADC : or en plus et 7e emplacement d’objet. En partie longue, ${myA.name} devient la menace n°1 : toute l’équipe joue autour de ce carry.`);
+  else if (thA?.scale === 3 && !iOutscale) quest.push(`Leur ADC (${thA.name}) aura son 7e objet grâce à sa quête de rôle en partie longue : finis avant 30 min ou concentre les fights sur lui.`);
+  midItems.push(...quest.filter((t) => t.startsWith('Quête de rôle du top')));
+  const lateItems = [baron.items[0], baron.items[1], ...quest.filter((t) => !t.startsWith('Quête de rôle du top'))];
   const lateAlts = fake.on ? [`Faux Nashor : lance le Baron avec la vision pour forcer le fight (sustain : ${susNames.join(', ')}).`] : [];
   const phases = [
     { name: 'Early', range: '0-14 min', diff: early, items: earlyItems, alts },
