@@ -430,9 +430,24 @@ function moveOverlay() {
 app.whenReady().then(() => {
   ipcMain.handle('overlay:data', (_e, d) => { overlayData = d; for (const w of [overlay, mini]) if (w && !w.isDestroyed()) w.webContents.send('overlay:update', d); });
   ipcMain.handle('overlay:show', (_e, on) => { showOverlay(on); return overlayWanted; });
+  // Position du panneau choisie depuis l'appli (pas besoin de le faire glisser par-dessus le jeu)
+  ipcMain.handle('overlay:place', (_e, where) => {
+    const P = { tr: [null, 70 / 1080], tl: [0.01, 0.12], mr: [null, 0.3], ml: [0.01, 0.35] }[where];
+    if (where === 'reset-mini') { try { fs.unlinkSync(MINI_FILE()); } catch {} miniFit(); return true; }
+    if (!P) return false;
+    const { width: W } = screen.getPrimaryDisplay().bounds;
+    const k = Math.max(0.55, Math.min(2.5, Math.min(W / 1920, screen.getPrimaryDisplay().bounds.height / 1080)));
+    const rx = P[0] ?? (W - Math.round(OV_W * k) - Math.round(20 * k)) / W;
+    try { fs.writeFileSync(OV_FILE(), JSON.stringify({ rx, ry: P[1] })); } catch {}
+    overlayFit(); return true;
+  });
   try {
-    globalShortcut.register('CommandOrControl+Shift+D', () => showOverlay(!(overlay && !overlay.isDestroyed() && overlay.isVisible())));
-    globalShortcut.register('CommandOrControl+Shift+F', moveOverlay);
+    // Ctrl+Maj+D / Ctrl+Maj+F partout ; sur Mac aussi Cmd+Maj+D / Cmd+Maj+F
+    const toggle = () => showOverlay(!(overlay && !overlay.isDestroyed() && overlay.isVisible()));
+    for (const mod of process.platform === 'darwin' ? ['Control', 'Command'] : ['Control']) {
+      try { globalShortcut.register(`${mod}+Shift+D`, toggle); } catch {}
+      try { globalShortcut.register(`${mod}+Shift+F`, moveOverlay); } catch {}
+    }
   } catch {}
   app.on('will-quit', () => { try { globalShortcut.unregisterAll(); } catch {} });
   // changement d'écran ou de résolution : le panneau garde sa taille et sa place proportionnelles

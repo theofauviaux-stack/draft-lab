@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('draftlab', {
   lobbyPlayers: () => ipcRenderer.invoke('live:lobby'),
   overlayData: (d) => ipcRenderer.invoke('overlay:data', d),
   overlayShow: (on) => ipcRenderer.invoke('overlay:show', on),
+  overlayPlace: (where) => ipcRenderer.invoke('overlay:place', where),
   onOverlayState: (cb) => ipcRenderer.on('overlay:state', (_e, on) => cb(on)),
   onLiveDetected: (cb) => ipcRenderer.on('live:detected', (_e, ph) => cb(ph)),
   onLive: (cb) => ipcRenderer.on('live:update', (_e, d) => cb(d)),

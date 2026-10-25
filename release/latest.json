@@ -1,7 +1,7 @@
 {
-  "version": "2.44.1",
-  "sha256": "2cda588dbb1fa55259f859db5213226d0dc6f21ad1f81a1fc653d3cf5f447584",
-  "file": "draftlab-2.44.1.json.gz",
-  "notes": "Mac : panneau en jeu au-dessus du jeu en plein écran ; calque de mini-carte recalibré",
-  "date": "2026-10-25T17:13:53.625Z"
+  "version": "2.44.2",
+  "sha256": "d3c52f87221f983ecf3bfddf1d872cb17983e5289fe89094658f2a7733931594",
+  "file": "draftlab-2.44.2.json.gz",
+  "notes": "Mac : raccourcis Ctrl ou Cmd+Maj+D/F ; position du panneau choisie depuis l'appli",
+  "date": "2026-10-25T17:19:38.828Z"
 }

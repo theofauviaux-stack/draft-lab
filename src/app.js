@@ -2017,6 +2017,8 @@ function initAutoLive() {
 }
 function initOverlay() {
   $('ovBtn').onclick = toggleOverlay; $('liveOv').onclick = toggleOverlay;
+  $('liveOvPos').hidden = !api.overlayPlace;
+  $('liveOvPos').onchange = () => { const v = $('liveOvPos').value; $('liveOvPos').value = ''; if (v) api.overlayPlace?.(v).then(() => toast(v === 'reset-mini' ? 'Calque de la mini-carte recalé sur sa place par défaut' : 'Panneau en jeu déplacé')); };
   $('ovDemoX').onclick = () => { $('ovDemo').hidden = true; clearInterval(ovDemoTimer); };
   api.onOverlayState?.((on) => { ovOpen = on; for (const id of ['ovBtn', 'liveOv']) $(id).classList.toggle('on', on); });
 }
