@@ -157,6 +157,16 @@ function stopLive() { if (timer) clearInterval(timer); timer = null; }
 // Résultats retrouvés dans l'historique de matchs du client (parties interrompues : client fermé, crash…)
 // Joueurs du salon (partie personnalisée ou groupe) du client League : pseudos Riot (Nom#TAG), équipe
 // (personnalisée : 100 = équipe 1, 200 = équipe 2), sans les bots ni les spectateurs.
+// Détection légère (toutes les quelques secondes, même sans le mode direct) : partie en cours, sélection des
+// champions, ou rien. Sert à lancer le direct et le panneau en jeu automatiquement.
+async function detectPhase() {
+  const g = await localGet(2999, '/liveclientdata/gamestats').catch(() => null);
+  if (g && typeof g === 'object' && g.gameTime != null) return 'InProgress';
+  const lcu = await findLcu();
+  if (!lcu) return null;
+  return await localGet(lcu.port, '/lol-gameflow/v1/gameflow-phase', lcu.token).catch(() => null);
+}
+
 async function lobbyPlayers() {
   const lcu = await findLcu();
   if (!lcu) return { error: 'client' };
@@ -200,4 +210,4 @@ async function matchResults(ids) {
   return out;
 }
 
-module.exports = { startLive, stopLive, champSelect, inGame, findLcu, matchResults, lobbyPlayers };
+module.exports = { startLive, stopLive, champSelect, inGame, findLcu, matchResults, lobbyPlayers, detectPhase };

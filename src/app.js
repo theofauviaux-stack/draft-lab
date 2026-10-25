@@ -1425,7 +1425,7 @@ function startLiveMode() {
   $('liveBar').hidden = false; $('liveTitle').textContent = 'Connexion au client…'; $('liveText').textContent = '';
   api.liveStart();
 }
-function stopLiveMode() { LIVE.on = false; api.liveStop?.(); $('liveBar').hidden = true; $('liveReco').hidden = true; $('liveMode').hidden = true; document.body.classList.remove('q-flex'); render(); }
+function stopLiveMode() { LIVE.suppress = true; LIVE.on = false; api.liveStop?.(); $('liveBar').hidden = true; $('liveReco').hidden = true; $('liveMode').hidden = true; document.body.classList.remove('q-flex'); render(); }
 function onLive(d) {
   if (!LIVE.on) return;
   // horloge de la partie pour le panneau en jeu ; il s'ouvre tout seul au début de la partie
@@ -1960,6 +1960,18 @@ function toggleOverlay() {
   ovSig = ''; pushOverlay();
   api.overlayShow(!ovOpen).then((on) => { ovOpen = on; toast(on ? 'Panneau en jeu affiché (Ctrl+Maj+D pour le masquer, Ctrl+Maj+F pour le déplacer)' : 'Panneau en jeu masqué'); });
 }
+// Lancement automatique : dès qu'une sélection des champions ou une partie est détectée sur cet ordinateur,
+// le direct démarre tout seul (et le panneau en jeu s'ouvre au début de la partie). Si tu arrêtes le direct
+// pendant une partie, il ne redémarre pas avant la suivante.
+function initAutoLive() {
+  api.onLiveDetected?.((ph) => {
+    const active = ph === 'ChampSelect' || ph === 'InProgress';
+    if (!active) { LIVE.suppress = false; return; }
+    if (LIVE.on || LIVE.suppress) return;
+    startLiveMode();
+    toast(ph === 'InProgress' ? 'Partie détectée : direct et panneau en jeu lancés automatiquement' : 'Sélection des champions détectée : direct lancé automatiquement');
+  });
+}
 function initOverlay() {
   $('ovBtn').onclick = toggleOverlay; $('liveOv').onclick = toggleOverlay;
   $('ovDemoX').onclick = () => { $('ovDemo').hidden = true; clearInterval(ovDemoTimer); };
@@ -2095,6 +2107,7 @@ function initControls() {
   document.querySelectorAll('#menuMode button').forEach((b) => (b.onclick = () => { document.querySelectorAll('#menuMode button').forEach((x) => x.classList.toggle('on', x === b)); }));
   initBalance();
   initOverlay();
+  initAutoLive();
   $('tierSel').onchange = () => { state.tierPref = $('tierSel').value; savePrefs(); render(); };
   $('startPlayers').onclick = () => { $('startMenu').classList.add('form'); $('startChoices').hidden = true; $('startForm').hidden = false; $('menuBlue').focus(); };
   $('menuBack').onclick = () => { $('startMenu').classList.remove('form'); $('startForm').hidden = true; $('startChoices').hidden = false; };

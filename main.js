@@ -10,7 +10,7 @@ const { fetchDpm, mergePool } = require('./providers/dpm');
 const { autoUpdate } = require('./providers/updater');
 const { fetchProGames } = require('./providers/progames');
 const { fetchPatchChanges } = require('./providers/patches');
-const { startLive, stopLive, matchResults, lobbyPlayers } = require('./providers/live');
+const { startLive, stopLive, matchResults, lobbyPlayers, detectPhase } = require('./providers/live');
 
 const HOUR = 3600 * 1000;
 const STALE = { patches: 6 * HOUR, lolalytics: 6 * HOUR, golgg: 12 * HOUR, progames: 4 * HOUR };
@@ -389,8 +389,18 @@ app.whenReady().then(() => {
     catch (e) { return c?.data ?? { error: e.message }; }
   });
   // Partie en direct (client League / jeu sur cet ordinateur)
-  ipcMain.handle('live:start', () => { startLive((d) => { if (win && !win.isDestroyed()) win.webContents.send('live:update', d); }); return true; });
-  ipcMain.handle('live:stop', () => { stopLive(); return true; });
+  let liveOn = false;
+  ipcMain.handle('live:start', () => { liveOn = true; startLive((d) => { if (win && !win.isDestroyed()) win.webContents.send('live:update', d); }); return true; });
+  ipcMain.handle('live:stop', () => { liveOn = false; stopLive(); return true; });
+  // Détection automatique d'une sélection des champions ou d'une partie : le direct (et le panneau en jeu)
+  // se lancent tout seuls, sans passer par le menu. Toutes les 5 s, seulement quand le direct n'est pas déjà actif.
+  let detecting = false;
+  setInterval(async () => {
+    if (liveOn || detecting || !win || win.isDestroyed()) return;
+    detecting = true;
+    try { const ph = await detectPhase(); win.webContents.send('live:detected', ph ?? null); } catch {}
+    detecting = false;
+  }, 5000);
   ipcMain.handle('live:results', (_e, ids) => matchResults(ids).catch(() => ({})));
   // Équilibrage : joueurs du salon du client (partie personnalisée)
   ipcMain.handle('live:lobby', () => lobbyPlayers().catch((e) => ({ error: 'client', detail: e.message })));

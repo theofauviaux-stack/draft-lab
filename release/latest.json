@@ -1,7 +1,7 @@
 {
-  "version": "2.41.1",
-  "sha256": "f2894cae3b2d05a53aefcf8c2b3a42971fa42d43c840b562089ce2fd76283403",
-  "file": "draftlab-2.41.1.json.gz",
-  "notes": "Panneau en jeu : taille et position proportionnelles à l'écran",
-  "date": "2026-10-25T16:17:36.613Z"
+  "version": "2.42.0",
+  "sha256": "e0981c13eee3463183d321328eea4adb59cd8458408ab5c4cadcd1d9003d1487",
+  "file": "draftlab-2.42.0.json.gz",
+  "notes": "Direct et panneau en jeu lancés automatiquement dès la sélection des champions ou la partie",
+  "date": "2026-10-25T16:20:29.107Z"
 }
