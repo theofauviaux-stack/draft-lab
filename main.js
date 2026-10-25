@@ -446,14 +446,15 @@ function saveOverlayPos() {
 function moveOverlay() {
   if (!overlay || overlay.isDestroyed() || !overlay.isVisible()) return;
   overlayMove = !overlayMove;
-  overlay.setIgnoreMouseEvents(!overlayMove, { forward: true });
-  overlay.setFocusable(overlayMove);
-  overlay.webContents.send('overlay:move', overlayMove);
-  // le calque de la mini-carte se règle en même temps (ajustement sur la vraie mini-carte)
-  if (mini && !mini.isDestroyed()) {
-    mini.setIgnoreMouseEvents(!overlayMove, { forward: true });
-    mini.setFocusable(overlayMove); mini.setResizable(overlayMove);
-    mini.webContents.send('overlay:move', overlayMove);
+  // Mac : réglage au clavier seulement. Rendre le panneau cliquable activerait Draft Lab, et macOS quitterait
+  // l'espace plein écran du jeu pour revenir au bureau. Windows / Linux : la souris marche aussi.
+  const mouse = overlayMove && process.platform !== 'darwin';
+  for (const w of [overlay, mini]) {
+    if (!w || w.isDestroyed()) continue;
+    w.setIgnoreMouseEvents(!mouse, { forward: true });
+    w.setFocusable(mouse);
+    if (w === mini) w.setResizable(mouse);
+    w.webContents.send('overlay:move', overlayMove);
   }
   for (const k of MOVE_KEYS.splice(0)) { try { globalShortcut.unregister(k); } catch {} }
   if (overlayMove) {

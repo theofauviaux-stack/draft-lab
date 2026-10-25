@@ -1,7 +1,7 @@
 {
-  "version": "2.44.4",
-  "sha256": "aa9bdd21246af74125efa0006ab07cb998e1e9aa1fc73fa97dc9d44ca4c8924a",
-  "file": "draftlab-2.44.4.json.gz",
-  "notes": "Panneau en jeu réglable au clavier (plein écran) : flèches, Alt+flèches, + / −",
-  "date": "2026-10-25T17:25:59.946Z"
+  "version": "2.44.5",
+  "sha256": "ae73fae6c49ed54dfcc4b599fdb59eca4b53ba68034a13d0685a44a96d67cb6f",
+  "file": "draftlab-2.44.5.json.gz",
+  "notes": "Mac : réglage du panneau au clavier sans quitter le plein écran",
+  "date": "2026-10-25T17:28:05.775Z"
 }
