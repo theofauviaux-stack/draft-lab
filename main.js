@@ -307,10 +307,11 @@ function createOverlay() {
   if (overlay && !overlay.isDestroyed()) return overlay;
   overlay = new BrowserWindow({
     width: OV_W, height: OV_H, frame: false, transparent: true, alwaysOnTop: true, skipTaskbar: true, resizable: false, focusable: false, hasShadow: false, show: false,
+    // macOS : un « panel » peut flotter au-dessus d'un jeu en plein écran ; Windows : fenêtre outil (hors barre des tâches)
+    type: process.platform === 'darwin' ? 'panel' : 'toolbar', fullscreenable: false,
     webPreferences: { preload: path.join(__dirname, 'src', 'overlay-preload.js'), contextIsolation: true, sandbox: true }
   });
-  overlay.setAlwaysOnTop(true, 'screen-saver');
-  try { overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true }); } catch {}
+  pinOverlay(true);
   overlay.setIgnoreMouseEvents(true, { forward: true });
   overlay.loadFile(path.join(__dirname, 'src', 'overlay.html'));
   overlay.webContents.on('did-finish-load', () => { overlayFit(); if (overlayData) overlay.webContents.send('overlay:update', overlayData); });
@@ -322,9 +323,22 @@ function createOverlay() {
   overlayFit();
   return overlay;
 }
+// Garde le panneau au premier plan, au-dessus du jeu (même en plein écran sur Mac) : le jeu passe parfois
+// devant au lancement ou après un alt-tab, donc on le remet au-dessus toutes les 2 s tant qu'il est affiché.
+let ovPin = null;
+function pinOverlay(first = false) {
+  if (!overlay || overlay.isDestroyed()) return;
+  overlay.setAlwaysOnTop(true, 'screen-saver', 1);
+  // la 1re fois, macOS doit changer le type de l'appli pour autoriser l'affichage au-dessus du plein écran ;
+  // ensuite on le saute (sinon le Dock clignoterait toutes les 2 s)
+  try { overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: !first }); } catch {}
+  if (overlay.isVisible()) overlay.moveTop();
+}
 function showOverlay(on) {
   overlayWanted = !!on;
-  if (on) createOverlay().showInactive(); else if (overlay && !overlay.isDestroyed()) overlay.hide();
+  clearInterval(ovPin); ovPin = null;
+  if (on) { createOverlay().showInactive(); pinOverlay(); ovPin = setInterval(pinOverlay, 2000); }
+  else if (overlay && !overlay.isDestroyed()) overlay.hide();
   if (win && !win.isDestroyed()) win.webContents.send('overlay:state', overlayWanted);
 }
 function moveOverlay() {

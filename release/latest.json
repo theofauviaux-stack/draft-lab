@@ -1,7 +1,7 @@
 {
-  "version": "2.42.0",
-  "sha256": "e0981c13eee3463183d321328eea4adb59cd8458408ab5c4cadcd1d9003d1487",
-  "file": "draftlab-2.42.0.json.gz",
-  "notes": "Direct et panneau en jeu lancés automatiquement dès la sélection des champions ou la partie",
-  "date": "2026-10-25T16:20:29.107Z"
+  "version": "2.42.1",
+  "sha256": "dd9a223453c0d6f638ff0e98f13ef82228685f11873d336a3c091d81470daf0c",
+  "file": "draftlab-2.42.1.json.gz",
+  "notes": "Panneau en jeu : reste au-dessus du jeu (plein écran Mac compris)",
+  "date": "2026-10-25T16:24:21.444Z"
 }
