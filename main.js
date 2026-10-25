@@ -287,22 +287,39 @@ function createWindow() {
 // Les clics la traversent ; Ctrl+Maj+D l'affiche / la masque, Ctrl+Maj+F permet de la déplacer.
 let overlay = null, overlayData = null, overlayMove = false, overlayWanted = false;
 const OV_FILE = () => path.join(app.getPath('userData'), 'overlay.json');
+// Taille proportionnelle à l'écran : le panneau est dessiné pour un écran 1920×1080 (330×470 px) puis mis à
+// l'échelle (zoom) selon l'écran ; sa position est retenue en proportion de l'écran (même place sur tous les écrans).
+const OV_W = 330, OV_H = 470;
+function overlayFit() {
+  if (!overlay || overlay.isDestroyed()) return;
+  const d = screen.getPrimaryDisplay(), { x: X, y: Y, width: W, height: H } = d.bounds;
+  const k = Math.max(0.55, Math.min(2.5, Math.min(W / 1920, H / 1080)));
+  let pos = null; try { pos = JSON.parse(fs.readFileSync(OV_FILE(), 'utf8')); } catch {}
+  const w = Math.round(OV_W * k), h = Math.round(OV_H * k);
+  const rx = pos?.rx ?? (W - w - Math.round(20 * k)) / W, ry = pos?.ry ?? 70 / 1080;
+  const x = Math.round(X + Math.max(0, Math.min(W - w, rx * W))), y = Math.round(Y + Math.max(0, Math.min(H - h, ry * H)));
+  overlay.__fitting = true;
+  overlay.setBounds({ x, y, width: w, height: h });
+  overlay.webContents.setZoomFactor(k);
+  setTimeout(() => { if (overlay && !overlay.isDestroyed()) overlay.__fitting = false; }, 300);
+}
 function createOverlay() {
   if (overlay && !overlay.isDestroyed()) return overlay;
-  const wa = screen.getPrimaryDisplay().workArea;
-  let pos = null; try { pos = JSON.parse(fs.readFileSync(OV_FILE(), 'utf8')); } catch {}
   overlay = new BrowserWindow({
-    width: 330, height: 470, x: pos?.x ?? wa.x + wa.width - 350, y: pos?.y ?? wa.y + 140,
-    frame: false, transparent: true, alwaysOnTop: true, skipTaskbar: true, resizable: false, focusable: false, hasShadow: false, show: false,
+    width: OV_W, height: OV_H, frame: false, transparent: true, alwaysOnTop: true, skipTaskbar: true, resizable: false, focusable: false, hasShadow: false, show: false,
     webPreferences: { preload: path.join(__dirname, 'src', 'overlay-preload.js'), contextIsolation: true, sandbox: true }
   });
   overlay.setAlwaysOnTop(true, 'screen-saver');
   try { overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true }); } catch {}
   overlay.setIgnoreMouseEvents(true, { forward: true });
   overlay.loadFile(path.join(__dirname, 'src', 'overlay.html'));
-  overlay.webContents.on('did-finish-load', () => { if (overlayData) overlay.webContents.send('overlay:update', overlayData); });
-  overlay.on('moved', () => { try { const [x, y] = overlay.getPosition(); fs.writeFileSync(OV_FILE(), JSON.stringify({ x, y })); } catch {} });
+  overlay.webContents.on('did-finish-load', () => { overlayFit(); if (overlayData) overlay.webContents.send('overlay:update', overlayData); });
+  overlay.on('moved', () => {
+    if (overlay.__fitting) return;
+    try { const { x: X, y: Y, width: W, height: H } = screen.getPrimaryDisplay().bounds; const [x, y] = overlay.getPosition(); fs.writeFileSync(OV_FILE(), JSON.stringify({ rx: (x - X) / W, ry: (y - Y) / H })); } catch {}
+  });
   overlay.on('closed', () => { overlay = null; });
+  overlayFit();
   return overlay;
 }
 function showOverlay(on) {
@@ -326,6 +343,8 @@ app.whenReady().then(() => {
     globalShortcut.register('CommandOrControl+Shift+F', moveOverlay);
   } catch {}
   app.on('will-quit', () => { try { globalShortcut.unregisterAll(); } catch {} });
+  // changement d'écran ou de résolution : le panneau garde sa taille et sa place proportionnelles
+  for (const ev of ['display-metrics-changed', 'display-added', 'display-removed']) screen.on(ev, () => setTimeout(overlayFit, 200));
   loadCache();
   ipcMain.handle('data:load', (_e, opts) => quickLoad(opts?.tier ?? lastTier));
   ipcMain.handle('data:refresh', (_e, opts) => sync({ force: true, tier: opts?.tier }));

@@ -1,7 +1,7 @@
 {
-  "version": "2.41.0",
-  "sha256": "05bd90c3d30010104bd0a08007213e03e232228aaf513e5aae4c13b803d68602",
-  "file": "draftlab-2.41.0.json.gz",
-  "notes": "Nouveau : panneau en jeu (plan de match, côtés fort/faible, objectifs) par-dessus le jeu",
-  "date": "2026-10-25T15:57:17.358Z"
+  "version": "2.41.1",
+  "sha256": "f2894cae3b2d05a53aefcf8c2b3a42971fa42d43c840b562089ce2fd76283403",
+  "file": "draftlab-2.41.1.json.gz",
+  "notes": "Panneau en jeu : taille et position proportionnelles à l'écran",
+  "date": "2026-10-25T16:17:36.613Z"
 }
