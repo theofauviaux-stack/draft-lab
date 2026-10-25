@@ -419,18 +419,53 @@ function showOverlay(on) {
   }
   if (win && !win.isDestroyed()) win.webContents.send('overlay:state', overlayWanted);
 }
+// Mode réglage (Ctrl ou Cmd + Maj + F). En plein écran, le jeu garde la souris : on règle donc au clavier,
+// avec des touches actives seulement pendant le réglage :
+//   flèches = déplacer le panneau · Alt + flèches = déplacer le calque de la mini-carte
+//   + / − = taille du calque · Entrée ou Ctrl/Cmd + Maj + F = terminer. (La souris marche aussi hors plein écran.)
+const MOVE_KEYS = [];
+function nudge(w, dx, dy, grow = 0) {
+  if (!w || w.isDestroyed()) return;
+  const d = screen.getPrimaryDisplay().bounds, step = Math.round(Math.min(d.width, d.height) * 0.015);
+  const b = w.getBounds();
+  const nb = { x: b.x + dx * step, y: b.y + dy * step, width: b.width + grow * step, height: b.height + grow * step };
+  if (w === overlay) { nb.width = b.width; nb.height = b.height; }
+  nb.width = Math.max(60, nb.width); nb.height = Math.max(60, nb.height);
+  if (grow) { nb.x = b.x + b.width - nb.width; nb.y = b.y + b.height - nb.height; } // le calque grandit depuis le coin de la mini-carte
+  nb.x = Math.max(d.x, Math.min(d.x + d.width - nb.width, nb.x)); nb.y = Math.max(d.y, Math.min(d.y + d.height - nb.height, nb.y));
+  w.setBounds(nb);
+  saveOverlayPos();
+}
+function saveOverlayPos() {
+  try {
+    const { x: X, y: Y, width: W, height: H } = screen.getPrimaryDisplay().bounds;
+    if (overlay && !overlay.isDestroyed()) { const [x, y] = overlay.getPosition(); fs.writeFileSync(OV_FILE(), JSON.stringify({ rx: (x - X) / W, ry: (y - Y) / H })); }
+    if (mini && !mini.isDestroyed()) { const bb = mini.getBounds(); fs.writeFileSync(MINI_FILE(), JSON.stringify({ rx: (bb.x - X) / W, ry: (bb.y - Y) / H, rw: bb.width / W })); }
+  } catch {}
+}
 function moveOverlay() {
   if (!overlay || overlay.isDestroyed() || !overlay.isVisible()) return;
   overlayMove = !overlayMove;
   overlay.setIgnoreMouseEvents(!overlayMove, { forward: true });
   overlay.setFocusable(overlayMove);
   overlay.webContents.send('overlay:move', overlayMove);
-  // le calque de la mini-carte se déplace et se redimensionne en même temps (ajustement sur la vraie mini-carte)
+  // le calque de la mini-carte se règle en même temps (ajustement sur la vraie mini-carte)
   if (mini && !mini.isDestroyed()) {
     mini.setIgnoreMouseEvents(!overlayMove, { forward: true });
     mini.setFocusable(overlayMove); mini.setResizable(overlayMove);
     mini.webContents.send('overlay:move', overlayMove);
   }
+  for (const k of MOVE_KEYS.splice(0)) { try { globalShortcut.unregister(k); } catch {} }
+  if (overlayMove) {
+    const reg = (k, fn) => { try { if (globalShortcut.register(k, fn)) MOVE_KEYS.push(k); } catch {} };
+    for (const [key, dx, dy] of [['Left', -1, 0], ['Right', 1, 0], ['Up', 0, -1], ['Down', 0, 1]]) {
+      reg(key, () => nudge(overlay, dx, dy));
+      reg(`Alt+${key}`, () => nudge(mini, dx, dy));
+    }
+    for (const k of ['Plus', '=', 'numadd']) reg(k, () => nudge(mini, 0, 0, 1));
+    for (const k of ['-', 'numsub']) reg(k, () => nudge(mini, 0, 0, -1));
+    reg('Return', moveOverlay); reg('Escape', moveOverlay);
+  } else saveOverlayPos();
 }
 
 app.whenReady().then(() => {

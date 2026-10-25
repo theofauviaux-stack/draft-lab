@@ -5,7 +5,7 @@ const MINI = location.search.includes('mini');
 document.getElementById('ovcss').textContent = OVERLAY_CSS;
 let data = null;
 const draw = () => { document.getElementById('root').innerHTML = MINI ? minimapLayerHtml(data) : overlayHtml(data); };
-if (MINI) { document.body.classList.add('mini'); document.querySelector('.mv').textContent = 'Ajuste le calque sur la mini-carte (glisser, coin pour la taille) puis Ctrl+Maj+F'; }
+if (MINI) { document.body.classList.add('mini'); document.querySelector('.mv').textContent = 'Calque : Alt + flèches = déplacer · + / − = taille · Entrée = terminer'; }
 window.overlay?.onUpdate((d) => { data = d; draw(); });
 window.overlay?.onMove((on) => document.body.classList.toggle('move', on));
 draw(); setInterval(draw, 1000);

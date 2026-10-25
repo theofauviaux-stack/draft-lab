@@ -45,7 +45,7 @@ export function overlayHtml(d, now = Date.now()) {
     <div class="ov-sec">Objectifs</div>
     <div class="ov-objs">${objs}</div>
     ${d.me ? `<div class="ov-sec">Ta lane · ${esc(d.me.name)}${d.me.vs ? ` contre ${esc(d.me.vs)}` : ''}</div><p class="ov-tip">${esc(d.me.tip ?? '')}</p>` : ''}
-    <div class="ov-f">Ctrl+Maj+D masquer · Ctrl+Maj+F déplacer</div>
+    <div class="ov-f">Ctrl/Cmd+Maj+D masquer · Ctrl/Cmd+Maj+F régler la place</div>
   </div>`;
 }
 

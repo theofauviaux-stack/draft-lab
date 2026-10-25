@@ -2001,7 +2001,7 @@ function overlayDemo() {
 function toggleOverlay() {
   if (!api.overlayShow) { overlayDemo(); return; }
   ovSig = ''; pushOverlay();
-  api.overlayShow(!ovOpen).then((on) => { ovOpen = on; toast(on ? 'Panneau en jeu affiché (Ctrl+Maj+D pour le masquer, Ctrl+Maj+F pour le déplacer)' : 'Panneau en jeu masqué'); });
+  api.overlayShow(!ovOpen).then((on) => { ovOpen = on; toast(on ? 'Panneau en jeu affiché (Ctrl ou Cmd + Maj + D pour le masquer, + F pour régler sa place au clavier)' : 'Panneau en jeu masqué'); });
 }
 // Lancement automatique : dès qu'une sélection des champions ou une partie est détectée sur cet ordinateur,
 // le direct démarre tout seul (et le panneau en jeu s'ouvre au début de la partie). Si tu arrêtes le direct
