@@ -332,9 +332,9 @@ function pinOverlay(first = false) {
   overlay.setAlwaysOnTop(true, 'screen-saver', 1);
   // la 1re fois, macOS doit changer le type de l'appli pour autoriser l'affichage au-dessus du plein écran ;
   // ensuite on le saute (sinon le Dock clignoterait toutes les 2 s)
-  try { overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: !first }); } catch {}
+  try { overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true }); } catch {}
   if (overlay.isVisible()) overlay.moveTop();
-  if (mini && !mini.isDestroyed() && mini.isVisible()) { mini.setAlwaysOnTop(true, 'screen-saver', 1); mini.moveTop(); }
+  if (mini && !mini.isDestroyed() && mini.isVisible()) { mini.setAlwaysOnTop(true, 'screen-saver', 1); try { mini.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true }); } catch {} mini.moveTop(); }
 }
 // ---- Calque sur la mini-carte du jeu : posé d'après les réglages du jeu (taille de la mini-carte, à gauche
 // ou à droite), ajustable à la main (Ctrl+Maj+F) ; la place choisie est retenue en proportion de l'écran ----
@@ -383,8 +383,22 @@ function createMini() {
 function showOverlay(on) {
   overlayWanted = !!on;
   clearInterval(ovPin); ovPin = null;
-  if (on) { createOverlay().showInactive(); createMini().showInactive(); pinOverlay(); ovPin = setInterval(pinOverlay, 2000); }
-  else { if (overlay && !overlay.isDestroyed()) overlay.hide(); if (mini && !mini.isDestroyed()) mini.hide(); }
+  // macOS : le jeu en plein écran a son propre espace (Space). Une fenêtre ne peut s'y afficher que si l'appli
+  // est un « accessoire » (sans icône dans le Dock) : on passe dans ce mode le temps de la partie, puis on revient.
+  const mac = process.platform === 'darwin';
+  if (on) {
+    if (mac) { try { app.setActivationPolicy('accessory'); } catch {} }
+    createOverlay(); createMini();
+    for (const w of [overlay, mini]) {
+      w.setAlwaysOnTop(true, 'screen-saver', 1);
+      try { w.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true }); } catch {}
+      w.showInactive();
+    }
+    pinOverlay(); ovPin = setInterval(pinOverlay, 2000);
+  } else {
+    if (overlay && !overlay.isDestroyed()) overlay.hide(); if (mini && !mini.isDestroyed()) mini.hide();
+    if (mac) { try { app.setActivationPolicy('regular'); app.dock?.show(); } catch {} }
+  }
   if (win && !win.isDestroyed()) win.webContents.send('overlay:state', overlayWanted);
 }
 function moveOverlay() {
