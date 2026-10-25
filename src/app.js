@@ -2,7 +2,7 @@ import { teamSynergy, KINDS } from './synergy.js';
 import { detectSlots, matchBanner } from './shotauto.js';
 import {
   ROLES, ROLE_LABEL, ARCH, ORDER, rel, relText, laneEdge, proEdge, LANE_OPP,
-  buildProfiles, evaluate, setDetailSource, setDataTierLabel, dataTierLabel, botDuel, applyProGames, proInfo, recommend, recommendBans, projectPicks, gamePlan, powerCurve,
+  buildProfiles, evaluate, liveGameState, setDetailSource, setDataTierLabel, dataTierLabel, botDuel, applyProGames, proInfo, recommend, recommendBans, projectPicks, gamePlan, powerCurve,
   comfortPts, proposeDrafts, playerLabel, rankName, analyzeDraft, matchPlan, pentagonView, styleBreakdown, compLabel, playersForecast, combineWr, pointsLabel, rankPoints, RANK_OPTIONS, playerRating, dominant, teamShares, predictPicks, enemyScenarios, predictedBans
 } from './engine.js';
 import { overlayHtml, OVERLAY_CSS } from './overlayview.js';
@@ -1356,6 +1356,7 @@ function liveSnapshot(d) {
 }
 // la partie (ou la sélection) est finie : on archive et on nettoie l'écran
 function liveEndGame(d) {
+  LIVE.stats = null; LIVE.obj = null; LIVE.liveSig = '';
   if (LIVE.ovAuto) { api.overlayShow?.(false); LIVE.ovAuto = false; } LIVE.time = null; LIVE.timeAt = null;
   if (LIVE.game) {
     histUpsert({ ...LIVE.game, result: d.result ?? LIVE.game.result ?? null, gameId: LIVE.game.gameId ?? d.gameId ?? null });
@@ -1428,6 +1429,16 @@ function startLiveMode() {
 function stopLiveMode() { LIVE.suppress = true; LIVE.on = false; api.liveStop?.(); $('liveBar').hidden = true; $('liveReco').hidden = true; $('liveMode').hidden = true; document.body.classList.remove('q-flex'); render(); }
 function onLive(d) {
   if (!LIVE.on) return;
+  // état de la partie (scores, objets, objectifs) : le plan s'adapte au fil de la partie
+  if (d.live && d.teams) {
+    const st = {};
+    for (const side of ['blue', 'red']) (d.teams[side] ?? []).forEach((m, i) => {
+      const id = m.champKey ? champByName(m.champKey) ?? champByName(m.champName) : champByKey(m.champ);
+      if (id && d.live[side]?.[i]) st[id] = d.live[side][i];
+    });
+    const sig2 = JSON.stringify([st, d.live.obj]);
+    if (sig2 !== LIVE.liveSig) { LIVE.liveSig = sig2; LIVE.stats = st; LIVE.obj = d.live.obj; setTimeout(() => { if (state.data) { renderAdvice(); ovSig = ''; pushOverlay(); } }, 0); }
+  }
   // horloge de la partie pour le panneau en jeu ; il s'ouvre tout seul au début de la partie
   if (d.phase === 'InProgress' && d.time != null) {
     LIVE.time = d.time; LIVE.timeAt = Date.now();
@@ -1907,15 +1918,42 @@ function miniMap(mp, myJ, side = state.mySide) {
   return themed(`<svg viewBox="0 0 220 220" class="minimap"><defs><marker id="jarr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0L10,5L0,10z" fill="#1f2937"/></marker></defs>${s}</svg>`);
 }
 
+// ---------- État de la partie en direct (tableau des scores : score, niveau, objets, objectifs) ----------
+function liveState() {
+  if (!LIVE.on || !LIVE.stats) return null;
+  const me = state.mySide, them = me === 'blue' ? 'red' : 'blue';
+  const mine = roster(me), theirs = roster(them);
+  if (!mine.length || !theirs.length) return null;
+  const mp = matchPlan(mine, theirs);
+  return liveGameState({ mine, theirs, stats: LIVE.stats, obj: LIVE.obj, mySide: me, mp, time: LIVE.time ?? 0 });
+}
+function liveStateHtml(ls) {
+  const k = (n) => `${n >= 0 ? '+' : '−'}${(Math.abs(n) / 1000).toFixed(1).replace('.', ',')} k`;
+  return `<div class="lgs"><div class="lgs-h"><b>Plan adapté à la partie</b>
+    <span class="${ls.goldDiff >= 0 ? 'up' : 'down'}">${k(ls.goldDiff)} or</span><span>⚔ ${ls.kills[0]}-${ls.kills[1]}</span><span>🐉 ${ls.drakes[0]}-${ls.drakes[1]}</span><span>🏰 ${ls.towers[0]}-${ls.towers[1]}</span></div>
+    <ul>${ls.advice.map((t) => `<li>${t}</li>`).join('')}</ul></div>`;
+}
+
 // ---------- Panneau en jeu (overlay) ----------
 // Infos connues avant la partie ou visibles par tous : plan de match, côtés fort / faible, priorités d'objectifs.
 const strip = (t) => String(t ?? '').replace(/<[^>]+>/g, '');
 // une phrase courte pour le panneau : sans parenthèses, coupée à la première phrase (120 caractères max)
+// pour l'état de la partie : on garde les parenthèses (score, or), seulement la 1re phrase
+const short = (t) => { let x = strip(t).split(/(?<=[.!])\s/)[0].trim(); if (x.length > 140) x = x.slice(0, 138).replace(/\s\S*$/, '') + '…'; return x; };
 const brief = (t) => { let x = strip(t).replace(/\s*\([^)]*\)/g, '').split(/(?<=[.!])\s/)[0].trim(); if (x.length > 120) x = x.slice(0, 118).replace(/\s\S*$/, '') + '…'; return x; };
 function myLaneRole() {
   const me = state.mySide;
   if (LIVE.myChamp) { const i = state.slots[me].indexOf(LIVE.myChamp); if (i >= 0) return state.roles[me][i]; }
   return state.roles[me].find((r, i) => state.slots[me][i] && r === 'M') ? 'M' : state.roles[me].find((r, i) => state.slots[me][i]) ?? null;
+}
+// conseil de lane d'après l'or réel (objets) face au vis-à-vis, pendant la partie
+function liveLaneTip(L, opp) {
+  const ls = L ? liveState() : null; const g = ls?.lanes?.[L]?.gold;
+  if (g == null) return null;
+  const amt = `${(Math.abs(g) / 1000).toFixed(1).replace('.', ',')} k or`, LN = { T: 'Top', M: 'Mid', B: 'Bot' }[L], vs = opp ? ` sur ${opp.name}` : '';
+  if (g >= 700) return `${LN} : ${amt} d’avance${vs}. Options : garder la prio pour le jungler, roam ou prendre des plaques.`;
+  if (g <= -700) return `${LN} : ${amt} de retard${vs}. Options : farm près de ta tour, éviter les trades longs, demander une couverture du jungler.`;
+  return `${LN} : lane à égalité${vs} : joue les timings de vague et les objectifs proches.`;
 }
 function overlayPayload() {
   const me = state.mySide, them = me === 'blue' ? 'red' : 'blue';
@@ -1933,10 +1971,11 @@ function overlayPayload() {
   return {
     wr, strong: mp.strongSide ? { T: 'top', M: 'mid', B: 'bot' }[mp.strongSide] : null,
     lanes: Object.fromEntries(['T', 'M', 'B'].map((k) => [k, { state: mp.lanes[k].state }])),
-    obj: { drake: mp.drake.simple, grubs: mp.grubs.simple, herald: mp.herald.simple?.[1]?.length > 16 ? [mp.herald.simple[0], 'Si prio mid'] : mp.herald.simple, baron },
+    obj: { drake: (() => { const ls = liveState(); return ls?.drakes?.[1] >= 3 && ls.drakes[1] < 4 ? ['high', 'Contester (âme)'] : ls?.drakes?.[0] >= 3 && ls.drakes[0] < 4 ? ['high', 'Prendre l’âme'] : mp.drake.simple; })(), grubs: mp.grubs.simple, herald: mp.herald.simple?.[1]?.length > 16 ? [mp.herald.simple[0], 'Si prio mid'] : mp.herald.simple, baron },
     phases: mp.phases.map((p) => ({ name: p.name, range: p.range, diff: p.diff, tip: brief(p.items.find((t) => !/^Côté fort/.test(strip(t))) ?? p.items[0]) })),
-    me: myC ? { name: myC.name, vs: opp?.name ?? null, tip: tip ?? null } : null,
+    me: myC ? { name: myC.name, vs: opp?.name ?? null, tip: liveLaneTip(L, opp) ?? tip ?? null } : null,
     side: me, jg: mine.some((x) => x.role === 'J'),
+    live: (() => { const ls = liveState(); return ls ? { gd: ls.goldDiff, kills: ls.kills, drakes: ls.drakes, towers: ls.towers, lanes: Object.fromEntries(Object.entries(ls.lanes).map(([k2, v]) => [k2, { state: v.state }])), advice: ls.advice.slice(0, 3).map(short) } : null; })(),
     time: LIVE.time ?? null, at: LIVE.timeAt ?? null
   };
 }
@@ -2030,7 +2069,8 @@ function renderAdvice() {
         <div class="pv-c" style="--a:${pv.alt ? ARCH[pv.alt.arch].color : 'var(--line)'}"><span class="pv-i">🔀</span><h5>${pv.alt ? `Plan B : ${ARCH[pv.alt.arch].label}` : 'Plan B'}</h5><p>${pv.alt ? `${Math.round(pv.alt.share * 100)} % de ta compo · ${pv.alt.rel} face à leur compo. ${pv.alt.how}` : 'Pas de second style assez présent : reste sur ton plan principal.'}</p></div>
         <div class="pv-c" style="--a:${ARCH[pv.vs.arch].color}"><span class="pv-i">🛡</span><h5>Face à leur compo ${ARCH[pv.vs.arch].label}</h5><p>${pv.vs.how.replace(/^face à une compo [^:]+: /, '').replace(/^./, (x) => x.toUpperCase())}</p></div>
       </div></div>`;
-  $('advice').innerHTML = `
+  const ls = liveState();
+  $('advice').innerHTML = `${ls ? liveStateHtml(ls) : ''}
     <div class="pl-top">
       <div class="pl-map">${miniMap(mp, myJ)}<div class="pl-lanes">${['T', 'M', 'B'].map(laneRow).join('')}</div></div>
       <div class="pl-jgl"><h4>Jungle et côtés</h4>${mp.jungle.items.map((t) => `<p>${t}</p>`).join('') || '<p class="muted">Choisis ton jungler.</p>'}

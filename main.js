@@ -290,7 +290,7 @@ let overlay = null, overlayData = null, overlayMove = false, overlayWanted = fal
 const OV_FILE = () => path.join(app.getPath('userData'), 'overlay.json');
 // Taille proportionnelle à l'écran : le panneau est dessiné pour un écran 1920×1080 (330×470 px) puis mis à
 // l'échelle (zoom) selon l'écran ; sa position est retenue en proportion de l'écran (même place sur tous les écrans).
-const OV_W = 330, OV_H = 470;
+const OV_W = 330, OV_H = 600;
 function overlayFit() {
   if (!overlay || overlay.isDestroyed()) return;
   const d = screen.getPrimaryDisplay(), { x: X, y: Y, width: W, height: H } = d.bounds;

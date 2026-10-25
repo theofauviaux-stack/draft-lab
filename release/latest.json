@@ -1,7 +1,7 @@
 {
-  "version": "2.43.0",
-  "sha256": "cee5b532a683e18a7d1e3cb9c001899c177d8b8e875113ab89edcf9a26345ab6",
-  "file": "draftlab-2.43.0.json.gz",
-  "notes": "Calque sur la mini-carte du jeu (placé d'après les réglages du jeu) ; mini-carte du plan orientée selon ton côté",
-  "date": "2026-10-25T16:44:10.952Z"
+  "version": "2.44.0",
+  "sha256": "1609786b433bd8e0dcafe7515770d224dd2d0209f5fcf941f89feb16b005a5bb",
+  "file": "draftlab-2.44.0.json.gz",
+  "notes": "Plan de jeu adapté à l'état de la partie : or, joueurs en avance ou en retard, menace, drakes",
+  "date": "2026-10-25T16:52:32.240Z"
 }
