@@ -848,6 +848,8 @@ details.box > summary, .scal summary { cursor: pointer; }
 .sl-row { display: grid; grid-template-columns: 22px 30px 1fr auto 82px; gap: 6px; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
 .sl-row.empty { grid-template-columns: 22px 1fr; }
 .sl-r { color: var(--muted); font-weight: 700; font-size: 11.5px; }
+.sl-nm { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sl-pseudo { width: 100%; max-width: 150px; font-size: 11px; padding: 2px 5px; border-radius: 5px; border: 1px solid var(--line); background: var(--panel-2); color: var(--muted, var(--text)); }
 .sl-row > img { width: 30px; height: 30px; border-radius: 6px; }
 .sl-alt { display: flex; gap: 3px; } .sl-alt img { width: 22px; height: 22px; border-radius: 4px; opacity: .65; cursor: pointer; } .sl-alt img:hover { opacity: 1; outline: 2px solid var(--gold); }
 .sl-in { width: 82px; font-size: 11px; padding: 3px 5px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); }

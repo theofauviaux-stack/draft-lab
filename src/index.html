@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'self'; img-src 'self' https://ddragon.leagueoflegends.com data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src https://ddragon.leagueoflegends.com" />
+    content="default-src 'self'; img-src 'self' https://ddragon.leagueoflegends.com data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' https://cdn.jsdelivr.net blob: 'wasm-unsafe-eval'; worker-src blob: https://cdn.jsdelivr.net; connect-src https://ddragon.leagueoflegends.com https://cdn.jsdelivr.net" />
   <title>Draft Lab</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -187,7 +187,7 @@
         <button id="startShot" class="st-card shot">
           <span class="st-ic">📷</span>
           <b>Depuis une capture</b>
-          <span class="st-desc">Tableau de fin de game ou écran d’un drafter : les 10 champions (et les bans) sont repérés et reconnus automatiquement.</span>
+          <span class="st-desc">Fin de game, drafter ou partie en cours : les 10 champions (et les bans) sont reconnus automatiquement, et en partie les pseudos aussi.</span>
           <span class="st-go">Importer une capture →</span>
         </button>
         <button id="startBalance" class="st-bar">
@@ -252,8 +252,8 @@
   <div id="laneAsk" class="laneask" hidden></div>
   <div id="shotBox" class="shotbox" hidden>
     <div class="shot-card">
-      <div class="shot-head"><b>📷 Draft depuis une capture (fin de game ou drafter)</b><button id="shotClose" class="tb-icon" title="Fermer">✕</button></div>
-      <p class="muted" id="shotHelp">Choisis, glisse ou colle (Ctrl/Cmd + V) une capture : tableau de fin de game ou écran d’un drafter.</p>
+      <div class="shot-head"><b>📷 Draft depuis une capture (fin de game, drafter ou partie en cours)</b><button id="shotClose" class="tb-icon" title="Fermer">✕</button></div>
+      <p class="muted" id="shotHelp">Choisis, glisse ou colle (Ctrl/Cmd + V) une capture : tableau de fin de game, écran d’un drafter ou partie en cours.</p>
       <div class="shot-main">
         <div class="shot-img" id="shotDrop">
           <div class="shot-empty" id="shotEmpty">
@@ -268,7 +268,7 @@
         </div>
         <div class="shot-list" id="shotList"></div>
       </div>
-      <div class="shot-foot"><button id="shotUndo">↶ Retirer le dernier</button><span class="muted" id="shotState"></span><button id="shotGo" class="primary" disabled>Analyser cette draft</button></div>
+      <div class="shot-foot"><button id="shotUndo">↶ Retirer le dernier</button><span class="muted" id="shotState"></span><button id="shotBal" hidden>Équilibrer ces joueurs</button><button id="shotGo" class="primary" disabled>Analyser cette draft</button></div>
     </div>
   </div>
   <datalist id="champList"></datalist>

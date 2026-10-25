@@ -1,7 +1,7 @@
 {
-  "version": "2.45.0",
-  "sha256": "b05184ff60ee3f3cb4e5fa040109c066bfc43bc9b3ff184ff10cded5d0c07610",
-  "file": "draftlab-2.45.0.json.gz",
-  "notes": "Retour à l'application de base : panneau en jeu (overlay) retiré",
-  "date": "2026-10-25T17:41:32.242Z"
+  "version": "2.46.0",
+  "sha256": "7efe7f4b58234df58d8af44865a9f79b595b436e38577ee94ee5855fcd44ac84",
+  "file": "draftlab-2.46.0.json.gz",
+  "notes": "Capture d'une partie en cours : 10 champions et pseudos lus automatiquement, joueurs chargés depuis op.gg ou envoyés à l'équilibrage",
+  "date": "2026-10-25T20:53:08.651Z"
 }

@@ -1,5 +1,6 @@
 import { teamSynergy, KINDS } from './synergy.js';
 import { detectSlots, matchBanner } from './shotauto.js';
+import { lineCanvas, readLines } from './ocr.js';
 import {
   ROLES, ROLE_LABEL, ARCH, ORDER, rel, relText, laneEdge, proEdge, LANE_OPP,
   buildProfiles, evaluate, setDetailSource, setDataTierLabel, dataTierLabel, botDuel, applyProGames, proInfo, recommend, recommendBans, projectPicks, gamePlan, powerCurve,
@@ -1631,6 +1632,56 @@ function matchGray(b, exclude) {
   }
   return [...best.entries()].sort((p, q) => q[1] - p[1]).slice(0, 4).map(([id]) => id);
 }
+// Capture en jeu (spectateur / replay) : 5 portraits collés au bord gauche (bleu) et 5 au bord droit (rouge),
+// le pseudo au-dessus de chacun. Les positions suivent la hauteur de l'écran et l'échelle de l'interface
+// du jeu : on essaie plusieurs échelles et on garde celle où les 10 cases ressemblent le plus à des portraits.
+const IG = { x: 0.0484, y: 0.165, step: 0.0955, size: 0.035 }; // en fraction de la hauteur, échelle d'interface 100 %
+function igBoxes(W, H, g, dy = 0) {
+  const s = IG.size * H * g;
+  return [0, 1].map((t) => [0, 1, 2, 3, 4].map((k) => {
+    const cx = t ? W - IG.x * H * g : IG.x * H * g, cy = (IG.y + k * IG.step) * H * g + dy * H;
+    return { kind: 'sq', cx, cy, w: s, h: s, side: t };
+  }));
+}
+function detectIngame(img) {
+  const W = img.width, H = img.height;
+  if (W / H < 1.2 || W / H > 2.5) return null;
+  const z1 = SHOT.icons.filter((ic) => ic.z === 0.6);
+  const corr = (v, u) => { let c = 0; for (let j = 0; j < v.length; j++) c += v[j] * u[j]; return c / v.length; };
+  const boxScore = (b) => {
+    let best = -1;
+    for (const ox of [-0.12, 0, 0.12]) for (const oy of [-0.12, 0, 0.12]) {
+      const w = b.w * 0.6, v = iconVec(img, b.cx + ox * b.w - w / 2, b.cy + oy * b.w - w / 2, w, w);
+      if (v.sd < 6) continue;
+      for (const ic of z1) { const c = corr(v, ic.v); if (c > best) best = c; }
+    }
+    return best;
+  };
+  let top = null;
+  for (let g = 0.6; g <= 1.501; g += 0.05) for (const dy of [-0.01, 0, 0.01]) {
+    const boxes = igBoxes(W, H, g, dy).flat();
+    if (boxes.some((b) => b.cy + b.h / 2 > H)) continue;
+    const sc = boxes.reduce((a, b) => a + boxScore(b), 0) / 10;
+    if (!top || sc > top.sc) top = { sc, g, dy };
+  }
+  if (!top || top.sc < 0.45) return null;
+  // affinage de l'échelle autour de la meilleure
+  for (let g = top.g - 0.04; g <= top.g + 0.041; g += 0.02) for (const dy of [top.dy - 0.004, top.dy, top.dy + 0.004]) {
+    const sc = igBoxes(W, H, g, dy).flat().reduce((a, b) => a + boxScore(b), 0) / 10;
+    if (sc > top.sc) top = { sc, g, dy };
+  }
+  return { picks: igBoxes(W, H, top.g, top.dy), bans: null, ingame: top };
+}
+// Pseudos au-dessus des portraits (aligné à gauche pour le bleu, à droite pour le rouge)
+async function readIngameNames(img, det) {
+  const H = img.height, g = det.ingame.g;
+  const lines = det.picks.flat().map((b) => {
+    const wTxt = 0.14 * H * g, y0 = b.cy - b.h / 2 - 0.026 * H * g, hTxt = 0.022 * H * g;
+    return lineCanvas(img, b.side ? img.width - wTxt : 0, y0, wTxt, hTxt);
+  });
+  return readLines(lines);
+}
+
 // Analyse sans clic : repérage des cases puis reconnaissance de chacune
 async function autoShot() {
   const run = ++SHOT.run;
@@ -1639,9 +1690,14 @@ async function autoShot() {
   await new Promise((r) => setTimeout(r, 30));
   let det = null;
   try { det = detectSlots(SHOT.img); } catch (e) { console.warn(e); }
+  await loadIcons();
+  if (!det) {
+    st('Recherche des portraits de la partie en cours…'); await new Promise((r) => setTimeout(r, 0));
+    try { det = detectIngame(SHOT.img); } catch (e) { console.warn(e); }
+    if (run !== SHOT.run) return;
+  }
   SHOT.det = det;
   if (!det) { st(''); SHOT.auto = 'fail'; renderShotList(); return; }
-  await loadIcons();
   const boxes = det.picks.flat(), taken = new Set();
   SHOT.clicks = [];
   for (let k = 0; k < boxes.length; k++) {
@@ -1660,6 +1716,14 @@ async function autoShot() {
     const seen = new Set(taken);
     SHOT.bans = det.bans.flat().map((b) => { const alts = matchGray(b, seen); if (alts[0]) seen.add(alts[0]); return { x: b.cx, y: b.cy, id: alts[0], alts, box: b }; });
   }
+  if (det.ingame) {
+    st('Lecture des pseudos…');
+    try {
+      const names = await readIngameNames(SHOT.img, det);
+      if (run !== SHOT.run) return;
+      names.forEach((n, k) => { if (SHOT.clicks[k] && n) SHOT.clicks[k].name = n; });
+    } catch (e) { toast('Pseudos non lus : ' + e.message); }
+  }
   SHOT.auto = 'ok'; st(''); drawShot(); renderShotList();
 }
 function drawShot() {
@@ -1671,17 +1735,22 @@ function renderShotList() {
   const n = SHOT.clicks.length;
   $('shotHelp').innerHTML = !SHOT.img ? 'Choisis, glisse ou colle (Ctrl/Cmd + V) une capture : les champions sont repérés et reconnus automatiquement.'
     : !SHOT.auto ? 'Analyse de l’image en cours : les champions sont repérés et reconnus automatiquement…'
+    : n === 10 && SHOT.det?.ingame ? 'Partie en cours : les 10 champions et les pseudos ont été lus automatiquement. Vérifie la liste à droite (champion : autre choix ou nom tapé ; pseudo : corrige-le si besoin), puis lance l’analyse : les joueurs sont chargés depuis op.gg.'
     : n === 10 ? 'Les 10 champions ont été reconnus automatiquement. Vérifie la liste à droite : si un champion est faux, clique sur un autre choix proposé ou tape son nom, puis lance l’analyse.'
     : SHOT.auto === 'fail' && !n ? 'Les champions n’ont pas pu être repérés automatiquement sur cette image : <b>clique sur chaque portrait</b>, équipe bleue d’abord (l’ordre des lanes n’a pas d’importance).'
     : `Il manque ${10 - n} champion${10 - n > 1 ? 's' : ''} : clique sur le portrait d’un champion de l’<b>${n < 5 ? 'équipe 1 (bleue)' : 'équipe 2 (rouge)'}</b> pour le reconnaître.`;
   $('shotList').innerHTML = [0, 1].map((t) => `<div class="sl-team ${t ? 'r' : 'b'}"><h5>${t ? 'Équipe 2 · rouge' : 'Équipe 1 · bleu'}</h5>${ROLES.map((r, k) => {
     const c = SHOT.clicks[t * 5 + k];
-    return `<div class="sl-row ${c ? '' : 'empty'}"><span class="sl-r">${k + 1}</span>${c ? `<img src="${img(c.id)}" alt=""><b>${state.P[c.id]?.name ?? c.id}</b>
+    return `<div class="sl-row ${c ? '' : 'empty'}"><span class="sl-r">${k + 1}</span>${c ? `<img src="${img(c.id)}" alt=""><span class="sl-nm"><b>${state.P[c.id]?.name ?? c.id}</b>${SHOT.det?.ingame ? `<input class="sl-pseudo" data-k="${t * 5 + k}" value="${String(c.name ?? '').replace(/"/g, '&quot;')}" placeholder="pseudo" title="Pseudo lu sur l’image (modifiable)">` : ''}</span>
       <span class="sl-alt">${c.alts.filter((a) => a !== c.id).slice(0, 3).map((a) => `<img src="${img(a)}" title="${state.P[a]?.name}" data-k="${t * 5 + k}" data-id="${a}">`).join('')}</span>
       <input class="sl-in" data-k="${t * 5 + k}" list="champList" placeholder="autre…">` : '<span class="muted">—</span>'}</div>`;
   }).join('')}</div>`).join('') + (SHOT.bans ? `<div class="sl-bans"><h5>Bans repérés</h5>${[0, 1].map((t) => `<span class="${t ? 'r' : 'b'}">${SHOT.bans.slice(t * 5, t * 5 + 5).map((b) => (b.id ? `<img src="${img(b.id)}" title="${state.P[b.id]?.name}">` : '<i></i>')).join('')}</span>`).join('')}<button class="sl-noban" id="shotNoBans">ignorer</button></div>` : '');
   $('shotNoBans') && ($('shotNoBans').onclick = () => { SHOT.bans = null; drawShot(); renderShotList(); });
   $('shotList').querySelectorAll('.sl-alt img').forEach((im) => (im.onclick = () => { const c = SHOT.clicks[+im.dataset.k]; c.alts = [im.dataset.id, ...c.alts.filter((a) => a !== im.dataset.id)]; c.id = im.dataset.id; renderShotList(); }));
+  $('shotList').querySelectorAll('.sl-pseudo').forEach((inp) => (inp.onchange = () => { SHOT.clicks[+inp.dataset.k].name = inp.value.trim(); }));
+  const names = SHOT.clicks.filter((c) => c.name).length;
+  $('shotBal').hidden = !(SHOT.det?.ingame && names);
+  $('shotBal').textContent = `Équilibrer ces ${names} joueurs`;
   $('shotList').querySelectorAll('.sl-in').forEach((inp) => (inp.onchange = () => { const ch = findChamp(inp.value); if (ch) { SHOT.clicks[+inp.dataset.k].id = ch.id; renderShotList(); } }));
   $('shotGo').disabled = n < 10;
   $('shotUndo').disabled = !n;
@@ -1714,7 +1783,15 @@ function applyShot() {
   // Rôles déduits uniquement des champions reconnus sur l'image (jamais des pseudos)
   assignRoles('blue'); assignRoles('red');
   for (const [t, side] of ['blueBans', 'redBans'].entries()) state.slots[side] = SHOT.bans ? SHOT.bans.slice(t * 5, t * 5 + 5).map((b) => b.id ?? NO_BAN) : Array(5).fill(NO_BAN);
-  state.flow = state.flow === 'players' ? 'players' : 'zero';
+  // capture en jeu : pseudos lus sur l'image → joueurs chargés depuis op.gg (elo, champions joués)
+  const pseudo = (t) => SHOT.clicks.slice(t * 5, t * 5 + 5).map((c) => c.name).filter(Boolean);
+  const withNames = SHOT.det?.ingame && pseudo(0).length + pseudo(1).length > 0;
+  state.flow = withNames || state.flow === 'players' ? 'players' : 'zero';
+  if (withNames) {
+    state.players = { blue: [], red: [] };
+    $('opggBlue').value = pseudo(0).join(', '); $('opggRed').value = pseudo(1).join(', ');
+    Promise.all([loadTeam('blue'), loadTeam('red')]).then(() => { $('playersBox').open = true; });
+  }
   $('shotBox').hidden = true; closeMenu(); render();
   // seule question possible : qui est top et qui est mid, quand les deux champions jouent les deux lanes
   const ask = ['blue', 'red'].filter(topMidAmbiguous);
@@ -1798,6 +1875,13 @@ function initShot() {
   };
   $('shotUndo').onclick = () => { SHOT.run++; SHOT.clicks.pop(); $('shotState').textContent = ''; drawShot(); renderShotList(); };
   $('shotGo').onclick = applyShot;
+  // les pseudos lus sur une capture en jeu partent vers l'équilibrage d'équipes
+  $('shotBal').onclick = () => {
+    const names = SHOT.clicks.map((c) => c.name).filter(Boolean);
+    $('shotBox').hidden = true;
+    openBalance('manual');
+    balSearch(names.join('\n'));
+  };
 }
 
 // ---------- Drafts sauvegardées ----------

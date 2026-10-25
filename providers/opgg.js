@@ -66,24 +66,44 @@ const normTag = (t) => String(t || '').replace(/\s+/g, '').toLowerCase();
 const normName = (n) => String(n || '').replace(/\s+/g, '').toLowerCase();
 
 async function findSummoner(region, riotId) {
-  const [name, tag] = riotId.split('#');
-  const pick = (list) => {
+  const [nm, tag] = riotId.split('#'), name = nm;
+  const pick = (list, name = nm) => {
     if (!list?.length) return null;
     const exact = list.find((x) => normName(x.game_name) === normName(name) && (!tag || normTag(x.tagline) === normTag(tag)));
     if (exact) return exact;
     const same = list.filter((x) => normName(x.game_name) === normName(name));
     // tag changé (ex. « UC akirielle#YOLO » devenu « UC akirielle#PANDA ») : un seul compte à ce nom, c'est lui
     if (tag) return same.length === 1 ? same[0] : null;
-    return same[0] || list[0];
+    // pseudo sans tag (lu sur une capture) : plusieurs comptes peuvent porter ce nom, on prend le plus joué
+    if (same.length) return same.reduce((a, x) => ((x.level ?? 0) > (a.level ?? 0) ? x : a));
+    return null;
   };
-  const q1 = await getJson(`${BASE}/v3/${region}/summoners?riot_id=${encodeURIComponent(riotId)}&hl=fr_FR`).catch(() => null);
-  let s = pick(q1?.data?.filter((x) => x.summoner_id));
-  if (!s && tag) {
-    const q2 = await getJson(`${BASE}/v3/${region}/summoners?riot_id=${encodeURIComponent(name)}&hl=fr_FR`).catch(() => null);
-    s = pick(q2?.data?.filter((x) => x.summoner_id));
+  const search = async (q, n) => pick((await getJson(`${BASE}/v3/${region}/summoners?riot_id=${encodeURIComponent(q)}&hl=fr_FR`).catch(() => null))?.data?.filter((x) => x.summoner_id), n);
+  let s = await search(riotId);
+  if (!s && tag) s = await search(name);
+  // pseudo lu sur une image : un accent a pu être perdu ou mal lu (Blast pour Blàst) ; op.gg ne cherche
+  // que le nom exact, on essaie donc les variantes accentuées (une lettre à la fois)
+  if (!s && !tag) {
+    for (const group of chunks(accentVariants(name), 6)) {
+      const found = (await Promise.all(group.map((v) => search(v, v)))).find(Boolean);
+      if (found) { s = found; break; }
+    }
   }
   return s;
 }
+const ACC = { a: 'àáâäãå', e: 'éèêë', i: 'íìîï', o: 'óòôöõø', u: 'úùûü', y: 'ýÿ', n: 'ñ', c: 'ç' };
+const bare = (t) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+function accentVariants(name, max = 36) {
+  const base = bare(name), out = [];
+  if (base !== name) out.push(base);
+  for (let i = 0; i < base.length; i++) {
+    const ch = base[i], low = ch.toLowerCase(), alts = ACC[low];
+    if (!alts) continue;
+    for (const a of alts) out.push(base.slice(0, i) + (ch === low ? a : a.toUpperCase()) + base.slice(i + 1));
+  }
+  return [...new Set(out)].filter((v) => v !== name).slice(0, max);
+}
+const chunks = (a, n) => Array.from({ length: Math.ceil(a.length / n) }, (_, k) => a.slice(k * n, k * n + n));
 
 async function fetchPlayer(region, riotId, byKey) {
   const s = await findSummoner(region, riotId);
