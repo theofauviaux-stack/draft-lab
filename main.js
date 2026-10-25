@@ -287,7 +287,7 @@ function createWindow() {
 // ---- Panneau en jeu (overlay) : fenêtre transparente au-dessus du jeu (mode fenêtré ou sans bordure) ----
 // Les clics la traversent ; Ctrl+Maj+D l'affiche / la masque, Ctrl+Maj+F permet de la déplacer.
 let overlay = null, overlayData = null, overlayMove = false, overlayWanted = false;
-const OV_FILE = () => path.join(app.getPath('userData'), 'overlay.json');
+const OV_FILE = () => path.join(app.getPath('userData'), 'overlay2.json'); // v2 : positions enregistrées par erreur ignorées
 // Taille proportionnelle à l'écran : le panneau est dessiné pour un écran 1920×1080 (330×470 px) puis mis à
 // l'échelle (zoom) selon l'écran ; sa position est retenue en proportion de l'écran (même place sur tous les écrans).
 const OV_W = 330, OV_H = 600;
@@ -317,7 +317,9 @@ function createOverlay() {
   overlay.loadFile(path.join(__dirname, 'src', 'overlay.html'));
   overlay.webContents.on('did-finish-load', () => { overlayFit(); if (overlayData) overlay.webContents.send('overlay:update', overlayData); });
   overlay.on('moved', () => {
-    if (overlay.__fitting) return;
+    // on n'enregistre que les déplacements faits à la main (mode déplacement) : macOS déplace aussi la fenêtre
+    // quand le jeu change la résolution de l'écran (plein écran), et ça ne doit pas devenir sa place
+    if (overlay.__fitting || !overlayMove) return;
     try { const { x: X, y: Y, width: W, height: H } = screen.getPrimaryDisplay().bounds; const [x, y] = overlay.getPosition(); fs.writeFileSync(OV_FILE(), JSON.stringify({ rx: (x - X) / W, ry: (y - Y) / H })); } catch {}
   });
   overlay.on('closed', () => { overlay = null; });
@@ -338,7 +340,11 @@ function topLevel(w) {
   }
   w.setAlwaysOnTop(true, 'screen-saver', 1);
 }
+let lastDisp = '';
 function pinOverlay(first = false) {
+  // le jeu en plein écran change la résolution de l'écran : on recalcule taille et place dès qu'elle change
+  const b = screen.getPrimaryDisplay().bounds, sig = `${b.x},${b.y},${b.width},${b.height}`;
+  if (sig !== lastDisp) { lastDisp = sig; if (!overlayMove) { overlayFit(); miniFit(); } }
   for (const w of [overlay, mini]) {
     if (!w || w.isDestroyed()) continue;
     topLevel(w);
@@ -384,7 +390,7 @@ function createMini() {
   mini.loadFile(path.join(__dirname, 'src', 'overlay.html'), { search: 'mini=1' });
   mini.webContents.on('did-finish-load', () => { if (overlayData) mini.webContents.send('overlay:update', overlayData); });
   const save = () => {
-    if (mini.__fitting) return;
+    if (mini.__fitting || !overlayMove) return;
     try { const { x: X, y: Y, width: W, height: H } = screen.getPrimaryDisplay().bounds; const bb = mini.getBounds(); fs.writeFileSync(MINI_FILE(), JSON.stringify({ rx: (bb.x - X) / W, ry: (bb.y - Y) / H, rw: bb.width / W })); } catch {}
   };
   mini.on('moved', save); mini.on('resized', save);

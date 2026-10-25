@@ -1,7 +1,7 @@
 {
-  "version": "2.44.2",
-  "sha256": "d3c52f87221f983ecf3bfddf1d872cb17983e5289fe89094658f2a7733931594",
-  "file": "draftlab-2.44.2.json.gz",
-  "notes": "Mac : raccourcis Ctrl ou Cmd+Maj+D/F ; position du panneau choisie depuis l'appli",
-  "date": "2026-10-25T17:19:38.828Z"
+  "version": "2.44.3",
+  "sha256": "2f77b9a47603234cf6da8b087b700044cb07b0b713ec329517173363ae98a1c7",
+  "file": "draftlab-2.44.3.json.gz",
+  "notes": "Mac plein écran : panneau et calque recalés quand le jeu change la résolution",
+  "date": "2026-10-25T17:21:18.604Z"
 }
