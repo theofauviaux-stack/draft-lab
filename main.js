@@ -327,19 +327,31 @@ function createOverlay() {
 // Garde le panneau au premier plan, au-dessus du jeu (même en plein écran sur Mac) : le jeu passe parfois
 // devant au lancement ou après un alt-tab, donc on le remet au-dessus toutes les 2 s tant qu'il est affiché.
 let ovPin = null;
+// Niveau de fenêtre : sur Mac, en « Plein écran », le jeu prend tout l'écran (capture de l'affichage) et
+// macOS place un voile au niveau « shielding » au-dessus de toutes les fenêtres normales. Pour rester visible,
+// le panneau doit être placé juste au-dessus de ce voile (comme les overlays du type Porofessor).
+const MAC_SHIELD = 2147483628; // CGShieldingWindowLevel()
+function topLevel(w) {
+  if (!w || w.isDestroyed()) return;
+  if (process.platform === 'darwin') {
+    try { w.setAlwaysOnTop(true, 'screen-saver', MAC_SHIELD + 1 - 1000); return; } catch {}
+  }
+  w.setAlwaysOnTop(true, 'screen-saver', 1);
+}
 function pinOverlay(first = false) {
-  if (!overlay || overlay.isDestroyed()) return;
-  overlay.setAlwaysOnTop(true, 'screen-saver', 1);
-  // la 1re fois, macOS doit changer le type de l'appli pour autoriser l'affichage au-dessus du plein écran ;
-  // ensuite on le saute (sinon le Dock clignoterait toutes les 2 s)
-  try { overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true }); } catch {}
-  if (overlay.isVisible()) overlay.moveTop();
-  if (mini && !mini.isDestroyed() && mini.isVisible()) { mini.setAlwaysOnTop(true, 'screen-saver', 1); try { mini.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true }); } catch {} mini.moveTop(); }
+  for (const w of [overlay, mini]) {
+    if (!w || w.isDestroyed()) continue;
+    topLevel(w);
+    // la 1re fois, macOS change le type de l'appli pour autoriser l'affichage au-dessus du plein écran ;
+    // ensuite on le saute (sinon le Dock clignoterait toutes les 2 s)
+    try { w.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: !first }); } catch {}
+    if (w.isVisible()) w.moveTop();
+  }
 }
 // ---- Calque sur la mini-carte du jeu : posé d'après les réglages du jeu (taille de la mini-carte, à gauche
 // ou à droite), ajustable à la main (Ctrl+Maj+F) ; la place choisie est retenue en proportion de l'écran ----
 let mini = null;
-const MINI_FILE = () => path.join(app.getPath('userData'), 'minimap.json');
+const MINI_FILE = () => path.join(app.getPath('userData'), 'minimap2.json'); // v2 : anciennes positions estimées ignorées
 function miniFit() {
   if (!mini || mini.isDestroyed()) return;
   const { x: X, y: Y, width: W, height: H } = screen.getPrimaryDisplay().bounds;
@@ -348,10 +360,10 @@ function miniFit() {
   if (saved?.rw) b = { x: X + saved.rx * W, y: Y + saved.ry * H, width: saved.rw * W, height: saved.rw * W };
   else {
     // mini-carte du jeu : carrée, collée au coin bas-droit (ou bas-gauche si « mini-carte à gauche ») ;
-    // côté ≈ 24 % de la hauteur de l'écran à la taille par défaut, plus ou moins selon le réglage de taille
+    // côté = 25 % de la hauteur de l'écran (mesuré en jeu sur un MacBook 1728×1117) ; le réglage de taille de
+    // la mini-carte du jeu n'a pas d'équivalence connue en pixels : on l'ajuste avec Ctrl+Maj+F si besoin
     const hud = readHud();
-    const sc = hud?.minimapScale != null ? Math.max(0, Math.min(3, hud.minimapScale)) : 1;
-    const side = Math.round(H * 0.24 * (0.55 + 0.45 * sc));
+    const side = Math.round(H * 0.252);
     b = { x: hud?.flip ? X : X + W - side, y: Y + H - side, width: side, height: side };
   }
   mini.__fitting = true;
@@ -365,7 +377,7 @@ function createMini() {
     type: process.platform === 'darwin' ? 'panel' : 'toolbar', fullscreenable: false,
     webPreferences: { preload: path.join(__dirname, 'src', 'overlay-preload.js'), contextIsolation: true, sandbox: true }
   });
-  mini.setAlwaysOnTop(true, 'screen-saver', 1);
+  topLevel(mini);
   try { mini.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true }); } catch {}
   mini.setIgnoreMouseEvents(true, { forward: true });
   mini.setAspectRatio(1);

@@ -1,7 +1,7 @@
 {
   "version": "2.44.1",
-  "sha256": "2b59e4df88d6305c808a2c817419fdaaa63d6725a7a65b3f3f6d6762451c7e5f",
+  "sha256": "2cda588dbb1fa55259f859db5213226d0dc6f21ad1f81a1fc653d3cf5f447584",
   "file": "draftlab-2.44.1.json.gz",
-  "notes": "Mac : panneau en jeu affiché dans l'espace plein écran du jeu",
-  "date": "2026-10-25T17:10:14.243Z"
+  "notes": "Mac : panneau en jeu au-dessus du jeu en plein écran ; calque de mini-carte recalibré",
+  "date": "2026-10-25T17:13:53.625Z"
 }
