@@ -36,7 +36,7 @@
     </div>
   </header>
 
-  <div id="liveBar" class="livebar" hidden><span class="lv-conn" id="liveConn"><span class="lv-dot"></span><span id="liveConnTxt">Recherche du client…</span></span><b id="liveTitle">Partie en direct</b><span id="liveMode" class="lv-mode" hidden></span><span id="liveText" class="muted"></span><button id="liveOv" class="tb-btn" title="Panneau par-dessus le jeu (mode fenêtré ou sans bordure) : il s'ouvre tout seul au début de la partie. Ctrl+Maj+D pour l'afficher ou le masquer, Ctrl+Maj+F pour le déplacer.">🖥 Panneau en jeu</button><select id="liveOvPos" class="tb-btn ov-pos" title="Place du panneau en jeu sur l’écran"><option value="">Position…</option><option value="tr">Panneau : haut droite</option><option value="mr">Panneau : milieu droite</option><option value="tl">Panneau : haut gauche</option><option value="ml">Panneau : milieu gauche</option><option value="reset-mini">Recaler la mini-carte</option></select><button id="liveHist" class="tb-btn" title="Tes parties précédentes, regroupées par session">📜 Historique</button><button id="liveStop" class="tb-btn">Arrêter le direct</button></div>
+  <div id="liveBar" class="livebar" hidden><span class="lv-conn" id="liveConn"><span class="lv-dot"></span><span id="liveConnTxt">Recherche du client…</span></span><b id="liveTitle">Partie en direct</b><span id="liveMode" class="lv-mode" hidden></span><span id="liveText" class="muted"></span><button id="liveHist" class="tb-btn" title="Tes parties précédentes, regroupées par session">📜 Historique</button><button id="liveStop" class="tb-btn">Arrêter le direct</button></div>
   <div id="liveReco" class="live-reco" hidden></div>
   <div id="flBar" class="flbar" hidden></div>
   <section class="tools">
@@ -110,7 +110,7 @@
       <div id="banPlan" class="banplan"></div>
     </div>
     <div class="card plan-card">
-      <div class="card-h"><h3>Plan de jeu</h3><span class="muted">pour ton côté (« Je joue » en haut)</span><button id="ovBtn" class="tb-btn ov-btn" title="Panneau par-dessus le jeu : plan de match, côtés fort / faible, priorités d'objectifs. Ctrl+Maj+D pour l'afficher ou le masquer.">🖥 Panneau en jeu</button></div>
+      <div class="card-h"><h3>Plan de jeu</h3><span class="muted">pour ton côté (« Je joue » en haut)</span></div>
       <div id="advice" class="advice"></div>
     </div>
     <div class="card half">
@@ -250,7 +250,6 @@
   </div>
 
   <div id="laneAsk" class="laneask" hidden></div>
-  <div id="ovDemo" class="ovdemo" hidden><div class="ovd-game"><div class="ovd-note">Aperçu : le panneau s'affiche ainsi par-dessus le jeu (mode fenêtré ou sans bordure). Les clics le traversent.</div><div id="ovDemoPanel" class="ovd-panel"></div><button id="ovDemoX" class="tb-btn ovd-x">Fermer l'aperçu</button></div></div>
   <div id="shotBox" class="shotbox" hidden>
     <div class="shot-card">
       <div class="shot-head"><b>📷 Draft depuis une capture (fin de game ou drafter)</b><button id="shotClose" class="tb-icon" title="Fermer">✕</button></div>

@@ -1225,24 +1225,3 @@ body.fearless .board .grid { box-shadow: inset 0 0 0 2px color-mix(in srgb, #b04
 .bal-lobby.ok { border-color: color-mix(in srgb, var(--good) 45%, transparent); color: var(--good); }
 .bal-lobby.err { border-color: color-mix(in srgb, var(--bad) 45%, transparent); color: var(--bad); }
 .bal-linkrow input { flex: 1; min-width: 220px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; }
-/* panneau en jeu : bouton et aperçu */
-.card-h .ov-btn { margin-left: auto; font-size: 11.5px; padding: 3px 9px; }
-.tb-btn.on { border-color: var(--gold); background: color-mix(in srgb, var(--gold) 14%, transparent); }
-.ovdemo { position: fixed; inset: 0; z-index: 80; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; }
-.ovd-game { position: relative; width: min(1100px, 92vw); aspect-ratio: 16 / 9; border-radius: 14px; overflow: hidden;
-  background: radial-gradient(ellipse at 30% 70%, #1f3b2a 0%, #13241b 35%, #0b1410 70%), #0b1410; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
-.ovd-game::before { content: ""; position: absolute; inset: 0; background:
-  linear-gradient(135deg, transparent 47%, rgba(90,150,200,.25) 49%, rgba(90,150,200,.25) 51%, transparent 53%),
-  repeating-radial-gradient(circle at 70% 30%, rgba(255,255,255,.025) 0 2px, transparent 2px 22px); }
-.ovd-game::after { content: ""; position: absolute; right: 12px; bottom: 12px; width: 110px; height: 110px; border: 2px solid rgba(200,164,92,.5); border-radius: 4px;
-  background: linear-gradient(135deg, #1b3326, #0e1c15); }
-.ovd-panel { position: absolute; top: 50px; right: 22px; z-index: 2; }
-.ovd-note { position: absolute; left: 18px; top: 16px; z-index: 2; color: #cfd6e4; font-size: 12px; max-width: 55%; }
-.ovd-x { position: absolute; left: 18px; bottom: 16px; z-index: 2; }
-.ovdemo[hidden] { display: none; }
-/* plan adapté à la partie (direct) */
-.lgs { border: 1px solid color-mix(in srgb, var(--gold) 50%, transparent); background: color-mix(in srgb, var(--gold) 7%, transparent); border-radius: 10px; padding: 8px 12px; margin-bottom: 10px; }
-.lgs-h { display: flex; flex-wrap: wrap; gap: 12px; align-items: baseline; font-variant-numeric: tabular-nums; }
-.lgs-h b { margin-right: auto; } .lgs-h .up { color: var(--good); font-weight: 700; } .lgs-h .down { color: var(--bad); font-weight: 700; }
-.lgs ul { margin: 6px 0 0; padding-left: 18px; } .lgs li { margin: 3px 0; }
-.ov-pos { padding: 4px 6px; }

@@ -50,21 +50,6 @@ try {
   }
 } catch (e) { issues.push(`calcul : ${e.message}`); }
 
-// ---------- plan adapté à la partie ----------
-try {
-  const P2 = E.buildProfiles(seed.ddragon.champions, seed.lolalytics.stats, seed.golgg.pro);
-  const R = (ids) => ids.map((id, i) => ({ c: P2[id], role: 'TJMAS'[i] }));
-  const mine = R(['Gnar', 'LeeSin', 'Ahri', 'Jinx', 'Thresh']), theirs = R(['Renekton', 'Vi', 'Zed', 'Kaisa', 'Nautilus']);
-  const g = { Gnar: 3100, LeeSin: 3600, Ahri: 2400, Jinx: 6200, Thresh: 2300, Renekton: 4400, Vi: 3500, Zed: 6500, Kaisa: 3000, Nautilus: 2100 };
-  const kd = { Jinx: [6, 0], Zed: [7, 1], Ahri: [0, 4] };
-  const stats = Object.fromEntries(Object.entries(g).map(([id, gold]) => [id, { k: kd[id]?.[0] ?? 1, d: kd[id]?.[1] ?? 1, a: 2, gold }]));
-  const ls = E.liveGameState({ mine, theirs, stats, obj: { blue: { drakes: ['Earth'], towers: 1 }, red: { drakes: ['Fire', 'Water', 'Air'], towers: 1 } }, mySide: 'blue', mp: E.matchPlan(mine, theirs), time: 1320 });
-  if (ls.goldDiff !== -1900) issues.push(`plan en partie : écart d'or ${ls.goldDiff} au lieu de -1900`);
-  if (!/de retard/.test(ls.advice[0]) || /\+/.test(ls.advice[0])) issues.push(`plan en partie : 1er conseil incohérent « ${ls.advice[0]} »`);
-  if (ls.fed[0]?.c.id !== 'Jinx' || ls.threat?.c.id !== 'Zed') issues.push('plan en partie : joueur en avance ou menace mal détectés');
-  if (!ls.advice.some((t) => /Point d’âme pour eux/.test(t))) issues.push('plan en partie : point d’âme adverse non signalé');
-} catch (e) { issues.push(`plan en partie : ${e.message}`); }
-
 // ---------- 3) pseudos et équilibrage ----------
 const cases = [
   ['https://op.gg/fr/lol/multisearch/euw?summoners=INT+soul%23INT%2CMetaFir%2306660', ['INT soul#INT', 'MetaFir#06660']],
@@ -100,14 +85,6 @@ try {
     for (let k = 0; k < 4; k++) await p.click('.skipban'); // 2e phase de bans
     for (const n of ['Ornn', 'Renekton', 'Lulu', 'Ashe']) await pick(p, n);
     const filled = await p.locator('.board .team .slot:not(.empty)').count(); if (filled < 10) issues.push(`draft classique : ${filled}/10 picks placés`);
-  });
-  await run('panneau en jeu (aperçu)', async (p) => {
-    await p.click('#startZero'); await p.click('#startModeBox .sm-o[data-mode="classic"]'); await p.waitForTimeout(300);
-    for (let k = 0; k < 6; k++) await p.click('.skipban');
-    for (const n of ['Ahri', 'Zed']) await pick(p, n);
-    await p.click('#ovBtn'); await p.waitForTimeout(800);
-    const t = await p.locator('#ovDemoPanel').innerText();
-    if (!/Objectifs/i.test(t) || !/Drake/.test(t)) issues.push('panneau en jeu : contenu incomplet');
   });
   await run('fearless', async (p) => {
     await p.click('#startZero'); await p.click('#startModeBox .sm-o[data-mode="fl3"]'); await p.waitForTimeout(300);

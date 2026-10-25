@@ -132,24 +132,7 @@ async function inGame() {
     return { champKey, champName: p.championName, role: POS_GAME[p.position] ?? (smite ? 'J' : null), riotId: masked ? null : `${name}#${tag}`, me: (p.riotId || p.summonerName) === me, locked: true };
   };
   const teams = { blue: d.allPlayers.filter((p) => p.team === 'ORDER').map(player), red: d.allPlayers.filter((p) => p.team === 'CHAOS').map(player) };
-  // État de la partie, tel que le tableau des scores (Tab) le montre à tout le monde : score, niveau, sbires,
-  // valeur des objets ; objectifs pris (fil des événements). Gardé à part des équipes (la draft ne bouge plus).
-  const stat = (p) => ({ k: p.scores?.kills ?? 0, d: p.scores?.deaths ?? 0, a: p.scores?.assists ?? 0, cs: p.scores?.creepScore ?? 0, lvl: p.level ?? 1,
-    gold: (p.items ?? []).reduce((x, it) => x + (it.price ?? 0) * (it.count ?? 1), 0), dead: !!p.isDead });
-  const sideOf = {};
-  for (const p of d.allPlayers) for (const n of [p.riotIdGameName, p.summonerName, (p.riotId || '').split('#')[0], p.riotId]) if (n) sideOf[n] = p.team === 'CHAOS' ? 'red' : 'blue';
-  const obj = { blue: { drakes: [], barons: 0, heralds: 0, grubs: 0, towers: 0, inhibs: 0 }, red: { drakes: [], barons: 0, heralds: 0, grubs: 0, towers: 0, inhibs: 0 } };
-  for (const e of d.events?.Events ?? []) {
-    const t = sideOf[e.KillerName];
-    if (e.EventName === 'DragonKill' && t) obj[t].drakes.push(e.DragonType ?? '?');
-    else if (e.EventName === 'BaronKill' && t) obj[t].barons++;
-    else if (e.EventName === 'HeraldKill' && t) obj[t].heralds++;
-    else if ((e.EventName === 'HordeKill' || e.EventName === 'VoidGrubKill') && t) obj[t].grubs++;
-    else if (e.EventName === 'TurretKilled') { const m = String(e.TurretKilled ?? '').match(/_T([12])_/); if (m) obj[m[1] === '1' ? 'red' : 'blue'].towers++; }
-    else if (e.EventName === 'InhibKilled') { const m = String(e.InhibKilled ?? '').match(/_T([12])_/); if (m) obj[m[1] === '1' ? 'red' : 'blue'].inhibs++; }
-  }
-  const live = { blue: d.allPlayers.filter((p) => p.team === 'ORDER').map(stat), red: d.allPlayers.filter((p) => p.team === 'CHAOS').map(stat), obj };
-  return { phase: 'InProgress', source: 'jeu', summoner: me || null, queue: lastQueue ?? (d.gameData?.gameMode === 'CLASSIC' ? null : { label: d.gameData?.gameMode }), mySide, teams, live, bans: { blue: [], red: [] }, time: d.gameData?.gameTime ?? 0 };
+  return { phase: 'InProgress', source: 'jeu', summoner: me || null, queue: lastQueue ?? (d.gameData?.gameMode === 'CLASSIC' ? null : { label: d.gameData?.gameMode }), mySide, teams, bans: { blue: [], red: [] }, time: d.gameData?.gameTime ?? 0 };
 }
 
 // Boucle : le jeu d'abord (si une partie tourne), sinon la sélection des champions
@@ -174,16 +157,6 @@ function stopLive() { if (timer) clearInterval(timer); timer = null; }
 // Résultats retrouvés dans l'historique de matchs du client (parties interrompues : client fermé, crash…)
 // Joueurs du salon (partie personnalisée ou groupe) du client League : pseudos Riot (Nom#TAG), équipe
 // (personnalisée : 100 = équipe 1, 200 = équipe 2), sans les bots ni les spectateurs.
-// Détection légère (toutes les quelques secondes, même sans le mode direct) : partie en cours, sélection des
-// champions, ou rien. Sert à lancer le direct et le panneau en jeu automatiquement.
-async function detectPhase() {
-  const g = await localGet(2999, '/liveclientdata/gamestats').catch(() => null);
-  if (g && typeof g === 'object' && g.gameTime != null) return 'InProgress';
-  const lcu = await findLcu();
-  if (!lcu) return null;
-  return await localGet(lcu.port, '/lol-gameflow/v1/gameflow-phase', lcu.token).catch(() => null);
-}
-
 async function lobbyPlayers() {
   const lcu = await findLcu();
   if (!lcu) return { error: 'client' };
@@ -227,4 +200,4 @@ async function matchResults(ids) {
   return out;
 }
 
-module.exports = { startLive, stopLive, champSelect, inGame, findLcu, matchResults, lobbyPlayers, detectPhase };
+module.exports = { startLive, stopLive, champSelect, inGame, findLcu, matchResults, lobbyPlayers };
