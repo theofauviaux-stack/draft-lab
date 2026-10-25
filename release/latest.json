@@ -1,7 +1,7 @@
 {
-  "version": "2.44.5",
-  "sha256": "d82fae608a9d5080b6f6d3661b2549a8d6d968bfc4d136196ccc2bc52f64ba9a",
-  "file": "draftlab-2.44.5.json.gz",
-  "notes": "Mac : réglage du panneau au clavier sans quitter le plein écran",
-  "date": "2026-10-25T17:28:18.113Z"
+  "version": "2.44.6",
+  "sha256": "11b79cf38d05816ed6c576afa64d4dc59ff953c83f81159f81bb6d50dd06b37a",
+  "file": "draftlab-2.44.6.json.gz",
+  "notes": "Mac plein écran : raccourcis du panneau lus directement au clavier",
+  "date": "2026-10-25T17:33:41.117Z"
 }

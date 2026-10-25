@@ -11,6 +11,7 @@ const { autoUpdate } = require('./providers/updater');
 const { fetchProGames } = require('./providers/progames');
 const { fetchPatchChanges } = require('./providers/patches');
 const { readHud } = require('./providers/gamecfg');
+const { startMacKeys, stopMacKeys } = require('./providers/mackeys');
 const { startLive, stopLive, matchResults, lobbyPlayers, detectPhase } = require('./providers/live');
 
 const HOUR = 3600 * 1000;
@@ -424,6 +425,34 @@ function showOverlay(on) {
 //   flèches = déplacer le panneau · Alt + flèches = déplacer le calque de la mini-carte
 //   + / − = taille du calque · Entrée ou Ctrl/Cmd + Maj + F = terminer. (La souris marche aussi hors plein écran.)
 const MOVE_KEYS = [];
+// Mac : le plein écran du jeu bloque les raccourcis globaux ; l'état du clavier est alors lu directement
+// (providers/mackeys.js). Les deux voies peuvent arriver ensemble hors plein écran : on ignore le doublon.
+let keysWork = false; const lastAct = {};
+const once = (name, fn) => { const t = Date.now(); if (t - (lastAct[name] ?? 0) < 600) return; lastAct[name] = t; fn(); };
+const toggleOverlay = () => once('toggle', () => showOverlay(!(overlay && !overlay.isDestroyed() && overlay.isVisible())));
+const toggleMove = () => once('move', moveOverlay);
+let prevKeys = new Set(), holdTick = 0;
+function onMacKeys(k) {
+  if (k.size) keysWork = true;
+  const pressed = (n) => k.has(n) && !prevKeys.has(n);
+  const mod = (k.has('CTRL') || k.has('CMD')) && k.has('SHIFT');
+  if (mod && pressed('D')) toggleOverlay();
+  else if (mod && pressed('F')) toggleMove();
+  else if (overlayMove) {
+    if (pressed('ENTER') || pressed('ESC')) toggleMove();
+    if (pressed('PLUS')) nudge(mini, 0, 0, 1);
+    if (pressed('MINUS')) nudge(mini, 0, 0, -1);
+  }
+  prevKeys = k;
+}
+// flèches en mode réglage : un pas à l'appui, puis en continu tant qu'elles restent enfoncées
+setInterval(() => {
+  if (!overlayMove || !keysWork) return;
+  const k = prevKeys, dirs = [['LEFT', -1, 0], ['RIGHT', 1, 0], ['UP', 0, -1], ['DOWN', 0, 1]].filter(([n]) => k.has(n));
+  if (!dirs.length) { holdTick = 0; return; }
+  if (holdTick++ % 3) return;
+  for (const [, dx, dy] of dirs) nudge(k.has('ALT') ? mini : overlay, dx, dy);
+}, 60);
 function nudge(w, dx, dy, grow = 0) {
   if (!w || w.isDestroyed()) return;
   const d = screen.getPrimaryDisplay().bounds, step = Math.round(Math.min(d.width, d.height) * 0.015);
@@ -457,7 +486,7 @@ function moveOverlay() {
     w.webContents.send('overlay:move', overlayMove);
   }
   for (const k of MOVE_KEYS.splice(0)) { try { globalShortcut.unregister(k); } catch {} }
-  if (overlayMove) {
+  if (overlayMove && !keysWork) {
     const reg = (k, fn) => { try { if (globalShortcut.register(k, fn)) MOVE_KEYS.push(k); } catch {} };
     for (const [key, dx, dy] of [['Left', -1, 0], ['Right', 1, 0], ['Up', 0, -1], ['Down', 0, 1]]) {
       reg(key, () => nudge(overlay, dx, dy));
@@ -485,13 +514,13 @@ app.whenReady().then(() => {
   });
   try {
     // Ctrl+Maj+D / Ctrl+Maj+F partout ; sur Mac aussi Cmd+Maj+D / Cmd+Maj+F
-    const toggle = () => showOverlay(!(overlay && !overlay.isDestroyed() && overlay.isVisible()));
     for (const mod of process.platform === 'darwin' ? ['Control', 'Command'] : ['Control']) {
-      try { globalShortcut.register(`${mod}+Shift+D`, toggle); } catch {}
-      try { globalShortcut.register(`${mod}+Shift+F`, moveOverlay); } catch {}
+      try { globalShortcut.register(`${mod}+Shift+D`, toggleOverlay); } catch {}
+      try { globalShortcut.register(`${mod}+Shift+F`, toggleMove); } catch {}
     }
+    startMacKeys(onMacKeys);
   } catch {}
-  app.on('will-quit', () => { try { globalShortcut.unregisterAll(); } catch {} });
+  app.on('will-quit', () => { try { globalShortcut.unregisterAll(); } catch {} stopMacKeys(); });
   // changement d'écran ou de résolution : le panneau garde sa taille et sa place proportionnelles
   for (const ev of ['display-metrics-changed', 'display-added', 'display-removed']) screen.on(ev, () => setTimeout(() => { overlayFit(); miniFit(); }, 200));
   loadCache();
