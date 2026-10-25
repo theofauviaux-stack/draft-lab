@@ -5,6 +5,7 @@ import {
   buildProfiles, evaluate, setDetailSource, setDataTierLabel, dataTierLabel, botDuel, applyProGames, proInfo, recommend, recommendBans, projectPicks, gamePlan, powerCurve,
   comfortPts, proposeDrafts, playerLabel, rankName, analyzeDraft, matchPlan, pentagonView, styleBreakdown, compLabel, playersForecast, combineWr, pointsLabel, rankPoints, RANK_OPTIONS, playerRating, dominant, teamShares, predictPicks, enemyScenarios, predictedBans
 } from './engine.js';
+import { overlayHtml, OVERLAY_CSS } from './overlayview.js';
 import { balanceTeams, rolesFromPool, balValue, roleFit, BAL_ROLES, BAL_COST } from './balance.js';
 
 // ---------- Accès aux données (app Electron, ou navigateur en secours) ----------
@@ -268,6 +269,7 @@ function select(t, i) {
 function render() {
   if (!state.data) return;
   syncTier();
+  setTimeout(pushOverlay, 0);
   ensureDetails();
   renderBans(); renderTeams(); renderStep(); renderFearless();
   const ev = evaluate(team('blue'), team('red'));
@@ -1354,6 +1356,7 @@ function liveSnapshot(d) {
 }
 // la partie (ou la sélection) est finie : on archive et on nettoie l'écran
 function liveEndGame(d) {
+  if (LIVE.ovAuto) { api.overlayShow?.(false); LIVE.ovAuto = false; } LIVE.time = null; LIVE.timeAt = null;
   if (LIVE.game) {
     histUpsert({ ...LIVE.game, result: d.result ?? LIVE.game.result ?? null, gameId: LIVE.game.gameId ?? d.gameId ?? null });
     LIVE.lastId = LIVE.game.id;
@@ -1425,6 +1428,12 @@ function startLiveMode() {
 function stopLiveMode() { LIVE.on = false; api.liveStop?.(); $('liveBar').hidden = true; $('liveReco').hidden = true; $('liveMode').hidden = true; document.body.classList.remove('q-flex'); render(); }
 function onLive(d) {
   if (!LIVE.on) return;
+  // horloge de la partie pour le panneau en jeu ; il s'ouvre tout seul au début de la partie
+  if (d.phase === 'InProgress' && d.time != null) {
+    LIVE.time = d.time; LIVE.timeAt = Date.now();
+    if (!LIVE.ovAuto && api.overlayShow) { LIVE.ovAuto = true; ovSig = ''; setTimeout(() => { pushOverlay(); api.overlayShow(true); }, 300); }
+    else if (Math.abs((LIVE.lastOvT ?? -99) - d.time) >= 30) { LIVE.lastOvT = d.time; ovSig = ''; pushOverlay(); }
+  }
   const [t, sub] = LIVE_TXT[d.phase] ?? ['Client connecté', d.phase];
   $('liveTitle').textContent = t; $('liveText').textContent = d.error ? `${sub} (${d.error})` : sub;
   $('liveBar').dataset.phase = d.phase;
@@ -1496,6 +1505,8 @@ function onLive(d) {
       }).catch(() => {});
     }
   }
+  const meM = (d.teams[d.mySide] ?? []).find((m) => m.me);
+  if (meM) LIVE.myChamp = meM.champKey ? champByName(meM.champKey) ?? champByName(meM.champName) : champByKey(meM.champ);
   render();
   liveReco(d);
   if (d.phase === 'InProgress') { LIVE.game = liveSnapshot(d); histUpsert(LIVE.game); }
@@ -1893,6 +1904,68 @@ function miniMap(mp, myJ) {
   return themed(`<svg viewBox="0 0 220 220" class="minimap"><defs><marker id="jarr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0L10,5L0,10z" fill="#1f2937"/></marker></defs>${s}</svg>`);
 }
 
+// ---------- Panneau en jeu (overlay) ----------
+// Infos connues avant la partie ou visibles par tous : plan de match, côtés fort / faible, priorités d'objectifs.
+const strip = (t) => String(t ?? '').replace(/<[^>]+>/g, '');
+// une phrase courte pour le panneau : sans parenthèses, coupée à la première phrase (120 caractères max)
+const brief = (t) => { let x = strip(t).replace(/\s*\([^)]*\)/g, '').split(/(?<=[.!])\s/)[0].trim(); if (x.length > 120) x = x.slice(0, 118).replace(/\s\S*$/, '') + '…'; return x; };
+function myLaneRole() {
+  const me = state.mySide;
+  if (LIVE.myChamp) { const i = state.slots[me].indexOf(LIVE.myChamp); if (i >= 0) return state.roles[me][i]; }
+  return state.roles[me].find((r, i) => state.slots[me][i] && r === 'M') ? 'M' : state.roles[me].find((r, i) => state.slots[me][i]) ?? null;
+}
+function overlayPayload() {
+  const me = state.mySide, them = me === 'blue' ? 'red' : 'blue';
+  const mine = roster(me), theirs = roster(them);
+  const mp = mine.length ? matchPlan(mine, theirs) : null;
+  if (!mp) return null;
+  const LN = { T: 'top', M: 'mid', B: 'bot' };
+  const role = myLaneRole(), L = role === 'A' || role === 'S' ? 'B' : role === 'J' ? null : role;
+  const myC = role ? mine.find((x) => x.role === role)?.c : null;
+  const opp = role ? theirs.find((x) => x.role === role)?.c : null;
+  const early = mp.phases[0].items.map(strip);
+  const tip = role === 'J' ? brief(mp.jungle?.items?.[0]) : L ? brief(early.find((t) => t.toLowerCase().startsWith(LN[L])) ?? '') : null;
+  const baron = mp.iOutscale ? ['mid', 'En late'] : mp.theyOutscale ? ['high', 'Dès 20:00'] : ['mid', 'Sur ouverture'];
+  const wr = state.lastMain != null ? (me === 'blue' ? state.lastMain : 100 - state.lastMain) : null;
+  return {
+    wr, strong: mp.strongSide ? { T: 'top', M: 'mid', B: 'bot' }[mp.strongSide] : null,
+    lanes: Object.fromEntries(['T', 'M', 'B'].map((k) => [k, { state: mp.lanes[k].state }])),
+    obj: { drake: mp.drake.simple, grubs: mp.grubs.simple, herald: mp.herald.simple?.[1]?.length > 16 ? [mp.herald.simple[0], 'Si prio mid'] : mp.herald.simple, baron },
+    phases: mp.phases.map((p) => ({ name: p.name, range: p.range, diff: p.diff, tip: brief(p.items.find((t) => !/^Côté fort/.test(strip(t))) ?? p.items[0]) })),
+    me: myC ? { name: myC.name, vs: opp?.name ?? null, tip: tip ?? null } : null,
+    time: LIVE.time ?? null, at: LIVE.timeAt ?? null
+  };
+}
+let ovSig = '', ovOpen = false;
+function pushOverlay() {
+  if (!api.overlayData) return;
+  const d = overlayPayload();
+  const sig = JSON.stringify({ ...d, at: 0, time: d?.time != null ? Math.round(d.time / 10) : null });
+  if (sig === ovSig) return;
+  ovSig = sig; api.overlayData(d);
+}
+// Aperçu (version web, ou pour voir le rendu) : le panneau sur un fond façon partie, horloge qui défile
+let ovDemoTimer = null;
+function overlayDemo() {
+  const d = overlayPayload();
+  if (!d) { toast('Choisis au moins un champion pour voir le panneau en jeu'); return; }
+  if (!document.getElementById('ovCss')) { const st = document.createElement('style'); st.id = 'ovCss'; st.textContent = OVERLAY_CSS; document.head.appendChild(st); }
+  const start = Date.now(), base = d.time ?? 255;
+  const draw = () => { $('ovDemoPanel').innerHTML = overlayHtml({ ...d, time: base + (Date.now() - start) / 1000 * 6, at: null }); };
+  draw(); clearInterval(ovDemoTimer); ovDemoTimer = setInterval(draw, 500);
+  $('ovDemo').hidden = false;
+}
+function toggleOverlay() {
+  if (!api.overlayShow) { overlayDemo(); return; }
+  ovSig = ''; pushOverlay();
+  api.overlayShow(!ovOpen).then((on) => { ovOpen = on; toast(on ? 'Panneau en jeu affiché (Ctrl+Maj+D pour le masquer, Ctrl+Maj+F pour le déplacer)' : 'Panneau en jeu masqué'); });
+}
+function initOverlay() {
+  $('ovBtn').onclick = toggleOverlay; $('liveOv').onclick = toggleOverlay;
+  $('ovDemoX').onclick = () => { $('ovDemo').hidden = true; clearInterval(ovDemoTimer); };
+  api.onOverlayState?.((on) => { ovOpen = on; for (const id of ['ovBtn', 'liveOv']) $(id).classList.toggle('on', on); });
+}
+
 function renderAdvice() {
   const me = state.mySide, them = me === 'blue' ? 'red' : 'blue';
   const mine = roster(me), theirs = roster(them);
@@ -2021,6 +2094,7 @@ function initControls() {
   document.querySelectorAll('#startModeBox .sm-o').forEach((b) => (b.onclick = () => { $('startModeBox').hidden = true; $('startChoices').hidden = false; $('startMenu').classList.remove('form'); startFromZero(b.dataset.mode); }));
   document.querySelectorAll('#menuMode button').forEach((b) => (b.onclick = () => { document.querySelectorAll('#menuMode button').forEach((x) => x.classList.toggle('on', x === b)); }));
   initBalance();
+  initOverlay();
   $('tierSel').onchange = () => { state.tierPref = $('tierSel').value; savePrefs(); render(); };
   $('startPlayers').onclick = () => { $('startMenu').classList.add('form'); $('startChoices').hidden = true; $('startForm').hidden = false; $('menuBlue').focus(); };
   $('menuBack').onclick = () => { $('startMenu').classList.remove('form'); $('startForm').hidden = true; $('startChoices').hidden = false; };

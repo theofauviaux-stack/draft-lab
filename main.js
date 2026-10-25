@@ -1,5 +1,5 @@
 // Processus principal Electron : fenêtre, cache disque, synchronisation des données.
-const { app, BrowserWindow, ipcMain, shell, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, screen, globalShortcut } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { fetchDDragon } = require('./providers/ddragon');
@@ -283,7 +283,49 @@ function createWindow() {
   win.on('closed', () => { for (const w of BrowserWindow.getAllWindows()) { try { w.destroy(); } catch {} } });
 }
 
+// ---- Panneau en jeu (overlay) : fenêtre transparente au-dessus du jeu (mode fenêtré ou sans bordure) ----
+// Les clics la traversent ; Ctrl+Maj+D l'affiche / la masque, Ctrl+Maj+F permet de la déplacer.
+let overlay = null, overlayData = null, overlayMove = false, overlayWanted = false;
+const OV_FILE = () => path.join(app.getPath('userData'), 'overlay.json');
+function createOverlay() {
+  if (overlay && !overlay.isDestroyed()) return overlay;
+  const wa = screen.getPrimaryDisplay().workArea;
+  let pos = null; try { pos = JSON.parse(fs.readFileSync(OV_FILE(), 'utf8')); } catch {}
+  overlay = new BrowserWindow({
+    width: 330, height: 470, x: pos?.x ?? wa.x + wa.width - 350, y: pos?.y ?? wa.y + 140,
+    frame: false, transparent: true, alwaysOnTop: true, skipTaskbar: true, resizable: false, focusable: false, hasShadow: false, show: false,
+    webPreferences: { preload: path.join(__dirname, 'src', 'overlay-preload.js'), contextIsolation: true, sandbox: true }
+  });
+  overlay.setAlwaysOnTop(true, 'screen-saver');
+  try { overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true }); } catch {}
+  overlay.setIgnoreMouseEvents(true, { forward: true });
+  overlay.loadFile(path.join(__dirname, 'src', 'overlay.html'));
+  overlay.webContents.on('did-finish-load', () => { if (overlayData) overlay.webContents.send('overlay:update', overlayData); });
+  overlay.on('moved', () => { try { const [x, y] = overlay.getPosition(); fs.writeFileSync(OV_FILE(), JSON.stringify({ x, y })); } catch {} });
+  overlay.on('closed', () => { overlay = null; });
+  return overlay;
+}
+function showOverlay(on) {
+  overlayWanted = !!on;
+  if (on) createOverlay().showInactive(); else if (overlay && !overlay.isDestroyed()) overlay.hide();
+  if (win && !win.isDestroyed()) win.webContents.send('overlay:state', overlayWanted);
+}
+function moveOverlay() {
+  if (!overlay || overlay.isDestroyed() || !overlay.isVisible()) return;
+  overlayMove = !overlayMove;
+  overlay.setIgnoreMouseEvents(!overlayMove, { forward: true });
+  overlay.setFocusable(overlayMove);
+  overlay.webContents.send('overlay:move', overlayMove);
+}
+
 app.whenReady().then(() => {
+  ipcMain.handle('overlay:data', (_e, d) => { overlayData = d; if (overlay && !overlay.isDestroyed()) overlay.webContents.send('overlay:update', d); });
+  ipcMain.handle('overlay:show', (_e, on) => { showOverlay(on); return overlayWanted; });
+  try {
+    globalShortcut.register('CommandOrControl+Shift+D', () => showOverlay(!(overlay && !overlay.isDestroyed() && overlay.isVisible())));
+    globalShortcut.register('CommandOrControl+Shift+F', moveOverlay);
+  } catch {}
+  app.on('will-quit', () => { try { globalShortcut.unregisterAll(); } catch {} });
   loadCache();
   ipcMain.handle('data:load', (_e, opts) => quickLoad(opts?.tier ?? lastTier));
   ipcMain.handle('data:refresh', (_e, opts) => sync({ force: true, tier: opts?.tier }));

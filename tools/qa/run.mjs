@@ -86,6 +86,14 @@ try {
     for (const n of ['Ornn', 'Renekton', 'Lulu', 'Ashe']) await pick(p, n);
     const filled = await p.locator('.board .team .slot:not(.empty)').count(); if (filled < 10) issues.push(`draft classique : ${filled}/10 picks placés`);
   });
+  await run('panneau en jeu (aperçu)', async (p) => {
+    await p.click('#startZero'); await p.click('#startModeBox .sm-o[data-mode="classic"]'); await p.waitForTimeout(300);
+    for (let k = 0; k < 6; k++) await p.click('.skipban');
+    for (const n of ['Ahri', 'Zed']) await pick(p, n);
+    await p.click('#ovBtn'); await p.waitForTimeout(800);
+    const t = await p.locator('#ovDemoPanel').innerText();
+    if (!/Objectifs/i.test(t) || !/Drake/.test(t)) issues.push('panneau en jeu : contenu incomplet');
+  });
   await run('fearless', async (p) => {
     await p.click('#startZero'); await p.click('#startModeBox .sm-o[data-mode="fl3"]'); await p.waitForTimeout(300);
     for (let k = 0; k < 6; k++) await p.click('.skipban'); for (const n of ['Ahri', 'Zed']) await pick(p, n);

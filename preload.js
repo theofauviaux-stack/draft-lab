@@ -19,6 +19,9 @@ contextBridge.exposeInMainWorld('draftlab', {
   liveStop: () => ipcRenderer.invoke('live:stop'),
   liveResults: (ids) => ipcRenderer.invoke('live:results', ids),
   lobbyPlayers: () => ipcRenderer.invoke('live:lobby'),
+  overlayData: (d) => ipcRenderer.invoke('overlay:data', d),
+  overlayShow: (on) => ipcRenderer.invoke('overlay:show', on),
+  onOverlayState: (cb) => ipcRenderer.on('overlay:state', (_e, on) => cb(on)),
   onLive: (cb) => ipcRenderer.on('live:update', (_e, d) => cb(d)),
   detail: (cid, lane, tier) => ipcRenderer.invoke('lola:detail', { cid, lane, tier }),
   onUpdate: (cb) => ipcRenderer.on('update:status', (_e, st) => cb(st))

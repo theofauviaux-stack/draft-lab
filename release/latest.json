@@ -1,7 +1,7 @@
 {
-  "version": "2.40.0",
-  "sha256": "cfd208b90ae6c920b825705387aa59c4e1e2d6da62387788f3a80e0894765d96",
-  "file": "draftlab-2.40.0.json.gz",
-  "notes": "Équilibrage : joueurs lus dans le salon du client ou via un lien d'invitation",
-  "date": "2026-10-25T14:23:42.532Z"
+  "version": "2.41.0",
+  "sha256": "05bd90c3d30010104bd0a08007213e03e232228aaf513e5aae4c13b803d68602",
+  "file": "draftlab-2.41.0.json.gz",
+  "notes": "Nouveau : panneau en jeu (plan de match, côtés fort/faible, objectifs) par-dessus le jeu",
+  "date": "2026-10-25T15:57:17.358Z"
 }
