@@ -155,6 +155,35 @@ function startLive(send) { stopLive(); lcu = null; poll(send); timer = setInterv
 function stopLive() { if (timer) clearInterval(timer); timer = null; }
 
 // Résultats retrouvés dans l'historique de matchs du client (parties interrompues : client fermé, crash…)
+// Joueurs du salon (partie personnalisée ou groupe) du client League : pseudos Riot (Nom#TAG), équipe
+// (personnalisée : 100 = équipe 1, 200 = équipe 2), sans les bots ni les spectateurs.
+async function lobbyPlayers() {
+  const lcu = await findLcu();
+  if (!lcu) return { error: 'client' };
+  const get = (p) => localGet(lcu.port, p, lcu.token);
+  let lobby;
+  try { lobby = await get('/lol-lobby/v2/lobby'); } catch (e) { return { error: 'client' }; }
+  if (!lobby || typeof lobby !== 'object') return { error: 'salon' };
+  const cfg = lobby.gameConfig ?? {};
+  const t100 = cfg.customTeam100 ?? [], t200 = cfg.customTeam200 ?? [];
+  const custom = !!(t100.length || t200.length);
+  const list = custom ? [...t100.map((m) => ({ m, team: 100 })), ...t200.map((m) => ({ m, team: 200 }))] : (lobby.members ?? []).map((m) => ({ m, team: null }));
+  const out = [];
+  for (const { m, team } of list) {
+    if (!m || m.isBot || m.botId) continue;
+    let gn = m.gameName ?? m.riotIdGameName ?? null, tl = m.gameTag ?? m.tagLine ?? m.riotIdTagLine ?? null;
+    if ((!gn || !tl) && m.puuid) { const s = await get(`/lol-summoner/v2/summoners/puuid/${m.puuid}`).catch(() => null); gn = s?.gameName ?? gn; tl = s?.tagLine ?? tl; }
+    if ((!gn || !tl) && m.summonerId) { const s = await get(`/lol-summoner/v1/summoners/${m.summonerId}`).catch(() => null); gn = s?.gameName ?? gn; tl = s?.tagLine ?? tl; }
+    if (!gn && m.summonerName) gn = m.summonerName;
+    if (hidden(gn)) continue;
+    out.push({ riotId: tl ? `${gn}#${tl}` : gn, team, owner: !!m.isLeader });
+  }
+  // région du client (EUW1 → euw) pour la recherche op.gg
+  const reg = await get('/riotclient/region-locale').catch(() => null);
+  const region = String(reg?.region ?? reg?.webRegion ?? '').toLowerCase().replace(/\d+$/, '').replace(/^eun$/, 'eune').replace(/^oc$/, 'oce').replace(/^la$/, 'lan') || null;
+  return { players: out, custom, region, mode: cfg.gameMode ?? null };
+}
+
 async function matchResults(ids) {
   const want = new Set((ids ?? []).map(Number)), out = {};
   if (!want.size) return out;
@@ -171,4 +200,4 @@ async function matchResults(ids) {
   return out;
 }
 
-module.exports = { startLive, stopLive, champSelect, inGame, findLcu, matchResults };
+module.exports = { startLive, stopLive, champSelect, inGame, findLcu, matchResults, lobbyPlayers };

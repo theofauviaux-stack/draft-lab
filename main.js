@@ -10,7 +10,7 @@ const { fetchDpm, mergePool } = require('./providers/dpm');
 const { autoUpdate } = require('./providers/updater');
 const { fetchProGames } = require('./providers/progames');
 const { fetchPatchChanges } = require('./providers/patches');
-const { startLive, stopLive, matchResults } = require('./providers/live');
+const { startLive, stopLive, matchResults, lobbyPlayers } = require('./providers/live');
 
 const HOUR = 3600 * 1000;
 const STALE = { patches: 6 * HOUR, lolalytics: 6 * HOUR, golgg: 12 * HOUR, progames: 4 * HOUR };
@@ -331,6 +331,8 @@ app.whenReady().then(() => {
   ipcMain.handle('live:start', () => { startLive((d) => { if (win && !win.isDestroyed()) win.webContents.send('live:update', d); }); return true; });
   ipcMain.handle('live:stop', () => { stopLive(); return true; });
   ipcMain.handle('live:results', (_e, ids) => matchResults(ids).catch(() => ({})));
+  // Équilibrage : joueurs du salon du client (partie personnalisée)
+  ipcMain.handle('live:lobby', () => lobbyPlayers().catch((e) => ({ error: 'client', detail: e.message })));
   // Mises à jour automatiques de l'application
   let lastUpdate = null;
   const sendUpdate = (st) => { lastUpdate = st; if (win && !win.isDestroyed()) win.webContents.send('update:status', st); };

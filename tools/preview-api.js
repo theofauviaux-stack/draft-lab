@@ -106,6 +106,8 @@
     onUpdated: () => {},
     open: () => {},
     // démo de l'équilibrage : les 10 joueurs d'exemple, avec les pseudos entrés s'il y en a
+    // démo du salon du client : les 10 joueurs d'exemple
+    lobbyPlayers: async () => ({ players: [...DEMO.blue, ...DEMO.red].map((p, i) => ({ riotId: p.riotId, team: i < 5 ? 100 : 200 })), custom: true, region: 'euw' }),
     loadPlayers: async ({ input }) => {
       const txt = String(input || ''), RE = /(?:https?:\/\/)?(?:[a-z]+\.)?op\.gg\/\S+/gi, names = [];
       for (const u of txt.match(RE) ?? []) { try { const x = new URL(/^https?:/.test(u) ? u : 'https://' + u); const q = x.searchParams.get('summoners'); names.push(...(q ? q.split(',') : [decodeURIComponent(x.pathname.split('/').filter(Boolean).pop()).replace(/-+$/, '').replace(/-([^-]+)$/, '#$1')])); } catch {} }

@@ -205,8 +205,19 @@
         </div>
         <div class="form-row"><button id="modeBack">Retour</button></div>
       </div>
+      <div id="balModeBox" class="start-form st-form st-mode" hidden>
+        <b class="sm-t">Équilibrer des équipes : d’où viennent les joueurs ?</b>
+        <div class="sm-opts">
+          <button class="sm-o" data-mode="client"><span class="sm-ic">🎮</span><b>Salon du client</b><small>Les joueurs de ta partie personnalisée sont lus dans le client League, et ajoutés dès que quelqu’un rejoint.</small></button>
+          <button class="sm-o" data-mode="link"><span class="sm-ic">🔗</span><b>Lien d’invitation</b><small>Colle le lien gg.riotgames.com : le client rejoint le salon, puis les joueurs sont lus automatiquement.</small></button>
+          <button class="sm-o" data-mode="manual"><span class="sm-ic">✍</span><b>Pseudos ou liens op.gg</b><small>Colle des pseudos, des liens op.gg ou le chat du salon.</small></button>
+        </div>
+        <div class="form-row"><button id="balModeBack">Retour</button></div>
+      </div>
       <div id="balanceBox" class="start-form st-form bal" hidden>
         <div class="bal-head"><b>⚖ Équilibrer des équipes</b><span class="muted" id="balCount"></span></div>
+        <div id="balLink" class="form-row bal-linkrow" hidden><input id="balLinkIn" placeholder="https://gg.riotgames.com/LOL?joinCode=…" /><button id="balJoin" class="primary">Rejoindre le salon</button></div>
+        <div id="balLobby" class="bal-lobby" hidden></div>
         <div id="balStep1">
           <label class="bal-in">Ajouter des joueurs<textarea id="balInput" rows="3" placeholder="Liens op.gg, Nom#TAG, Nom#TAG… ou le chat du salon collé tel quel : les joueurs s’ajoutent à la liste"></textarea></label>
           <div class="form-row">

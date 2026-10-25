@@ -1220,3 +1220,8 @@ body.fearless .board .grid { box-shadow: inset 0 0 0 2px color-mix(in srgb, #b04
 .mu-ch { display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px 2px 2px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--line); }
 .mu-ch img { width: 18px; height: 18px; border-radius: 50%; }
 .mu-ch small { color: var(--muted); } .mu-ch.up b { color: var(--good); } .mu-ch.down b { color: var(--bad); }
+/* équilibrage : salon du client / lien d'invitation */
+.bal-lobby { font-size: 12px; padding: 6px 10px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--line); }
+.bal-lobby.ok { border-color: color-mix(in srgb, var(--good) 45%, transparent); color: var(--good); }
+.bal-lobby.err { border-color: color-mix(in srgb, var(--bad) 45%, transparent); color: var(--bad); }
+.bal-linkrow input { flex: 1; min-width: 220px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; }

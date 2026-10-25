@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('draftlab', {
   liveStart: () => ipcRenderer.invoke('live:start'),
   liveStop: () => ipcRenderer.invoke('live:stop'),
   liveResults: (ids) => ipcRenderer.invoke('live:results', ids),
+  lobbyPlayers: () => ipcRenderer.invoke('live:lobby'),
   onLive: (cb) => ipcRenderer.on('live:update', (_e, d) => cb(d)),
   detail: (cid, lane, tier) => ipcRenderer.invoke('lola:detail', { cid, lane, tier }),
   onUpdate: (cb) => ipcRenderer.on('update:status', (_e, st) => cb(st))

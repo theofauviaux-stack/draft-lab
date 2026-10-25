@@ -101,7 +101,9 @@ try {
     if (!(await p.evaluate(() => localStorage.getItem('draftlab-live-history')))) issues.push('partie en direct : historique non enregistré');
   });
   await run('équilibrage', async (p) => {
-    await p.click('#startBalance'); await p.fill('#balInput', 'A#1, B#1, C#1, D#1, E#1, F#1, G#1, H#1, I#1, J#1'); await p.click('#balSearch'); await p.waitForTimeout(600);
+    await p.click('#startBalance'); await p.click('#balModeBox .sm-o[data-mode="client"]'); await p.waitForTimeout(2500);
+    if (!(await p.locator('.bal-row').count())) issues.push('équilibrage : salon du client (démo) non lu');
+    await p.click('#balBack'); await p.click('#startBalance'); await p.click('#balModeBox .sm-o[data-mode="manual"]'); await p.fill('#balInput', 'A#1, B#1, C#1, D#1, E#1, F#1, G#1, H#1, I#1, J#1'); await p.click('#balSearch'); await p.waitForTimeout(600);
     await p.click('#balGo'); await p.waitForTimeout(400);
     if (!(await p.locator('.bal-lane').count())) issues.push('équilibrage : pas de résultat');
   });

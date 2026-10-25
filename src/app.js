@@ -1042,7 +1042,7 @@ function openMenu() {
   if ($('startModeBox')) $('startModeBox').hidden = true;
   try { window.scrollTo(0, 0); document.getElementById('appview')?.scrollTo(0, 0); } catch {}
   startBackground();
-  $('startForm').hidden = true; $('startChoices').hidden = false; $('balanceBox').hidden = true;
+  $('startForm').hidden = true; $('startChoices').hidden = false; $('balanceBox').hidden = true; $('balModeBox').hidden = true; lobbyWatch(false);
   $('menuBlue').value = state.teamInput.blue ?? ''; $('menuRed').value = state.teamInput.red ?? '';
   $('menuSide').value = state.mySide; $('menuRegion').value = state.region;
   renderMenuSaves();
@@ -1141,15 +1141,63 @@ function balElo(p) {
 const balPts = (p) => balElo(p).pts;
 const balActive = () => BAL.players.filter((p) => p.on !== false);
 const balLabel = (p) => { const e = balElo(p), n = p.rank?.tier || p.rank?.prevTier ? rankName(p.rank) : null; return { ...e, label: n ? n.label : pointsLabel(e.pts), color: n ? rankColor(p.rank) : tierColor(e.pts) }; };
-function openBalance() {
+// Sous-menu : d'où viennent les joueurs (salon du client, lien d'invitation, ou pseudos / op.gg)
+function openBalanceMenu() {
+  $('startMenu').classList.add('form'); $('startChoices').hidden = true; $('balModeBox').hidden = false;
+}
+function openBalance(mode = 'manual') {
+  BAL.mode = mode;
+  $('balModeBox').hidden = true;
   $('startMenu').classList.add('form'); $('startChoices').hidden = true; $('balanceBox').hidden = false;
+  $('balLink').hidden = mode !== 'link';
+  $('balLobby').hidden = mode === 'manual';
+  if (mode === 'client') lobbyWatch(true);
+  else if (mode === 'link') { lobbyStatus('Colle le lien d’invitation puis clique sur « Rejoindre le salon ».', ''); $('balLinkIn').focus(); }
+  else lobbyWatch(false);
   if (!BAL.players.length) $('balRegion').value = state.region;
   $('balStep1').hidden = false; $('balStep2').hidden = true;
   renderBalList();
 }
-function closeBalance() { $('balanceBox').hidden = true; $('startChoices').hidden = false; $('startMenu').classList.remove('form'); }
-async function balSearch() {
-  const raw = $('balInput').value.trim();
+function closeBalance() { lobbyWatch(false); $('balanceBox').hidden = true; $('balModeBox').hidden = true; $('startChoices').hidden = false; $('startMenu').classList.remove('form'); }
+// ---- Salon du client League : les joueurs présents sont ajoutés automatiquement (toutes les 3 s) ----
+let lobbyTimer = null, lobbyBusy = false;
+const lobbyStatus = (txt, cls) => { const el = $('balLobby'); el.textContent = txt; el.className = 'bal-lobby ' + (cls ?? ''); };
+function lobbyWatch(on) {
+  clearInterval(lobbyTimer); lobbyTimer = null;
+  if (!on) return;
+  if (!api.lobbyPlayers) { lobbyStatus('Lecture du client disponible uniquement dans l’application installée sur l’ordinateur où le client League est ouvert.', 'err'); return; }
+  lobbyStatus('Recherche du salon dans le client League…', '');
+  const tick = async () => {
+    if (lobbyBusy || $('balanceBox').hidden) return;
+    lobbyBusy = true;
+    try {
+      const r = await api.lobbyPlayers();
+      if (r?.error === 'client') lobbyStatus('Client League non détecté sur cet ordinateur : ouvre-le, puis crée ou rejoins le salon.', 'err');
+      else if (r?.error) lobbyStatus('Aucun salon ouvert dans le client : crée ou rejoins une partie personnalisée.', 'err');
+      else {
+        if (r.region && !BAL.players.length) $('balRegion').value = r.region;
+        const keys = new Set(BAL.players.map((p) => p.key));
+        const fresh = r.players.filter((p) => !keys.has(p.riotId.toLowerCase().replace(/\s+/g, '')));
+        lobbyStatus(`Salon du client · ${r.players.length} joueur${r.players.length > 1 ? 's' : ''}${r.custom ? ' (partie personnalisée)' : ''} · mis à jour automatiquement`, 'ok');
+        if (fresh.length) await balSearch(fresh.map((p) => p.riotId).join('\n'));
+      }
+    } catch { lobbyStatus('Lecture du client impossible pour le moment, nouvel essai dans quelques secondes.', 'err'); }
+    lobbyBusy = false;
+  };
+  tick(); lobbyTimer = setInterval(tick, 3000);
+}
+// Lien d'invitation (gg.riotgames.com/LOL?joinCode=…) : ouvert pour que le client rejoigne le salon, puis lecture du salon
+function joinByLink() {
+  const raw = $('balLinkIn').value.trim();
+  const m = raw.match(/https:\/\/gg\.riotgames\.com\/[^\s]*joinCode=[\w-]+/i);
+  if (!m) { toast('Lien d’invitation non reconnu : il ressemble à https://gg.riotgames.com/LOL?joinCode=xxxx-xxxx-xxxx'); return; }
+  if (!api.open || !api.lobbyPlayers) { toast('Disponible uniquement dans l’application'); return; }
+  api.open(m[0]);
+  toast('Le lien s’ouvre : accepte de rejoindre le salon dans le client League');
+  lobbyWatch(true);
+}
+async function balSearch(fromLobby = null) {
+  const raw = typeof fromLobby === 'string' ? fromLobby : $('balInput').value.trim();
   if (!raw) { toast('Entre des pseudos ou colle un lien op.gg'); return; }
   if (!api.loadPlayers) { toast('Disponible uniquement dans l’application'); return; }
   const btn = $('balSearch'); btn.disabled = true; btn.textContent = 'Recherche sur op.gg…';
@@ -1173,9 +1221,9 @@ async function balSearch() {
         added++;
       }
     }
-    $('balInput').value = '';
+    if (typeof fromLobby !== 'string') $('balInput').value = '';
     balSave(); renderBalList();
-    toast(`${added} joueur${added > 1 ? 's' : ''} ajouté${added > 1 ? 's' : ''}${updated ? ` · ${updated} mis à jour` : ''}`);
+    if (typeof fromLobby !== 'string' || added) toast(`${added} joueur${added > 1 ? 's' : ''} ajouté${added > 1 ? 's' : ''}${updated ? ` · ${updated} mis à jour` : ''}`);
   } catch (e) { toast(`op.gg : ${e.message}`); }
   btn.disabled = false; btn.textContent = 'Ajouter depuis op.gg';
 }
@@ -1256,7 +1304,11 @@ function balDraft() {
   toast('Équipes prêtes : choisis ton côté puis lance la draft');
 }
 function initBalance() {
-  $('startBalance').onclick = openBalance;
+  $('startBalance').onclick = openBalanceMenu;
+  document.querySelectorAll('#balModeBox .sm-o').forEach((b) => (b.onclick = () => openBalance(b.dataset.mode)));
+  $('balModeBack').onclick = closeBalance;
+  $('balJoin').onclick = joinByLink;
+  $('balLinkIn').onkeydown = (e) => { if (e.key === 'Enter') joinByLink(); };
   $('balBack').onclick = closeBalance;
   $('balSearch').onclick = balSearch;
   $('balInput').onchange = balSave;
