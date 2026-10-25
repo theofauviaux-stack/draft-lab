@@ -1882,23 +1882,26 @@ function renderSaves() {
 
 const WHO = { mine: ['toi', 'up'], theirs: ['eux', 'down'], even: ['disputé', ''], skip: ['à laisser', 'muted'], unknown: ['?', 'muted'] };
 
-function miniMap(mp, myJ) {
+// Mini-carte du plan, orientée comme dans le jeu : base bleue en bas à gauche, base rouge en haut à droite.
+// Côté rouge, « toi » est donc en haut à droite (symétrie par rapport à la diagonale : top et bot restent à leur place).
+function miniMap(mp, myJ, side = state.mySide) {
   const col = (st) => (st === 'fort' ? '#1f9d5b' : st === 'faible' ? '#d64552' : st === 'égal' ? '#9a7a3c' : '#c3cad5');
-  const L = mp.lanes;
+  const L = mp.lanes, red = side === 'red';
+  const P = (x, y) => (red ? `${y},${x}` : `${x},${y}`);
   let s = `<rect x="0" y="0" width="220" height="220" rx="14" fill="#eef1f5"/>`;
-  s += `<path d="M10,210 L210,10" stroke="#d3e2f4" stroke-width="26"/>`; // rivière (diagonale opposée)
-  s += `<path d="M10,10 L210,210" stroke="#c9d9ec" stroke-width="16" opacity=".6"/>`;
+  s += `<path d="M10,10 L210,210" stroke="#cfe0f3" stroke-width="26"/>`; // rivière : du Baron (haut-gauche) au drake (bas-droit)
   const lane = (d, st, w = 9) => `<path d="${d}" stroke="${col(st)}" stroke-width="${w}" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/>`;
   s += lane('M22,198 L22,22 L198,22', L.T.state) + lane('M28,192 L192,28', L.M.state) + lane('M22,198 L198,198 L198,22', L.B.state);
-  s += `<circle cx="22" cy="198" r="14" fill="#2f6fe0"/><text x="22" y="202" text-anchor="middle" font-size="10" font-weight="800" fill="#fff">TOI</text>`;
-  s += `<circle cx="198" cy="22" r="14" fill="#d64552"/><text x="198" y="26" text-anchor="middle" font-size="9" font-weight="800" fill="#fff">EUX</text>`;
+  const me = red ? [198, 22] : [22, 198], them = red ? [22, 198] : [198, 22];
+  s += `<circle cx="${me[0]}" cy="${me[1]}" r="14" fill="${red ? '#d64552' : '#2f6fe0'}"/><text x="${me[0]}" y="${me[1] + 4}" text-anchor="middle" font-size="10" font-weight="800" fill="#fff">TOI</text>`;
+  s += `<circle cx="${them[0]}" cy="${them[1]}" r="14" fill="${red ? '#2f6fe0' : '#d64552'}"/><text x="${them[0]}" y="${them[1] + 4}" text-anchor="middle" font-size="9" font-weight="800" fill="#fff">EUX</text>`;
   s += `<circle cx="150" cy="150" r="11" fill="#ffffff" stroke="#ff9f43" stroke-width="2"/><text x="150" y="154" text-anchor="middle" font-size="11">🐉</text>`;
   s += `<circle cx="70" cy="70" r="11" fill="#ffffff" stroke="#b65cff" stroke-width="2"/><text x="70" y="74" text-anchor="middle" font-size="10">🪲</text>`;
   const lab = (x, y, t, st) => `<text x="${x}" y="${y}" text-anchor="middle" font-size="10.5" font-weight="700" fill="${col(st)}">${t}</text>`;
   s += lab(40, 112, 'TOP', L.T.state) + lab(112, 98, 'MID', L.M.state) + lab(150, 186, 'BOT', L.B.state);
   if (myJ && mp.strongSide && mp.strongSide !== 'M') {
     const toBot = mp.strongSide === 'B';
-    const d = toBot ? 'M70,95 C95,120 110,140 140,158' : 'M140,125 C115,100 100,80 78,62';
+    const d = toBot ? `M${P(70, 95)} C${P(95, 120)} ${P(110, 140)} ${P(140, 158)}` : `M${P(140, 125)} C${P(115, 100)} ${P(100, 80)} ${P(78, 62)}`;
     s += `<path d="${d}" stroke="#1f2937" stroke-width="2.5" fill="none" stroke-dasharray="5 4" marker-end="url(#jarr)"/>`;
   }
   return themed(`<svg viewBox="0 0 220 220" class="minimap"><defs><marker id="jarr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0L10,5L0,10z" fill="#1f2937"/></marker></defs>${s}</svg>`);
@@ -1933,6 +1936,7 @@ function overlayPayload() {
     obj: { drake: mp.drake.simple, grubs: mp.grubs.simple, herald: mp.herald.simple?.[1]?.length > 16 ? [mp.herald.simple[0], 'Si prio mid'] : mp.herald.simple, baron },
     phases: mp.phases.map((p) => ({ name: p.name, range: p.range, diff: p.diff, tip: brief(p.items.find((t) => !/^Côté fort/.test(strip(t))) ?? p.items[0]) })),
     me: myC ? { name: myC.name, vs: opp?.name ?? null, tip: tip ?? null } : null,
+    side: me, jg: mine.some((x) => x.role === 'J'),
     time: LIVE.time ?? null, at: LIVE.timeAt ?? null
   };
 }

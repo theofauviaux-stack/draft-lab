@@ -1,7 +1,7 @@
 {
-  "version": "2.42.1",
-  "sha256": "dd9a223453c0d6f638ff0e98f13ef82228685f11873d336a3c091d81470daf0c",
-  "file": "draftlab-2.42.1.json.gz",
-  "notes": "Panneau en jeu : reste au-dessus du jeu (plein écran Mac compris)",
-  "date": "2026-10-25T16:24:21.444Z"
+  "version": "2.43.0",
+  "sha256": "cee5b532a683e18a7d1e3cb9c001899c177d8b8e875113ab89edcf9a26345ab6",
+  "file": "draftlab-2.43.0.json.gz",
+  "notes": "Calque sur la mini-carte du jeu (placé d'après les réglages du jeu) ; mini-carte du plan orientée selon ton côté",
+  "date": "2026-10-25T16:44:10.952Z"
 }

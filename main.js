@@ -10,6 +10,7 @@ const { fetchDpm, mergePool } = require('./providers/dpm');
 const { autoUpdate } = require('./providers/updater');
 const { fetchProGames } = require('./providers/progames');
 const { fetchPatchChanges } = require('./providers/patches');
+const { readHud } = require('./providers/gamecfg');
 const { startLive, stopLive, matchResults, lobbyPlayers, detectPhase } = require('./providers/live');
 
 const HOUR = 3600 * 1000;
@@ -333,12 +334,57 @@ function pinOverlay(first = false) {
   // ensuite on le saute (sinon le Dock clignoterait toutes les 2 s)
   try { overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: !first }); } catch {}
   if (overlay.isVisible()) overlay.moveTop();
+  if (mini && !mini.isDestroyed() && mini.isVisible()) { mini.setAlwaysOnTop(true, 'screen-saver', 1); mini.moveTop(); }
+}
+// ---- Calque sur la mini-carte du jeu : posé d'après les réglages du jeu (taille de la mini-carte, à gauche
+// ou à droite), ajustable à la main (Ctrl+Maj+F) ; la place choisie est retenue en proportion de l'écran ----
+let mini = null;
+const MINI_FILE = () => path.join(app.getPath('userData'), 'minimap.json');
+function miniFit() {
+  if (!mini || mini.isDestroyed()) return;
+  const { x: X, y: Y, width: W, height: H } = screen.getPrimaryDisplay().bounds;
+  let saved = null; try { saved = JSON.parse(fs.readFileSync(MINI_FILE(), 'utf8')); } catch {}
+  let b;
+  if (saved?.rw) b = { x: X + saved.rx * W, y: Y + saved.ry * H, width: saved.rw * W, height: saved.rw * W };
+  else {
+    // mini-carte du jeu : carrée, collée au coin bas-droit (ou bas-gauche si « mini-carte à gauche ») ;
+    // côté ≈ 24 % de la hauteur de l'écran à la taille par défaut, plus ou moins selon le réglage de taille
+    const hud = readHud();
+    const sc = hud?.minimapScale != null ? Math.max(0, Math.min(3, hud.minimapScale)) : 1;
+    const side = Math.round(H * 0.24 * (0.55 + 0.45 * sc));
+    b = { x: hud?.flip ? X : X + W - side, y: Y + H - side, width: side, height: side };
+  }
+  mini.__fitting = true;
+  mini.setBounds({ x: Math.round(b.x), y: Math.round(b.y), width: Math.round(b.width), height: Math.round(b.height) });
+  setTimeout(() => { if (mini && !mini.isDestroyed()) mini.__fitting = false; }, 300);
+}
+function createMini() {
+  if (mini && !mini.isDestroyed()) return mini;
+  mini = new BrowserWindow({
+    width: 260, height: 260, frame: false, transparent: true, alwaysOnTop: true, skipTaskbar: true, resizable: false, focusable: false, hasShadow: false, show: false,
+    type: process.platform === 'darwin' ? 'panel' : 'toolbar', fullscreenable: false,
+    webPreferences: { preload: path.join(__dirname, 'src', 'overlay-preload.js'), contextIsolation: true, sandbox: true }
+  });
+  mini.setAlwaysOnTop(true, 'screen-saver', 1);
+  try { mini.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true }); } catch {}
+  mini.setIgnoreMouseEvents(true, { forward: true });
+  mini.setAspectRatio(1);
+  mini.loadFile(path.join(__dirname, 'src', 'overlay.html'), { search: 'mini=1' });
+  mini.webContents.on('did-finish-load', () => { if (overlayData) mini.webContents.send('overlay:update', overlayData); });
+  const save = () => {
+    if (mini.__fitting) return;
+    try { const { x: X, y: Y, width: W, height: H } = screen.getPrimaryDisplay().bounds; const bb = mini.getBounds(); fs.writeFileSync(MINI_FILE(), JSON.stringify({ rx: (bb.x - X) / W, ry: (bb.y - Y) / H, rw: bb.width / W })); } catch {}
+  };
+  mini.on('moved', save); mini.on('resized', save);
+  mini.on('closed', () => { mini = null; });
+  miniFit();
+  return mini;
 }
 function showOverlay(on) {
   overlayWanted = !!on;
   clearInterval(ovPin); ovPin = null;
-  if (on) { createOverlay().showInactive(); pinOverlay(); ovPin = setInterval(pinOverlay, 2000); }
-  else if (overlay && !overlay.isDestroyed()) overlay.hide();
+  if (on) { createOverlay().showInactive(); createMini().showInactive(); pinOverlay(); ovPin = setInterval(pinOverlay, 2000); }
+  else { if (overlay && !overlay.isDestroyed()) overlay.hide(); if (mini && !mini.isDestroyed()) mini.hide(); }
   if (win && !win.isDestroyed()) win.webContents.send('overlay:state', overlayWanted);
 }
 function moveOverlay() {
@@ -347,10 +393,16 @@ function moveOverlay() {
   overlay.setIgnoreMouseEvents(!overlayMove, { forward: true });
   overlay.setFocusable(overlayMove);
   overlay.webContents.send('overlay:move', overlayMove);
+  // le calque de la mini-carte se déplace et se redimensionne en même temps (ajustement sur la vraie mini-carte)
+  if (mini && !mini.isDestroyed()) {
+    mini.setIgnoreMouseEvents(!overlayMove, { forward: true });
+    mini.setFocusable(overlayMove); mini.setResizable(overlayMove);
+    mini.webContents.send('overlay:move', overlayMove);
+  }
 }
 
 app.whenReady().then(() => {
-  ipcMain.handle('overlay:data', (_e, d) => { overlayData = d; if (overlay && !overlay.isDestroyed()) overlay.webContents.send('overlay:update', d); });
+  ipcMain.handle('overlay:data', (_e, d) => { overlayData = d; for (const w of [overlay, mini]) if (w && !w.isDestroyed()) w.webContents.send('overlay:update', d); });
   ipcMain.handle('overlay:show', (_e, on) => { showOverlay(on); return overlayWanted; });
   try {
     globalShortcut.register('CommandOrControl+Shift+D', () => showOverlay(!(overlay && !overlay.isDestroyed() && overlay.isVisible())));
@@ -358,7 +410,7 @@ app.whenReady().then(() => {
   } catch {}
   app.on('will-quit', () => { try { globalShortcut.unregisterAll(); } catch {} });
   // changement d'écran ou de résolution : le panneau garde sa taille et sa place proportionnelles
-  for (const ev of ['display-metrics-changed', 'display-added', 'display-removed']) screen.on(ev, () => setTimeout(overlayFit, 200));
+  for (const ev of ['display-metrics-changed', 'display-added', 'display-removed']) screen.on(ev, () => setTimeout(() => { overlayFit(); miniFit(); }, 200));
   loadCache();
   ipcMain.handle('data:load', (_e, opts) => quickLoad(opts?.tier ?? lastTier));
   ipcMain.handle('data:refresh', (_e, opts) => sync({ force: true, tier: opts?.tier }));

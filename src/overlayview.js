@@ -74,3 +74,27 @@ export const OVERLAY_CSS = `
 .ov-f { font-size: 10px; color: #6f7a8e; text-align: right; }
 .ov-empty { margin: 4px 0; color: #8f99ab; }
 `;
+
+// Calque posé sur la mini-carte du jeu : lanes fortes / faibles, trajet conseillé du jungler, priorités du
+// drake et des Larves. Orienté comme le jeu (bleu en bas à gauche, rouge en haut à droite). Transparent
+// pour laisser voir la vraie mini-carte dessous ; aucune position de joueur (infos de plan seulement).
+export function minimapLayerHtml(d) {
+  if (!d) return '';
+  const col = (st) => (st === 'fort' ? '#3ddc84' : st === 'faible' ? '#ff5d6c' : st === 'égal' ? '#e8c877' : 'transparent');
+  const L = d.lanes ?? {}, red = d.side === 'red';
+  const P = (x, y) => (red ? `${y},${x}` : `${x},${y}`);
+  const lane = (path, st) => `<path d="${path}" stroke="${col(st)}" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".55"/>`;
+  let s = lane('M20,200 L20,20 L200,20', L.T?.state) + lane('M26,194 L194,26', L.M?.state) + lane('M20,200 L200,200 L200,20', L.B?.state);
+  const tag = (x, y, t, st) => st && st !== 'inconnu' ? `<g><rect x="${x - 24}" y="${y - 9}" width="48" height="15" rx="4" fill="rgba(8,12,18,.72)"/><text x="${x}" y="${y + 2}" text-anchor="middle" font-size="9.5" font-weight="800" fill="${col(st)}">${t}</text></g>` : '';
+  const word = (st) => (st === 'fort' ? 'FORT' : st === 'faible' ? 'FAIBLE' : 'ÉGAL');
+  s += tag(38, 112, word(L.T?.state), L.T?.state) + tag(110, 96, word(L.M?.state), L.M?.state) + tag(150, 190, word(L.B?.state), L.B?.state);
+  if (d.jg && d.strong && d.strong !== 'mid') {
+    const toBot = d.strong === 'bot';
+    const path = toBot ? `M${P(70, 95)} C${P(95, 120)} ${P(110, 140)} ${P(140, 158)}` : `M${P(140, 125)} C${P(115, 100)} ${P(100, 80)} ${P(78, 62)}`;
+    s += `<path d="${path}" stroke="#ffffff" stroke-width="3" fill="none" stroke-dasharray="6 5" marker-end="url(#ar)" opacity=".85"/>`;
+  }
+  const pr = (p) => (p?.[0] === 'high' ? '#3ddc84' : p?.[0] === 'low' ? '#ff5d6c' : '#e8c877');
+  const pit = (x, y, p, t) => p ? `<g><circle cx="${x}" cy="${y}" r="13" fill="none" stroke="${pr(p)}" stroke-width="3" opacity=".9"/><text x="${x}" y="${y + 25}" text-anchor="middle" font-size="9" font-weight="800" fill="${pr(p)}" stroke="rgba(0,0,0,.7)" stroke-width="2.5" paint-order="stroke">${t}</text></g>` : '';
+  s += pit(150, 150, d.obj?.drake, 'DRAKE') + pit(70, 70, d.obj?.grubs, 'LARVES');
+  return `<svg viewBox="0 0 220 220" width="100%" height="100%" preserveAspectRatio="none" style="display:block"><defs><marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0L10,5L0,10z" fill="#fff"/></marker></defs>${s}</svg>`;
+}
