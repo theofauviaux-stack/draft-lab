@@ -321,6 +321,12 @@ export function evaluate(blue, red) {
   const comfTxt = (t) => t.filter((c) => c.comfort > 0).map((c) => c.name).join(', ');
   add('comfort', 'Maîtrise des joueurs', Math.max(-5, Math.min(5, (cB - cR) * W.comfort)),
     [comfTxt(blue) ? `Bleu : ${comfTxt(blue)}` : '', comfTxt(red) ? `Rouge : ${comfTxt(red)}` : ''].filter(Boolean).join(' · ') + ' (champions du pool op.gg du joueur)');
+  // Champions peu joués par leur joueur (seulement quand on connaît ses games op.gg)
+  const xB = blue.reduce((a, c) => a + (c.xp?.pen || 0), 0), xR = red.reduce((a, c) => a + (c.xp?.pen || 0), 0);
+  const xpTxt = (t) => t.filter((c) => c.xp?.pen > 0).map((c) => `${c.name} (${c.xp.games ? c.xp.games + ' game' + (c.xp.games > 1 ? 's' : '') : '1re game'})`).join(', ');
+  add('xp', 'Champions peu joués', Math.max(-6, Math.min(6, xR - xB)),
+    [xpTxt(blue) ? `Bleu : ${xpTxt(blue)}` : '', xpTxt(red) ? `Rouge : ${xpTxt(red)}` : ''].filter(Boolean).join(' · ')
+    + ' — games ranked de la saison sur op.gg ; un joueur qui découvre un champion gagne nettement moins, surtout en jungle et sur les champions longs à prendre en main');
   add('damage', 'Répartition des dégâts', damagePenalty(B) - damagePenalty(R), 'Trop de dégâts d’un seul type = facile à itemiser contre');
   add('front', 'Ligne de front', frontPenalty(B) - frontPenalty(R), 'Il faut au moins un champion capable d’encaisser');
   add('engage', 'Outils d’initiation', engagePenalty(B) - engagePenalty(R), 'Sans engage ni catch, difficile de forcer un fight');
@@ -441,6 +447,21 @@ export function comfortPts(entry) {
   const base = g >= 30 ? 2 : g >= 15 ? 1.5 : g >= 6 ? 1 : g >= 2 ? 0.4 : 0.2;
   const adj = Math.max(-1, Math.min(1, (wr - 50) / 10)) * 0.7 * Math.min(g, 30) / 30;
   return Math.max(0, +(base + adj).toFixed(2));
+}
+// Champion peu joué : en soloQ, un joueur qui débute sur un champion gagne nettement moins
+// (iTero, 1 M de games : ~44 % sous ~20 games contre ~50 % ensuite ; Riot : ~+4 % sur les 15 premières).
+// On compte les games ranked de la saison (op.gg, toutes lanes) : prudent, l'expérience des saisons
+// passées n'est pas visible. Plus fort en jungle et sur les champions longs à prendre en main, plus faible en ADC.
+const XP_STEPS = [[0, 3], [2, 2.4], [5, 1.7], [9, 1.1], [14, 0.5]];
+const XP_ROLE = { J: 1.3, A: 0.6 };
+// longs à prendre en main (iTero 2023, Riot /dev 2020) / rapides à prendre en main (iTero 2023, Riot /dev 2020)
+const XP_HARD = new Set(['KSante', 'Riven', 'Ivern', 'Nunu', 'Yuumi', 'Senna', 'Yasuo', 'Katarina', 'Nidalee', 'Bard', 'Ornn']);
+const XP_EASY = new Set(['Ryze', 'Vayne', 'Fiora', 'Neeko']);
+export function inexperience(games, lane, id) {
+  const step = XP_STEPS.find(([max]) => games <= max);
+  if (!step) return 0;
+  const k = (XP_ROLE[lane] ?? 1) * (XP_HARD.has(id) ? 1.4 : XP_EASY.has(id) ? 0.6 : 1);
+  return +(step[1] * k).toFixed(2);
 }
 export function targetBans(pool, enemyPlayers) {
   const byId = new Map(pool.map((c) => [c.id, c]));

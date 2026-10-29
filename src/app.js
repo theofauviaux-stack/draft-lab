@@ -4,7 +4,7 @@ import { lineCanvas, readLines } from './ocr.js';
 import {
   ROLES, ROLE_LABEL, ARCH, ORDER, rel, relText, laneEdge, proEdge, LANE_OPP,
   buildProfiles, evaluate, setDetailSource, setDataTierLabel, dataTierLabel, botDuel, applyProGames, proInfo, recommend, recommendBans, projectPicks, gamePlan, powerCurve,
-  comfortPts, proposeDrafts, playerLabel, rankName, analyzeDraft, matchPlan, pentagonView, styleBreakdown, compLabel, playersForecast, combineWr, pointsLabel, rankPoints, RANK_OPTIONS, playerRating, dominant, teamShares, predictPicks, enemyScenarios, predictedBans
+  comfortPts, inexperience, proposeDrafts, playerLabel, rankName, analyzeDraft, matchPlan, pentagonView, styleBreakdown, compLabel, playersForecast, combineWr, pointsLabel, rankPoints, RANK_OPTIONS, playerRating, dominant, teamShares, predictPicks, enemyScenarios, predictedBans
 } from './engine.js';
 import { balanceTeams, rolesFromPool, balValue, roleFit, BAL_ROLES, BAL_COST } from './balance.js';
 
@@ -121,11 +121,27 @@ function fitsRole(id, role) {
 const rolePool = (p) => (p.pool ?? []).filter((e) => e.manual || e.restored || fitsRole(e.id, p.role));
 const rolePlayers = (side) => state.players[side].map((p) => ({ ...p, pool: rolePool(p) })).filter((p) => p.pool.length);
 const playerFor = (side, role) => rolePlayers(side).find((p) => p.role === role);
+// Expérience du joueur sur le champion : games ranked de la saison (op.gg, toutes lanes).
+// Seulement pour un joueur chargé depuis op.gg avec au moins 20 games ranked cette saison ;
+// un champion ajouté à la main au pool compte comme maîtrisé.
+function champXp(c, side, role) {
+  if (!role) return null;
+  const p = state.players[side]?.find((x) => x.role === role && x.riotId && !x.error);
+  const games = p?.all ?? p?.pool?.filter((e) => e.games);
+  if (!games?.length) return null;
+  const total = p.total || games.reduce((a, e) => a + (e.games || 0), 0);
+  if (total < 20) return null;
+  if (p.pool?.some((e) => e.id === c.id && e.manual && !e.games)) return null;
+  const g = games.find((e) => e.id === c.id)?.games ?? 0;
+  const pen = inexperience(g, role, c.id);
+  return pen > 0 ? { games: g, pen, who: playerLabel(p) } : null;
+}
 function withComfort(c, side, role) {
+  const xp = champXp(c, side, role);
   const pl = role ? playerFor(side, role) : null;
   const e = pl?.pool?.find((x) => x.id === c.id);
-  if (!e) return c;
-  return { ...c, comfort: comfortPts(e), comfortTxt: e.games ? `${playerLabel(pl)} : ${e.games} games, ${Math.round((e.wins / e.games) * 100)} %` : `${playerLabel(pl)} : ajouté à la main` };
+  if (!e) return xp ? { ...c, xp } : c;
+  return { ...c, xp, comfort: comfortPts(e), comfortTxt: e.games ? `${playerLabel(pl)} : ${e.games} games, ${Math.round((e.wins / e.games) * 100)} %` : `${playerLabel(pl)} : ajouté à la main` };
 }
 const pickPos = (side, i) => PICKS.findIndex(([t, j]) => t === side && j === i);
 const team = (side) => state.slots[side].map((id, i) => (id ? { ...withComfort(state.P[id], side, state.roles[side][i]), lane: state.roles[side][i], po: pickPos(side, i) } : null)).filter(Boolean);
@@ -328,7 +344,7 @@ function renderTeams() {
         <div class="portrait">${c ? `<img src="${img(id)}" alt="">` : `<span class="lane-ph ${LIVE.on ? '' : 'po'}">${LIVE.on ? ROLE_LABEL[r] : po}</span>`}</div>
         <div>
           <div class="name">${c ? c.name : `<span class="muted">${LIVE.on ? ROLE_LABEL[r] : 'Pick ' + po} · à choisir</span>`}</div>
-          <div class="meta">${roleSel}${(() => { const pl = c ? playerFor(side, state.roles[side][i]) : null; const e = pl?.pool?.find((x) => x.id === id); return e && e.games ? `<span class="pgw ${e.wins / e.games >= 0.5 ? 'up' : 'down'}" title="${playerLabel(pl)} : ${e.games} games, ${Math.round((e.wins / e.games) * 100)} % de victoires">${e.games} g · ${Math.round((e.wins / e.games) * 100)} %</span>` : ''; })()}${c?.wr != null ? `<span class="wrtag" title="Winrate estimé : games pro + Master+ (one-tricks atténués)">${c.wr.toFixed(1)} % WR</span>` : ''}</div>
+          <div class="meta">${roleSel}${(() => { const pl = c ? playerFor(side, state.roles[side][i]) : null; const e = pl?.pool?.find((x) => x.id === id); const xp = c ? champXp(c, side, r) : null; const xpTag = xp ? `<span class="pgw down" title="${xp.who} : ${xp.games ? xp.games + ' game' + (xp.games > 1 ? 's' : '') : 'aucune game'} ranked sur ${c.name} cette saison. Un champion peu joué gagne nettement moins en soloQ : −${xp.pen.toFixed(1).replace('.', ',')} pt de winrate.">${xp.games ? 'peu joué' : '1re game'}</span>` : ''; return e && e.games ? `<span class="pgw ${e.wins / e.games >= 0.5 ? 'up' : 'down'}" title="${playerLabel(pl)} : ${e.games} games, ${Math.round((e.wins / e.games) * 100)} % de victoires">${e.games} g · ${Math.round((e.wins / e.games) * 100)} %</span>${xpTag}` : xpTag; })()}${c?.wr != null ? `<span class="wrtag" title="Winrate estimé : games pro + Master+ (one-tricks atténués)">${c.wr.toFixed(1)} % WR</span>` : ''}</div>
           ${c ? archBar(c) : ''}
           ${c ? sPairs.filter((x) => x.a.id === id || x.b.id === id).slice(0, 2).map((x) => { const o = x.a.id === id ? x.b : x.a; return `<span class="slink" style="--k:${KINDS[x.kind]?.color ?? '#6b7280'}" title="${x.title} : ${x.why.replace(/"/g, '&quot;')}">🔗 ${o.name} · ${KINDS[x.kind]?.label ?? ''}</span>`; }).join('') : ''}
         </div>

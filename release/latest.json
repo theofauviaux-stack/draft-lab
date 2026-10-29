@@ -1,7 +1,7 @@
 {
-  "version": "2.46.0",
-  "sha256": "7efe7f4b58234df58d8af44865a9f79b595b436e38577ee94ee5855fcd44ac84",
-  "file": "draftlab-2.46.0.json.gz",
-  "notes": "Capture d'une partie en cours : 10 champions et pseudos lus automatiquement, joueurs chargés depuis op.gg ou envoyés à l'équilibrage",
-  "date": "2026-10-25T20:53:08.651Z"
+  "version": "2.47.0",
+  "sha256": "a69576bd5f710df11f089870ceaf234396ba7b636b005a3be8f7576f9ce78ef7",
+  "file": "draftlab-2.47.0.json.gz",
+  "notes": "Champions peu joués : un joueur qui découvre un champion (moins de 15 games ranked cette saison sur op.gg) fait baisser le winrate de son équipe, surtout en jungle et sur les champions difficiles ; badge « 1re game » / « peu joué » sur le pick",
+  "date": "2026-10-29T16:50:37.366Z"
 }
