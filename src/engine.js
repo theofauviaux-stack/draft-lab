@@ -582,23 +582,33 @@ export function playerRating(p) {
   parts.pool = Math.min(25, deep * 5);
   return { total: parts.rank + parts.wr + parts.form + parts.pool, parts, games: g, wr: g ? Math.round((p.rank.wins / g) * 100) : null };
 }
+// Joueurs sans données (mode streamer, introuvable sur op.gg, non classé) : estimés à l'elo moyen des joueurs
+// connus de la partie (le matchmaking soloQ réunit des niveaux proches). Sans cela, l'équipe qui a un joueur
+// masqué serait jugée sur 4 joueurs seulement et le pourcentage serait faussé.
+export const unknownPlayer = (p) => !!p && (p.hidden || !!p.riotId) && !playerRating(p);
 export function playersForecast(bluePlayers, redPlayers) {
+  const rate = (list) => list.map((p) => ({ p, r: playerRating(p) })).filter((x) => x.r);
+  const all = [...rate(bluePlayers), ...rate(redPlayers)];
+  if (all.length < 2) return { blue: null, red: null, wr: null };
+  const mean = (a, f) => a.reduce((t, x) => t + f(x), 0) / a.length;
+  const est = { total: mean(all, (x) => x.r.total), rank: mean(all, (x) => x.r.parts.rank), pool: mean(all, (x) => x.r.parts.pool) };
   const team = (list) => {
-    const rated = list.map((p) => ({ p, r: playerRating(p) })).filter((x) => x.r);
-    if (!rated.length) return null;
-    const avg = (f) => rated.reduce((a, x) => a + f(x), 0) / rated.length;
+    const rated = rate(list), n = rated.length, e = list.filter(unknownPlayer).length;
+    if (!n && !e) return null;
+    const k = n + e;
     const wrs = rated.filter((x) => x.r.wr != null);
     return {
-      n: rated.length, rating: avg((x) => x.r.total), rank: avg((x) => x.r.parts.rank),
+      n, est: e, rating: (n * (n ? mean(rated, (x) => x.r.total) : 0) + e * est.total) / k,
+      rank: (n * (n ? mean(rated, (x) => x.r.parts.rank) : 0) + e * est.rank) / k,
       wr: wrs.length ? Math.round(wrs.reduce((a, x) => a + x.r.wr, 0) / wrs.length) : null,
-      hot: rated.filter((x) => x.p.rank?.hot).length, pool: avg((x) => x.r.parts.pool),
+      hot: rated.filter((x) => x.p.rank?.hot).length, pool: (n * (n ? mean(rated, (x) => x.r.parts.pool) : 0) + e * est.pool) / k,
       players: rated
     };
   };
   const B = team(bluePlayers), R = team(redPlayers);
   if (!B || !R) return { blue: B, red: R, wr: null };
   const wr = 100 / (1 + Math.pow(10, -(B.rating - R.rating) / 800));
-  return { blue: B, red: R, wr: +wr.toFixed(1) };
+  return { blue: B, red: R, wr: +wr.toFixed(1), est: B.est + R.est, estRank: est.rank };
 }
 // Combine deux probabilités indépendantes (draft et joueurs) en additionnant leurs log-cotes
 export function combineWr(a, b) {

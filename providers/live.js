@@ -1,7 +1,7 @@
 // Partie en direct (soloQ), comme Porofessor / dpm :
 //  - sélection des champions : API locale du client League (LCU) → picks, bans, lanes, joueurs alliés
 //  - en jeu : API « Live Client Data » du jeu (port 2999) → les 10 joueurs et leurs champions
-// Tout reste sur l'ordinateur (127.0.0.1). Les joueurs en mode streamer (nom masqué) sont ignorés.
+// Tout reste sur l'ordinateur (127.0.0.1). Les joueurs en mode streamer (nom masqué) ne sont pas cherchés : l'appli les estime à l'elo moyen de la partie.
 const https = require('https');
 const fs = require('fs');
 const path = require('path');

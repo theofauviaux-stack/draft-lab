@@ -4,7 +4,7 @@ import { lineCanvas, readLines } from './ocr.js';
 import {
   ROLES, ROLE_LABEL, ARCH, ORDER, rel, relText, laneEdge, proEdge, LANE_OPP,
   buildProfiles, evaluate, setDetailSource, setDataTierLabel, dataTierLabel, botDuel, applyProGames, proInfo, recommend, recommendBans, projectPicks, gamePlan, powerCurve,
-  comfortPts, proposeDrafts, playerLabel, rankName, analyzeDraft, matchPlan, pentagonView, styleBreakdown, compLabel, playersForecast, combineWr, pointsLabel, rankPoints, RANK_OPTIONS, playerRating, dominant, teamShares, predictPicks, enemyScenarios, predictedBans
+  comfortPts, proposeDrafts, playerLabel, rankName, analyzeDraft, matchPlan, pentagonView, styleBreakdown, compLabel, playersForecast, unknownPlayer, combineWr, pointsLabel, rankPoints, RANK_OPTIONS, playerRating, dominant, teamShares, predictPicks, enemyScenarios, predictedBans
 } from './engine.js';
 import { balanceTeams, rolesFromPool, balValue, roleFit, BAL_ROLES, BAL_COST } from './balance.js';
 
@@ -467,12 +467,14 @@ function renderWr(ev) {
   renderGauge(main, fc.wr != null ? 'Pronostic global' : 'Winrate de la draft');
 
   const bars = [['Draft', ev.wr, 'composition, synergies, méta']];
-  if (fc.wr != null) bars.push(['Joueurs', fc.wr, 'rang, forme, pools'], ['Global', glob, 'draft + joueurs']);
+  const estTxt = fc.est ? `${fc.est} joueur${fc.est > 1 ? 's' : ''} sans données (masqué${fc.est > 1 ? 's' : ''} ou non classé${fc.est > 1 ? 's' : ''}) estimé${fc.est > 1 ? 's' : ''} à l’elo moyen de la partie : ≈ ${pointsLabel(fc.estRank)}` : '';
+  if (fc.wr != null) bars.push(['Joueurs', fc.wr, fc.est ? `rang, forme, pools · ${fc.est} estimé${fc.est > 1 ? 's' : ''}` : 'rang, forme, pools'], ['Global', glob, 'draft + joueurs']);
   $('sbBars').innerHTML = bars.map(([l, v, sub]) => `
     <div class="sb-bar ${l === 'Global' ? 'glob' : ''}">
       <div class="sb-bar-h"><b class="b">${v.toFixed(1)}%</b><span>${l}<small>${sub}</small></span><b class="r">${(100 - v).toFixed(1)}%</b></div>
       <div class="sb-track"><div style="width:${v}%"></div></div>
-    </div>`).join('') + (fc.wr == null && state.flow === 'players' ? '<div class="sb-hint">Charge les joueurs (multi op.gg) pour ajouter le pronostic joueurs.</div>' : '');
+    </div>`).join('') + (fc.wr == null && state.flow === 'players' ? '<div class="sb-hint">Charge les joueurs (multi op.gg) pour ajouter le pronostic joueurs.</div>' : '')
+    + (fc.wr != null && estTxt ? `<div class="sb-hint est">≈ ${estTxt}.</div>` : '');
   for (const side of ['blue', 'red']) {
     const t = fc[side];
     const list = state.players[side] ?? [];
@@ -480,13 +482,13 @@ function renderWr(ev) {
     $(side === 'blue' ? 'sbBlue' : 'sbRed').innerHTML = `
       <div class="sb-title">${side === 'blue' ? 'Équipe 1' : 'Équipe 2'} <span>${side === 'blue' ? 'côté bleu' : 'côté rouge'}${state.mySide === side ? ' · toi' : ''}</span></div>
       <div class="sb-pct">${pct.toFixed(1)}<small>%</small></div>
-      <div class="sb-meta">${t ? `<span class="tier" style="--c:${tierColor(t.rank)}">${pointsLabel(t.rank)}</span>${t.wr != null ? `<span>${t.wr} % saison</span>` : ''}${t.hot ? `<span>🔥 ${t.hot} en forme</span>` : ''}` : '<span class="muted">joueurs inconnus</span>'}</div>
+      <div class="sb-meta">${t ? `<span class="tier" style="--c:${tierColor(t.rank)}" title="${t.est ? `dont ${t.est} joueur${t.est > 1 ? 's' : ''} estimé${t.est > 1 ? 's' : ''} à l’elo moyen de la partie` : ''}">${t.est ? '≈ ' : ''}${pointsLabel(t.rank)}</span>${t.wr != null ? `<span>${t.wr} % saison</span>` : ''}${t.hot ? `<span>🔥 ${t.hot} en forme</span>` : ''}` : '<span class="muted">joueurs inconnus</span>'}</div>
       <div class="sb-picks">${ROLES.map((r) => { const i = state.roles[side].indexOf(r), id = state.slots[side][i]; return `<div class="sb-pick ${id ? '' : 'empty'}" title="${id ? state.P[id].name : ''}">${id ? `<img src="${img(id)}" alt="">` : ''}<span>${ROLE_LABEL[r]}</span></div>`; }).join('')}</div>
       <div class="sb-players">${ROLES.map((r) => {
         const p = list.find((x) => x.role === r);
         const pts = p ? rankPoints(p.rank) : null;
         const fx = p?.rank?.flex ? rankPoints(p.rank.flex) : null;
-        return `<div class="sb-p" title="${p ? playerLabel(p) + (pts != null ? ' — Solo/Duo ' + (rankName(p.rank)?.label ?? '') : ' — Solo/Duo non classé') + (fx != null ? ' · Flex ' + (rankName(p.rank.flex)?.label ?? '') : '') : ROLE_LABEL[r]}"><i style="background:${p ? rankColor(p.rank) : tierColor(null)}"></i><span>${ROLE_LABEL[r]}</span><b>${p && p.riotId ? playerLabel(p) : '—'}</b>${p && p.riotId ? sbRank(p.rank, p.rank?.flex) : ''}</div>`;
+        return `<div class="sb-p" title="${p ? playerLabel(p) + (pts != null ? ' — Solo/Duo ' + (rankName(p.rank)?.label ?? '') : ' — Solo/Duo non classé') + (fx != null ? ' · Flex ' + (rankName(p.rank.flex)?.label ?? '') : '') : ROLE_LABEL[r]}"><i style="background:${p ? rankColor(p.rank) : tierColor(null)}"></i><span>${ROLE_LABEL[r]}</span><b>${p && p.riotId ? playerLabel(p) : p?.hidden ? 'masqué' : '—'}</b>${p && p.riotId && !unknownPlayer(p) ? sbRank(p.rank, p.rank?.flex) : unknownPlayer(p) && fc.estRank != null ? `<span class="sb-est" title="Pas de données : estimé à l’elo moyen des joueurs connus de la partie">≈ ${pointsLabel(fc.estRank)} <small>estimé</small></span>` : ''}</div>`;
       }).join('')}</div>`;
   }
 }
@@ -1477,12 +1479,12 @@ function onLive(d) {
     const bans = (d.bans?.[side] ?? []).map(champByKey).filter(Boolean).slice(0, 5);
     // en jeu, l'API ne donne plus les bans : on garde ceux de la sélection des champions
     if (bans.length || d.phase !== 'InProgress') state.slots[`${side}Bans`] = [...bans, ...Array(5 - bans.length).fill(null)];
-    // joueurs : op.gg pour ceux dont le nom est visible, les autres (mode streamer) sont ignorés
+    // joueurs : op.gg pour ceux dont le nom est visible ; les autres (mode streamer) sont estimés à l'elo moyen de la partie
     const visible = members.filter((m) => m.riotId);
     const key = visible.map((m) => m.riotId).join(',');
     state.players[side] = members.map((m, k) => {
       const old = state.players[side].find((p) => p.riotId && p.riotId === m.riotId);
-      return old ? { ...old, role: m.role ?? old.role } : { riotId: m.riotId ?? '', role: m.role ?? ROLES[k], pool: [], hidden: !m.riotId, error: m.riotId ? null : 'nom masqué (mode streamer) : ignoré' };
+      return old ? { ...old, role: m.role ?? old.role } : { riotId: m.riotId ?? '', role: m.role ?? ROLES[k], pool: [], hidden: !m.riotId, error: m.riotId ? null : 'nom masqué (mode streamer) : estimé à l’elo moyen de la partie' };
     });
     if (key && key !== LIVE.loaded[side] && api.loadTeam) {
       LIVE.loaded[side] = key;

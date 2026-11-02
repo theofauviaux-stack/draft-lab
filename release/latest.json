@@ -1,7 +1,7 @@
 {
-  "version": "2.46.0",
-  "sha256": "7efe7f4b58234df58d8af44865a9f79b595b436e38577ee94ee5855fcd44ac84",
-  "file": "draftlab-2.46.0.json.gz",
-  "notes": "Capture d'une partie en cours : 10 champions et pseudos lus automatiquement, joueurs chargés depuis op.gg ou envoyés à l'équilibrage",
-  "date": "2026-10-25T20:53:08.651Z"
+  "version": "2.47.0",
+  "sha256": "5bf7434a1519f4d15593b2f69c37f907ec5051e7d80d25aad7a299ec222ee287",
+  "file": "draftlab-2.47.0.json.gz",
+  "notes": "Pronostic joueurs : joueurs masqués (mode streamer) ou sans données estimés à l'elo moyen de la partie, avec mention",
+  "date": "2026-11-02T16:35:30.525Z"
 }
