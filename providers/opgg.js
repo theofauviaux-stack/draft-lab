@@ -105,9 +105,31 @@ function accentVariants(name, max = 36) {
 }
 const chunks = (a, n) => Array.from({ length: Math.ceil(a.length / n) }, (_, k) => a.slice(k * n, k * n + n));
 
+// op.gg ne relit le compte chez Riot que quand quelqu'un clique « Mettre à jour » : sans ça, le rang
+// affiché peut dater de plusieurs jours. On demande donc la mise à jour (comme le bouton du site) quand
+// la fiche a plus de 10 minutes, puis on attend qu'elle soit faite (8 s au plus) avant de lire le rang.
+const RENEW_AFTER = 10 * 60 * 1000;
+async function renew(region, s) {
+  const before = Date.parse(s.updated_at ?? 0) || 0;
+  if (Date.now() - before < RENEW_AFTER) return;
+  const url = `${BASE}/${region}/summoners/${s.summoner_id}/renewal`;
+  try {
+    const r = await fetch(url, { method: 'POST', headers: { 'User-Agent': UA, Accept: 'application/json' }, signal: AbortSignal.timeout(8000) });
+    if (!r.ok && r.status !== 202) return;
+    const end = Date.now() + 8000;
+    while (Date.now() < end) {
+      await new Promise((ok) => setTimeout(ok, 1000));
+      const st = await getJson(`${url}-status`).catch(() => null);
+      const last = Date.parse(st?.last_updated_at ?? st?.data?.last_updated_at ?? 0) || 0;
+      if (last > before || st?.data?.finish === true) return;
+    }
+  } catch {}
+}
+
 async function fetchPlayer(region, riotId, byKey) {
   const s = await findSummoner(region, riotId);
   if (!s) return { riotId, error: 'joueur introuvable sur op.gg' };
+  await renew(region, s);
   const [sum, most] = await Promise.all([
     // le résumé op.gg tombe parfois en erreur pour un compte : on lit alors le rang sur sa page op.gg
     getJson(`${BASE}/${region}/summoners/${s.summoner_id}/summary?hl=fr_FR`).catch(() => pageSummary(region, s)),
@@ -137,7 +159,7 @@ async function fetchPlayer(region, riotId, byKey) {
     .filter((c) => c.id && c.games > 0);
   const pool = all.filter((c) => c.share >= 1)
     .sort((a, b) => b.games - a.games);
-  return { riotId: `${d.game_name ?? s.game_name}#${String(d.tagline ?? s.tagline).replace(/\s+/g, '')}`, tier, rank, pool, all, total, level: d.level };
+  return { riotId: `${d.game_name ?? s.game_name}#${String(d.tagline ?? s.tagline).replace(/\s+/g, '')}`, asked: riotId, tier, rank, pool, all, total, level: d.level, updatedAt: d.updated_at ?? s.updated_at ?? null };
 }
 
 // Secours : rang Solo/Duo lu dans la description de la page op.gg du joueur
