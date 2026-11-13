@@ -1483,20 +1483,26 @@ function onLive(d) {
     const visible = members.filter((m) => m.riotId);
     const key = visible.map((m) => m.riotId).join(',');
     state.players[side] = members.map((m, k) => {
-      const old = state.players[side].find((p) => p.riotId && p.riotId === m.riotId);
+      const old = state.players[side].find((p) => p.riotId && (p.liveId ?? p.riotId) === m.riotId);
       return old ? { ...old, role: m.role ?? old.role } : { riotId: m.riotId ?? '', role: m.role ?? ROLES[k], pool: [], hidden: !m.riotId, error: m.riotId ? null : 'nom masqué (mode streamer) : estimé à l’elo moyen de la partie' };
     });
     if (key && key !== LIVE.loaded[side] && api.loadTeam) {
       LIVE.loaded[side] = key;
       api.loadTeam({ input: visible.map((m) => m.riotId).join(', '), region: (d.region || state.region || 'euw').toLowerCase() }).then((res) => {
-        if (!res || res.error || !LIVE.on) return;
-        for (const p of res.players ?? []) {
-          const m = visible.find((x) => x.riotId.toLowerCase().replace(/\s/g, '') === String(p.riotId).toLowerCase().replace(/\s/g, ''));
-          const k = state.players[side].findIndex((x) => x.riotId && m && x.riotId === m.riotId);
-          if (k >= 0) state.players[side][k] = { ...p, role: state.players[side][k].role };
-        }
+        // échec (op.gg lent ou en panne) : on réessaiera à la prochaine lecture du client
+        if (!res || res.error) { if (LIVE.loaded[side] === key) LIVE.loaded[side] = ''; return; }
+        if (!LIVE.on) return;
+        const norm = (x) => String(x).toLowerCase().replace(/\s/g, '');
+        (res.players ?? []).forEach((p, i) => {
+          // les joueurs reviennent dans l'ordre demandé : l'ordre suffit, même si op.gg renvoie un
+          // pseudo écrit autrement (tag changé, accent, majuscules)
+          const m = visible.find((x) => norm(x.riotId) === norm(p.riotId)) ?? visible[i];
+          const k = state.players[side].findIndex((x) => x.riotId && m && (x.liveId ?? x.riotId) === m.riotId);
+          // liveId : pseudo tel que le client l'écrit, pour retrouver le joueur aux lectures suivantes
+          if (k >= 0) state.players[side][k] = { ...p, liveId: m.riotId, role: state.players[side][k].role };
+        });
         render();
-      }).catch(() => {});
+      }).catch(() => { if (LIVE.loaded[side] === key) LIVE.loaded[side] = ''; });
     }
   }
   render();
@@ -1525,7 +1531,7 @@ function liveReco(d) {
   }).sort((p, q) => q.score - p.score);
   if (!all.length) { box.hidden = true; return; }
   // ton pool (op.gg) : tes champions jouables à cette lane, le meilleur en tête
-  const pl = playerFor(side, role) ?? state.players[side].find((p) => p.riotId && d.teams[side].find((m) => m.me)?.riotId === p.riotId);
+  const pl = playerFor(side, role) ?? state.players[side].find((p) => p.riotId && d.teams[side].find((m) => m.me)?.riotId === (p.liveId ?? p.riotId));
   const pe = (id) => pl?.pool?.find((e) => e.id === id);
   const mineRows = all.filter((x) => pe(x.c.id)?.games).slice(0, 4);
   const others = all.filter((x) => !mineRows.includes(x)).slice(0, mineRows.length ? 5 : 7);
