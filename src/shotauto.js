@@ -5,8 +5,13 @@
 // Aucun texte (pseudo) n'est lu.
 
 // ---------- 1-2. Repérage des cases ----------
+// Repérage à 760 px de large ; si rien n'est trouvé (capture plein écran d'un drafter : bandeaux fins,
+// illustrations sombres coupées en morceaux), nouvel essai à 1140 px où le cadre des bandeaux reste visible.
 export function detectSlots(img) {
-  const s = Math.min(1, 760 / img.width), w = Math.round(img.width * s), h = Math.round(img.height * s);
+  return detectAt(img, 760) ?? (img.width > 760 ? detectAt(img, 1140) : null);
+}
+function detectAt(img, target) {
+  const s = Math.min(1, target / img.width), w = Math.round(img.width * s), h = Math.round(img.height * s);
   const cv = Object.assign(document.createElement('canvas'), { width: w, height: h });
   const ctx = cv.getContext('2d', { willReadFrequently: true });
   ctx.imageSmoothingQuality = 'high'; ctx.drawImage(img, 0, 0, w, h);
@@ -93,12 +98,19 @@ export function detectSlots(img) {
           const dd = [];
           for (const x of halves) for (let k = 1; k < x.length; k++) dd.push(x[k][other] - x[k - 1][other]);
           const step = Math.min(...dd);
+          // case manquante : vers l'extérieur par défaut, sinon du côté (dans l'image) où il y a le plus de contenu
+          // (ex. bans d'un drafter : la 1re case de chaque équipe n'est pas toujours repérée)
           const teams = halves.map((x, t) => {
-            const pos = x.map((e) => e[other]);
-            while (pos.length < 5) t ? pos.push(pos[pos.length - 1] + step) : pos.unshift(pos[0] - step);
-            return pos.map((p) => mk(p, l));
+            const pos = x.map((e) => e[other]), m = 5 - pos.length;
+            const opts = Array.from({ length: m + 1 }, (_, k) => {
+              const nl = t ? k : m - k; // nombre de cases ajoutées avant (à gauche / en haut)
+              return [...Array.from({ length: nl }, (_, j) => pos[0] - (nl - j) * step), ...pos, ...Array.from({ length: m - nl }, (_, j) => pos[pos.length - 1] + (j + 1) * step)].map((p) => mk(p, l));
+            }).filter((o) => o.every(inside));
+            let best = opts[0] ?? null;
+            for (const o of opts) if (o.reduce((a, b) => a + cover(b), 0) > best.reduce((a, b) => a + cover(b), 0) + 0.05) best = o;
+            return best;
           });
-          if (teams.flat().every(inside)) res.push({ teams, score: sw * sh * l.length, seen: l.length });
+          if (teams.every(Boolean)) res.push({ teams, score: sw * sh * l.length, seen: l.length });
         }
         // deux lignes de 5 : on aligne les cases sur un pas régulier et on complète les manquantes
         const ok = L.filter((l) => l.length >= 3 && l.length <= 5);
@@ -128,7 +140,8 @@ export function detectSlots(img) {
     return res.sort((p, q) => q.score - p.score);
   };
   const S = structures(C);
-  const picks = S[0] ?? null;
+  // une rangée entièrement grisée, ce sont des bans (drafter) : jamais les picks
+  const picks = S.find((t) => !t.teams.flat().every((b) => grayness(b) < 0.2)) ?? null;
   // bans (drafters) : 10 petites cases grisées, hors des picks
   let bans = null;
   if (picks) {
@@ -151,15 +164,17 @@ const median = (a) => { const b = [...a].sort((x, y) => x - y); return b[b.lengt
 
 // ---------- 3. Bandeaux : comparaison avec les illustrations ----------
 // Recherche en 2 temps : en très petit sur toutes les illustrations (toutes tailles et positions),
-// puis plus finement autour des meilleures positions des 24 champions les plus proches.
+// puis plus finement autour des meilleures positions des 32 illustrations les plus proches (deux splashs par champion).
 const CW = 20, SCALES = Array.from({ length: 22 }, (_, k) => 0.22 * (0.95 / 0.22) ** (k / 21));
 let SPL = null;
 async function loadSplashes() {
   if (SPL) return SPL;
-  const data = (await import('./splashes.js')).default;
-  const list = await Promise.all(Object.entries(data).map(([id, b64]) => new Promise((res) => {
+  // deux références par champion : le splash Data Dragon et le splash actuel (CommunityDragon), car Data Dragon
+  // garde parfois l'ancienne illustration (ex. Nasus) alors que les drafters affichent la nouvelle
+  const sets = [(await import('./splashes.js')).default, (await import('./splashes-cd.js')).default];
+  const list = await Promise.all(sets.flatMap((data) => Object.entries(data).map(([id, b64]) => new Promise((res) => {
     const im = new Image(); im.onload = () => res({ id, im }); im.onerror = () => res(null); im.src = 'data:image/jpeg;base64,' + b64;
-  })));
+  }))));
   SPL = list.filter(Boolean);
   for (const sp of SPL) sp.coarse = SCALES.map((f) => pix(sp.im, 0, 0, sp.im.width, sp.im.height, Math.round(CW / f), Math.round((CW / f) * (sp.im.height / sp.im.width))));
   return SPL;
@@ -231,7 +246,7 @@ export async function matchBanner(img, box, exclude = new Set()) {
   coarse.sort((p, q) => q.c - p.c);
   const TW = 36, T2 = tmpl(pix(img, sx, sy, box.w, box.h, TW, Math.max(6, Math.round(TW * ratio))));
   const res = [];
-  for (const { sp, peaks } of coarse.slice(0, 24)) {
+  for (const { sp, peaks } of coarse.slice(0, 32)) {
     let best = -2;
     for (const pk of peaks) for (const kf of [0.92, 0.96, 1, 1.04, 1.08]) {
       const f = pk.f * kf, W = Math.round(TW / f), H = Math.round(W * (sp.im.height / sp.im.width));
@@ -243,5 +258,6 @@ export async function matchBanner(img, box, exclude = new Set()) {
     }
     res.push({ id: sp.id, c: best });
   }
-  return res.sort((p, q) => q.c - p.c).slice(0, 4).map((r) => r.id);
+  // meilleure des deux références par champion
+  return [...new Set(res.sort((p, q) => q.c - p.c).map((r) => r.id))].slice(0, 4);
 }
